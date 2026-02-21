@@ -9,31 +9,45 @@ document.addEventListener("DOMContentLoaded", () => {
   // Tab Switching Logic
   const genTabBtn = document.getElementById("nav-generation");
   const keysTabBtn = document.getElementById("nav-keys");
+  const galleryTabBtn = document.getElementById("nav-gallery"); // New: Gallery tab button
+
   const genContent = document.getElementById("tab-generation");
   const keysContent = document.getElementById("tab-keys");
+  const galleryContent = document.getElementById("tab-gallery"); // New: Gallery tab content
 
-  const switchTab = (tab: "generation" | "keys") => {
+  const switchTab = (tab: "generation" | "keys" | "gallery") => {
+    // Reset all
+    [genTabBtn, keysTabBtn, galleryTabBtn].forEach((btn) => {
+      btn?.classList.remove("text-primary", "border-b-2", "border-primary");
+      btn?.classList.add("text-text-secondary");
+    });
+    [genContent, keysContent, galleryContent].forEach((content) => {
+      content?.classList.add("hidden");
+    });
+
+    // Activate selected tab
     if (tab === "generation") {
       genTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
       genTabBtn?.classList.remove("text-text-secondary");
-      keysTabBtn?.classList.remove("text-primary", "border-b-2", "border-primary");
-      keysTabBtn?.classList.add("text-text-secondary");
-
       genContent?.classList.remove("hidden");
-      keysContent?.classList.add("hidden");
-    } else {
+    } else if (tab === "keys") {
       keysTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
       keysTabBtn?.classList.remove("text-text-secondary");
-      genTabBtn?.classList.remove("text-primary", "border-b-2", "border-primary");
-      genTabBtn?.classList.add("text-text-secondary");
-
       keysContent?.classList.remove("hidden");
-      genContent?.classList.add("hidden");
+    } else if (tab === "gallery") {
+      galleryTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
+      galleryTabBtn?.classList.remove("text-text-secondary");
+      galleryContent?.classList.remove("hidden");
+      window.dispatchEvent(new Event("gallery-opened")); // Dispatch event when gallery is opened
     }
   };
 
   genTabBtn?.addEventListener("click", () => switchTab("generation"));
   keysTabBtn?.addEventListener("click", () => switchTab("keys"));
+  galleryTabBtn?.addEventListener("click", () => switchTab("gallery")); // New: Gallery tab click listener
+
+  // Default to generation tab
+  switchTab("generation");
 
   // Global orchestration
   window.addEventListener("start-generation", async (e: Event) => {
@@ -84,7 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
         settings.variations,
       );
 
-      window.dispatchEvent(new CustomEvent("svgen-results", { detail: { svgs: results } }));
+      window.dispatchEvent(
+        new CustomEvent("svgen-results", { detail: { svgs: results, prompt, model } }),
+      );
       showAlert({ type: "success", message: "SVGs generated successfully" });
     } catch (error: any) {
       console.error("Generation failed:", error);

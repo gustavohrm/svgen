@@ -1,7 +1,10 @@
 import { showAlert } from "../../core/utils/alert";
+import { galleryDb, GalleryItem } from "../../core/modules/gallery-db/index";
 
 export class ResultsGrid extends HTMLElement {
   private svgs: string[] = [];
+  private currentPrompt: string = "";
+  private currentModel: string = "";
 
   constructor() {
     super();
@@ -12,8 +15,10 @@ export class ResultsGrid extends HTMLElement {
     this.attachEvents();
   }
 
-  setResults(svgs: string[]) {
+  setResults(svgs: string[], prompt: string, model: string) {
     this.svgs = svgs;
+    this.currentPrompt = prompt;
+    this.currentModel = model;
     this.render();
   }
 
@@ -47,6 +52,9 @@ export class ResultsGrid extends HTMLElement {
                 <button data-action="download" data-index="${i}" class="p-2 rounded hover:bg-surface text-text-secondary hover:text-text transition-colors cursor-pointer" title="Download SVG">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>
                 </button>
+                <button data-action="save-to-gallery" data-index="${i}" class="p-2 rounded hover:bg-surface text-text-secondary hover:text-text transition-colors cursor-pointer" title="Save to Gallery">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </button>
               </div>
             </div>
           </div>
@@ -72,13 +80,15 @@ export class ResultsGrid extends HTMLElement {
     window.addEventListener("svgen-results", (e: Event) => {
       const customEvent = e as CustomEvent;
       if (customEvent.detail?.svgs) {
-        this.setResults(customEvent.detail.svgs);
+        this.setResults(customEvent.detail.svgs, customEvent.detail.prompt, customEvent.detail.model);
       }
     });
 
     // Also clear results on start
     window.addEventListener("generation-started", () => {
       this.svgs = [];
+      this.currentPrompt = "";
+      this.currentModel = "";
       this.render();
 
       // Render a loading skeleton
@@ -127,6 +137,34 @@ export class ResultsGrid extends HTMLElement {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+      });
+    });
+
+    this.querySelectorAll("button[data-action='save-to-gallery']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const index = parseInt((btn as HTMLButtonElement).dataset.index || "0");
+        const svgContent = this.svgs[index];
+
+        if (!svgContent) {
+          showAlert({ type: "error", message: "No SVG content to save." });
+          return;
+        }
+
+        const galleryItem: GalleryItem = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          svg: svgContent,
+          prompt: this.currentPrompt,
+          model: this.currentModel,
+          timestamp: Date.now(),
+        };
+
+        try {
+          await galleryDb.saveSvg(galleryItem);
+          showAlert({ type: "success", message: "SVG saved to gallery!" });
+        } catch (error) {
+          console.error("Failed to save SVG to gallery:", error);
+          showAlert({ type: "error", message: "Failed to save SVG to gallery." });
+        }
       });
     });
   }
