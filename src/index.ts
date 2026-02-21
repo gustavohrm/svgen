@@ -6,26 +6,69 @@ import { showAlert } from "./core/utils/alert";
 import { getProvider } from "./core/services/ai/providers/index";
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Tab Switching Logic
+  const genTabBtn = document.getElementById("nav-generation");
+  const keysTabBtn = document.getElementById("nav-keys");
+  const genContent = document.getElementById("tab-generation");
+  const keysContent = document.getElementById("tab-keys");
+
+  const switchTab = (tab: "generation" | "keys") => {
+    if (tab === "generation") {
+      genTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
+      genTabBtn?.classList.remove("text-text-secondary");
+      keysTabBtn?.classList.remove("text-primary", "border-b-2", "border-primary");
+      keysTabBtn?.classList.add("text-text-secondary");
+
+      genContent?.classList.remove("hidden");
+      keysContent?.classList.add("hidden");
+    } else {
+      keysTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
+      keysTabBtn?.classList.remove("text-text-secondary");
+      genTabBtn?.classList.remove("text-primary", "border-b-2", "border-primary");
+      genTabBtn?.classList.add("text-text-secondary");
+
+      keysContent?.classList.remove("hidden");
+      genContent?.classList.add("hidden");
+    }
+  };
+
+  genTabBtn?.addEventListener("click", () => switchTab("generation"));
+  keysTabBtn?.addEventListener("click", () => switchTab("keys"));
+
   // Global orchestration
   window.addEventListener("start-generation", async (e: Event) => {
     const customEvent = e as CustomEvent;
-    const { prompt, referenceSvgs } = customEvent.detail;
+    const { prompt, referenceSvgs, model } = customEvent.detail;
 
     // Check if configuration exists
     const settings = db.getSettings();
-    const providerId = settings.selectedProvider;
-    const provider = getProvider(providerId);
+    const activeKey = settings.apiKeys.find((k) => k.id === settings.activeKeyId);
 
-    if (
-      provider &&
-      provider.configFields.some((f) => f.id === "apiKey") &&
-      !settings.apiKeys?.[providerId]
-    ) {
+    if (!activeKey) {
       showAlert({
         type: "error",
-        message: `Please configure your ${provider.name} API key in settings`,
+        message: "Please configure and select an API key in the API Keys tab.",
       });
-      window.dispatchEvent(new Event("open-settings"));
+      switchTab("keys");
+      return;
+    }
+
+    if (!model) {
+      showAlert({
+        type: "error",
+        message: "Please select a model to generate with.",
+      });
+      return;
+    }
+
+    const providerId = activeKey.providerId;
+    const provider = getProvider(providerId);
+
+    if (!provider) {
+      showAlert({
+        type: "error",
+        message: `Provider ${providerId} not found`,
+      });
       return;
     }
 
@@ -36,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
         {
           prompt,
           referenceSvgs,
-          model: settings.selectedModel,
+          model,
         },
         settings.variations,
       );
@@ -55,4 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
       window.dispatchEvent(new Event("generation-finished"));
     }
   });
+
+  // Export globally for components to trigger re-renders or switches
+  (window as any).switchTab = switchTab;
 });

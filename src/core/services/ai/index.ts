@@ -24,18 +24,17 @@ Requirements:
 
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
     const settings = db.getSettings();
-    const providerId = settings.selectedProvider;
+    const activeKey = settings.apiKeys.find((k) => k.id === settings.activeKeyId);
 
+    if (!activeKey) {
+      throw new Error("No active API key selected. Please configure one in settings.");
+    }
+
+    const providerId = activeKey.providerId;
     const provider = getProvider(providerId);
     if (!provider) {
       throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
-
-    const apiKey = settings.apiKeys?.[providerId];
-    if (!apiKey)
-      throw new Error(
-        `API key for provider '${provider.name}' is missing. Please set it in settings.`,
-      );
 
     const systemPrompt = this.buildSystemPrompt(options.referenceSvgs);
 
@@ -43,7 +42,7 @@ Requirements:
       prompt: options.prompt,
       systemPrompt,
       model: options.model,
-      apiKey,
+      apiKey: activeKey.value,
     });
   },
 

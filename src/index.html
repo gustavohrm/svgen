@@ -8,13 +8,48 @@
     <link rel="stylesheet" href="./ui/main.css" />
     <script type="module" src="./index.ts"></script>
   </head>
-  <body class="bg-background text-text font-sans antialiased">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <generator-controls></generator-controls>
-      <results-grid></results-grid>
-    </div>
+  <body class="bg-background text-text font-sans antialiased min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <nav class="bg-surface border-b border-border sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center h-16 justify-between">
+          <div class="flex items-center h-full">
+            <h1
+              class="text-xl font-bold bg-linear-to-r from-primary to-accent bg-clip-text text-transparent mr-8"
+            >
+              SVGen
+            </h1>
+            <div class="flex space-x-4 h-full">
+              <button
+                id="nav-generation"
+                class="h-full px-3 text-sm font-medium border-b-2 border-primary text-primary transition-colors cursor-pointer focus:outline-none"
+              >
+                Generation
+              </button>
+              <button
+                id="nav-keys"
+                class="h-full px-3 text-sm font-medium border-b-2 border-transparent text-text-secondary hover:text-text transition-colors cursor-pointer focus:outline-none"
+              >
+                API Keys
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
 
-    <!-- Hidden Modals -->
-    <settings-modal></settings-modal>
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Generation Tab -->
+      <div id="tab-generation" class="space-y-6">
+        <generator-controls></generator-controls>
+        <results-grid></results-grid>
+      </div>
+
+      <!-- API Keys Tab -->
+      <div id="tab-keys" class="hidden space-y-6">
+        <api-keys-manager></api-keys-manager>
+      </div>
+    </main>
   </body>
 </html>
