@@ -1,26 +1,14 @@
-import { AiProvider, GenerateOptions } from "../../../types/index";
+import { AiProvider, ProviderGenerateOptions } from "../../../types/index";
 
 export class GoogleCloudProvider implements AiProvider {
-  async generate(options: GenerateOptions): Promise<string> {
-    const { prompt, referenceSvgs, model, apiKey } = options;
+  id = "gcp";
+  name = "Google Cloud (Gemini)";
+
+  async generate(options: ProviderGenerateOptions): Promise<string> {
+    const { prompt, systemPrompt, model, apiKey } = options;
 
     if (!apiKey) {
       throw new Error("GCP (Gemini) API key is required");
-    }
-
-    let systemPrompt = `You are an expert SVG designer. Your only job is to return valid, clean SVG code based on the user's request.
-Requirements:
-1. ONLY return the SVG code, nothing else.
-2. NO markdown formatting, NO backticks.
-3. Use Tailwind colors (hex/rgb) or semantic colors.
-4. Make sure the SVG is self-contained.
-5. viewBox is preferred over fixed width/height.`;
-
-    if (referenceSvgs && referenceSvgs.length > 0) {
-      systemPrompt += `\n\nReference SVGs are provided below to guide the style or structure:\n`;
-      referenceSvgs.forEach((svg, index) => {
-        systemPrompt += `\n--- Reference ${index + 1} ---\n${svg}\n--------------------\n`;
-      });
     }
 
     const payload = {
@@ -53,14 +41,14 @@ Requirements:
 
     const data = await res.json();
     const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return this.extractSvg(result);
+    return this.extractResult(result);
   }
 
-  private extractSvg(text: string): string {
-    const svgStart = text.indexOf("<svg");
-    const svgEnd = text.lastIndexOf("</svg>");
-    if (svgStart !== -1 && svgEnd !== -1) {
-      return text.substring(svgStart, svgEnd + 6);
+  private extractResult(text: string): string {
+    const start = text.indexOf("<svg");
+    const end = text.lastIndexOf("</svg>");
+    if (start !== -1 && end !== -1) {
+      return text.substring(start, end + 6);
     }
     return text;
   }

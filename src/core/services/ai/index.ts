@@ -1,31 +1,56 @@
-import { OpenRouterProvider } from "./providers/open-router";
-import { GoogleCloudProvider } from "./providers/google-cloud";
+import { getProvider } from "./providers/index";
 import { GenerateOptions } from "../../types/index";
 import { db } from "../../modules/db/index";
 
 export const aiService = {
+  buildSystemPrompt(referenceSvgs?: string[]): string {
+    let systemPrompt = `You are an expert SVG designer. Your only job is to return valid, clean SVG code based on the user's request.
+Requirements:
+1. ONLY return the SVG code, nothing else.
+2. NO markdown formatting, NO backticks.
+3. Use Tailwind colors (hex/rgb) or semantic colors.
+4. Make sure the SVG is self-contained.
+5. viewBox is preferred over fixed width/height.`;
+
+    if (referenceSvgs && referenceSvgs.length > 0) {
+      systemPrompt += `\n\nReference SVGs are provided below to guide the style or structure:\n`;
+      referenceSvgs.forEach((svg, index) => {
+        systemPrompt += `\n--- Reference ${index + 1} ---\n${svg}\n--------------------\n`;
+      });
+    }
+
+    return systemPrompt;
+  },
+
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
     const settings = db.getSettings();
-    let apiKey = "";
+    const providerId = settings.selectedProvider;
 
-    if (settings.selectedProvider === "openrouter") {
-      apiKey = settings.openRouterKey;
-      if (!apiKey) throw new Error("OpenRouter API key is missing. Please set it in settings.");
-      const provider = new OpenRouterProvider();
-      return provider.generate({ ...options, apiKey });
-    } else {
-      apiKey = settings.gcpKey;
-      if (!apiKey) throw new Error("GCP (Gemini) API key is missing. Please set it in settings.");
-      const provider = new GoogleCloudProvider();
-      return provider.generate({ ...options, apiKey });
+    let apiKey = providerId === "openrouter" ? settings.openRouterKey : settings.gcpKey;
+    if (!apiKey)
+      throw new Error(
+        `API key for provider '${providerId}' is missing. Please set it in settings.`,
+      );
+
+    const provider = getProvider(providerId);
+    if (!provider) {
+      throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
+
+    const systemPrompt = this.buildSystemPrompt(options.referenceSvgs);
+
+    return provider.generate({
+      prompt: options.prompt,
+      systemPrompt,
+      model: options.model,
+      apiKey,
+    });
   },
 
   async generateMultiple(
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
   ): Promise<string[]> {
-    // Generate them in parallel
     const promises = Array.from({ length: count }).map(() => this.generate(options));
     return Promise.all(promises);
   },

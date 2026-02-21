@@ -1,10 +1,19 @@
-export interface GenerateOptions {
+export interface ProviderGenerateOptions {
   prompt: string;
-  referenceSvgs?: string[];
+  systemPrompt: string;
   model: string;
   apiKey: string;
 }
 
 export interface AiProvider {
-  generate(options: GenerateOptions): Promise<string>;
+  id: string;
+  name: string;
+  generate(options: ProviderGenerateOptions): Promise<string>;
+}
+
+export interface GenerateOptions {
+  prompt: string;
+  referenceSvgs?: string[];
+  model: string;
+  apiKey: string;
 }
