@@ -1,5 +1,6 @@
 import { db } from "../../core/modules/db/index";
 import { showAlert } from "../../core/utils/alert";
+import { providers, getProvider } from "../../core/services/ai/providers/index";
 
 export class SettingsModal extends HTMLElement {
   constructor() {
@@ -11,31 +12,37 @@ export class SettingsModal extends HTMLElement {
     this.attachEvents();
   }
 
-  async fetchModels(provider: "openrouter" | "gcp", apiKey: string): Promise<string[]> {
-    try {
-      if (provider === "openrouter") {
-        const res = await fetch("https://openrouter.ai/api/v1/models");
-        if (!res.ok) throw new Error("Failed to fetch OpenRouter models");
-        const data = await res.json();
-        return data.data.map((m: any) => m.id);
-      } else {
-        if (!apiKey) return [];
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-        );
-        if (!res.ok) throw new Error("Failed to fetch GCP models");
-        const data = await res.json();
-        return data.models.map((m: any) => m.name.replace("models/", ""));
-      }
-    } catch (e) {
-      console.error(e);
-      return [];
-    }
-  }
-
   render() {
     const settings = db.getSettings();
-    const isGcp = settings.selectedProvider === "gcp";
+    const providerId = settings.selectedProvider || providers[0]?.id;
+
+    const providerOptions = providers
+      .map(
+        (p) =>
+          `<option value="${p.id}" ${p.id === providerId ? "selected" : ""}>${p.name}</option>`,
+      )
+      .join("");
+
+    const configGroups = providers
+      .map((p) => {
+        const isHidden = p.id !== providerId;
+        const apiKeyValue = settings.apiKeys?.[p.id] || "";
+        return `
+        <div id="config-group-${p.id}" class="config-group ${isHidden ? "hidden" : ""}">
+          ${p.configFields
+            .map(
+              (field) => `
+            <div class="mb-3">
+              <label class="block text-sm font-medium mb-1">${field.label}</label>
+              <input type="${field.type}" id="config-${p.id}-${field.id}" value="${field.id === "apiKey" ? apiKeyValue : ""}" data-provider="${p.id}" data-field="${field.id}" class="w-full bg-surface border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-text placeholder-text-secondary provider-input" placeholder="${field.placeholder}" />
+            </div>
+          `,
+            )
+            .join("")}
+        </div>
+      `;
+      })
+      .join("");
 
     this.innerHTML = `
       <div id="settings-backdrop" class="fixed inset-0 bg-neutral-950/50 hidden z-40 items-center justify-center backdrop-blur-sm transition-opacity">
@@ -51,19 +58,12 @@ export class SettingsModal extends HTMLElement {
             <div>
               <label class="block text-sm font-medium mb-1">Provider</label>
               <select id="provider-select" class="w-full bg-surface border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer text-text">
-                <option value="openrouter" ${!isGcp ? "selected" : ""}>OpenRouter</option>
-                <option value="gcp" ${isGcp ? "selected" : ""}>Google Cloud (Gemini)</option>
+                ${providerOptions}
               </select>
             </div>
 
-            <div id="openrouter-key-group" class="${isGcp ? "hidden" : ""}">
-              <label class="block text-sm font-medium mb-1">OpenRouter API Key</label>
-              <input type="password" id="openrouter-key" value="${settings.openRouterKey}" class="w-full bg-surface border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-text placeholder-text-secondary" placeholder="sk-or-v1-..." />
-            </div>
-
-            <div id="gcp-key-group" class="${!isGcp ? "hidden" : ""}">
-              <label class="block text-sm font-medium mb-1">GCP API Key</label>
-              <input type="password" id="gcp-key" value="${settings.gcpKey}" class="w-full bg-surface border border-border rounded-lg px-3 py-2 outline-none focus:border-primary focus:ring-1 focus:ring-primary text-text placeholder-text-secondary" placeholder="AIzaSy..." />
+            <div id="dynamic-config-container">
+              ${configGroups}
             </div>
 
             <div>
@@ -90,21 +90,27 @@ export class SettingsModal extends HTMLElement {
     const closeBtn = this.querySelector("#close-settings")!;
     const providerSelect = this.querySelector("#provider-select") as HTMLSelectElement;
     const modelSelect = this.querySelector("#model-select") as HTMLSelectElement;
-    const openRouterGroup = this.querySelector("#openrouter-key-group")!;
-    const gcpGroup = this.querySelector("#gcp-key-group")!;
-    const openRouterKey = this.querySelector("#openrouter-key") as HTMLInputElement;
-    const gcpKey = this.querySelector("#gcp-key") as HTMLInputElement;
     const saveBtn = this.querySelector("#save-settings")!;
     const modelLoading = this.querySelector("#model-loading")!;
+    const configGroups = this.querySelectorAll(".config-group");
+    const providerInputs = this.querySelectorAll(".provider-input");
+
+    const getApiKeyForProvider = (providerId: string) => {
+      const input = this.querySelector(`#config-${providerId}-apiKey`) as HTMLInputElement;
+      return input ? input.value : "";
+    };
 
     const loadDynamicModels = async () => {
-      const provider = providerSelect.value as "openrouter" | "gcp";
-      const key = provider === "openrouter" ? openRouterKey.value : gcpKey.value;
+      const providerId = providerSelect.value;
+      const key = getApiKeyForProvider(providerId);
+
+      const provider = getProvider(providerId);
+      if (!provider) return;
 
       modelLoading.classList.remove("hidden");
       modelSelect.disabled = true;
 
-      const models = await this.fetchModels(provider, key);
+      const models = await provider.fetchModels(key);
 
       modelLoading.classList.add("hidden");
       modelSelect.disabled = false;
@@ -120,10 +126,9 @@ export class SettingsModal extends HTMLElement {
           .map((m) => `<option value="${m}" ${m === selectedModel ? "selected" : ""}>${m}</option>`)
           .join("");
       } else {
-        modelSelect.innerHTML =
-          provider === "gcp" && !key
-            ? `<option value="">Requires valid API Key</option>`
-            : `<option value="">No models found</option>`;
+        modelSelect.innerHTML = !key
+          ? `<option value="">Requires valid API Key</option>`
+          : `<option value="">No models found</option>`;
       }
     };
 
@@ -140,35 +145,46 @@ export class SettingsModal extends HTMLElement {
 
     providerSelect.addEventListener("change", (e) => {
       const target = e.target as HTMLSelectElement;
-      const isGcp = target.value === "gcp";
+      const providerId = target.value;
 
-      if (isGcp) {
-        gcpGroup.classList.remove("hidden");
-        openRouterGroup.classList.add("hidden");
-      } else {
-        openRouterGroup.classList.remove("hidden");
-        gcpGroup.classList.add("hidden");
-      }
+      configGroups.forEach((group) => {
+        if (group.id === `config-group-${providerId}`) {
+          group.classList.remove("hidden");
+        } else {
+          group.classList.add("hidden");
+        }
+      });
 
       loadDynamicModels();
     });
 
-    // Handle key changes
     let timeout: ReturnType<typeof setTimeout>;
     const onKeyInput = () => {
       clearTimeout(timeout);
       timeout = setTimeout(loadDynamicModels, 500);
     };
 
-    openRouterKey.addEventListener("input", onKeyInput);
-    gcpKey.addEventListener("input", onKeyInput);
+    providerInputs.forEach((input) => {
+      input.addEventListener("input", onKeyInput);
+    });
 
     saveBtn.addEventListener("click", () => {
+      const settings = db.getSettings();
+      const apiKeys = { ...settings.apiKeys };
+
+      providerInputs.forEach((el) => {
+        const input = el as HTMLInputElement;
+        const pId = input.dataset.provider;
+        const fId = input.dataset.field;
+        if (pId && fId === "apiKey") {
+          apiKeys[pId] = input.value;
+        }
+      });
+
       db.saveSettings({
-        selectedProvider: providerSelect.value as "openrouter" | "gcp",
+        selectedProvider: providerSelect.value,
         selectedModel: modelSelect.value,
-        openRouterKey: openRouterKey.value,
-        gcpKey: gcpKey.value,
+        apiKeys,
       });
 
       showAlert({ type: "success", message: "Settings saved successfully" });

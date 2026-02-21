@@ -1,14 +1,12 @@
 export interface AppSettings {
-  openRouterKey: string;
-  gcpKey: string;
-  selectedProvider: "openrouter" | "gcp";
+  apiKeys: Record<string, string>;
+  selectedProvider: string;
   selectedModel: string;
   variations: number;
 }
 
 const defaultSettings: AppSettings = {
-  openRouterKey: "",
-  gcpKey: "",
+  apiKeys: {},
   selectedProvider: "openrouter",
   selectedModel: "anthropic/claude-3.5-sonnet",
   variations: 1,
@@ -19,7 +17,20 @@ export const db = {
     const saved = localStorage.getItem("svgen_settings");
     if (saved) {
       try {
-        return { ...defaultSettings, ...JSON.parse(saved) };
+        const parsed = JSON.parse(saved);
+        if (parsed.openRouterKey || parsed.gcpKey) {
+          parsed.apiKeys = parsed.apiKeys || {};
+          if (parsed.openRouterKey) {
+            parsed.apiKeys["openrouter"] = parsed.openRouterKey;
+            delete parsed.openRouterKey;
+          }
+          if (parsed.gcpKey) {
+            parsed.apiKeys["gcp"] = parsed.gcpKey;
+            delete parsed.gcpKey;
+          }
+          localStorage.setItem("svgen_settings", JSON.stringify(parsed));
+        }
+        return { ...defaultSettings, ...parsed };
       } catch (e) {
         return defaultSettings;
       }

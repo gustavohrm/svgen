@@ -26,16 +26,16 @@ Requirements:
     const settings = db.getSettings();
     const providerId = settings.selectedProvider;
 
-    let apiKey = providerId === "openrouter" ? settings.openRouterKey : settings.gcpKey;
-    if (!apiKey)
-      throw new Error(
-        `API key for provider '${providerId}' is missing. Please set it in settings.`,
-      );
-
     const provider = getProvider(providerId);
     if (!provider) {
       throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
+
+    const apiKey = settings.apiKeys?.[providerId];
+    if (!apiKey)
+      throw new Error(
+        `API key for provider '${provider.name}' is missing. Please set it in settings.`,
+      );
 
     const systemPrompt = this.buildSystemPrompt(options.referenceSvgs);
 

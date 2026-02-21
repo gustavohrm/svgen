@@ -3,6 +3,8 @@ import { aiService } from "./core/services/ai/index";
 import { db } from "./core/modules/db/index";
 import { showAlert } from "./core/utils/alert";
 
+import { getProvider } from "./core/services/ai/providers/index";
+
 document.addEventListener("DOMContentLoaded", () => {
   // Global orchestration
   window.addEventListener("start-generation", async (e: Event) => {
@@ -11,13 +13,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Check if configuration exists
     const settings = db.getSettings();
-    if (settings.selectedProvider === "openrouter" && !settings.openRouterKey) {
-      showAlert({ type: "error", message: "Please configure your OpenRouter API key in settings" });
-      window.dispatchEvent(new Event("open-settings"));
-      return;
-    }
-    if (settings.selectedProvider === "gcp" && !settings.gcpKey) {
-      showAlert({ type: "error", message: "Please configure your GCP API key in settings" });
+    const providerId = settings.selectedProvider;
+    const provider = getProvider(providerId);
+
+    if (
+      provider &&
+      provider.configFields.some((f) => f.id === "apiKey") &&
+      !settings.apiKeys?.[providerId]
+    ) {
+      showAlert({
+        type: "error",
+        message: `Please configure your ${provider.name} API key in settings`,
+      });
       window.dispatchEvent(new Event("open-settings"));
       return;
     }

@@ -1,8 +1,32 @@
-import { AiProvider, ProviderGenerateOptions } from "../../../types/index";
+import { AiProvider, ProviderGenerateOptions, ProviderConfigField } from "../../../types/index";
 
 export class GoogleCloudProvider implements AiProvider {
   id = "gcp";
   name = "Google Cloud (Gemini)";
+
+  configFields: ProviderConfigField[] = [
+    {
+      id: "apiKey",
+      label: "GCP API Key",
+      placeholder: "AIzaSy...",
+      type: "password",
+    },
+  ];
+
+  async fetchModels(apiKey: string): Promise<string[]> {
+    if (!apiKey) return [];
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      );
+      if (!res.ok) throw new Error("Failed to fetch GCP models");
+      const data = await res.json();
+      return data.models.map((m: any) => m.name.replace("models/", ""));
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  }
 
   async generate(options: ProviderGenerateOptions): Promise<string> {
     const { prompt, systemPrompt, model, apiKey } = options;

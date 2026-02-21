@@ -1,8 +1,29 @@
-import { AiProvider, ProviderGenerateOptions } from "../../../types/index";
+import { AiProvider, ProviderGenerateOptions, ProviderConfigField } from "../../../types/index";
 
 export class OpenRouterProvider implements AiProvider {
   id = "openrouter";
   name = "OpenRouter";
+
+  configFields: ProviderConfigField[] = [
+    {
+      id: "apiKey",
+      label: "OpenRouter API Key",
+      placeholder: "sk-or-v1-...",
+      type: "password",
+    },
+  ];
+
+  async fetchModels(): Promise<string[]> {
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/models");
+      if (!res.ok) throw new Error("Failed to fetch OpenRouter models");
+      const data = await res.json();
+      return data.data.map((m: any) => m.id);
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  }
 
   async generate(options: ProviderGenerateOptions): Promise<string> {
     const { prompt, systemPrompt, model, apiKey } = options;
