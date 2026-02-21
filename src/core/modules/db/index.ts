@@ -5,6 +5,7 @@ export interface ApiKeyItem {
   value: string;
   createdAt: number;
   selectedModels: string[]; // List of models the user wants to see for this key
+  availableModels?: string[]; // All fetched models for this key
 }
 
 export interface AppSettings {

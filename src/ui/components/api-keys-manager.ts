@@ -18,6 +18,12 @@ export class ApiKeysManager extends HTMLElement {
   }
 
   render() {
+    // Capture scroll positions of model lists
+    const scrollPositions: { [id: string]: number } = {};
+    this.querySelectorAll('[id^="models-list-"]').forEach((el) => {
+      scrollPositions[el.id] = el.scrollTop;
+    });
+
     const settings = db.getSettings();
     const activeKeyId = settings.activeKeyId;
 
@@ -76,27 +82,43 @@ export class ApiKeysManager extends HTMLElement {
               <div class="mt-2 pt-2 border-t border-border/50">
                 <div class="flex justify-between items-center mb-2">
                    <h4 class="text-xs font-semibold uppercase text-text-secondary">Enabled Models</h4>
-                   <button data-action="fetch-models" data-key-id="${key.id}" class="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 1 0 2.81-6.53L2 9"></path></svg>
-                     Refresh Models
-                   </button>
+                   <div class="flex items-center gap-3">
+                     <button data-action="select-all" data-key-id="${key.id}" class="text-xs text-text-secondary hover:text-text cursor-pointer transition-colors" title="Select All Models">
+                       Select All
+                     </button>
+                     <button data-action="deselect-all" data-key-id="${key.id}" class="text-xs text-text-secondary hover:text-text cursor-pointer transition-colors" title="Deselect All Models">
+                       Deselect All
+                     </button>
+                     <button data-action="fetch-models" data-key-id="${key.id}" class="text-xs text-primary hover:underline cursor-pointer flex items-center gap-1">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"></path><path d="M3 12a9 9 0 1 0 2.81-6.53L2 9"></path></svg>
+                       Refresh Models
+                     </button>
+                   </div>
                 </div>
                 
                 <div id="models-list-${key.id}" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                  ${
-                    key.selectedModels && key.selectedModels.length > 0
-                      ? key.selectedModels
-                          .map(
-                            (m) => `
-                      <label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-surface/50 p-1.5 rounded truncate">
-                        <input type="checkbox" data-key-id="${key.id}" value="${m}" checked class="rounded border-border text-primary focus:ring-primary cursor-pointer model-checkbox">
-                        <span class="truncate" title="${m}">${m}</span>
-                      </label>
-                    `,
-                          )
-                          .join("")
-                      : `<div class="text-xs text-text-secondary col-span-full">No models available. Click refresh to load.</div>`
-                  }
+                  ${(() => {
+                    const listToRender =
+                      key.availableModels && key.availableModels.length > 0
+                        ? key.availableModels
+                        : key.selectedModels || [];
+
+                    if (listToRender.length > 0) {
+                      return listToRender
+                        .map((m) => {
+                          const isChecked = key.selectedModels.includes(m);
+                          return `
+                          <label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-surface/50 p-1.5 rounded truncate">
+                            <input type="checkbox" data-key-id="${key.id}" value="${m}" ${isChecked ? "checked" : ""} class="rounded border-border text-primary focus:ring-primary cursor-pointer model-checkbox">
+                            <span class="truncate" title="${m}">${m}</span>
+                          </label>
+                        `;
+                        })
+                        .join("");
+                    } else {
+                      return `<div class="text-xs text-text-secondary col-span-full">No models available. Click refresh to load.</div>`;
+                    }
+                  })()}
                 </div>
               </div>
             </div>
@@ -141,6 +163,14 @@ export class ApiKeysManager extends HTMLElement {
     `;
 
     this.innerHTML = content;
+
+    // Restore scroll positions
+    Object.keys(scrollPositions).forEach((id) => {
+      const el = this.querySelector(`#${id}`);
+      if (el) {
+        el.scrollTop = scrollPositions[id];
+      }
+    });
   }
 
   attachEvents() {
@@ -202,6 +232,45 @@ export class ApiKeysManager extends HTMLElement {
       });
     });
 
+    // Deselect All Models
+    const deselectButtons = this.querySelectorAll('[data-action="deselect-all"]');
+    deselectButtons.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const keyId = target.dataset.keyId;
+        const settings = db.getSettings();
+        const keyIndex = settings.apiKeys.findIndex((k) => k.id === keyId);
+
+        if (keyIndex !== -1) {
+          settings.apiKeys[keyIndex].selectedModels = [];
+          db.saveSettings({ apiKeys: settings.apiKeys });
+          this.render();
+          this.attachEvents();
+          window.dispatchEvent(new Event("settings-updated"));
+        }
+      });
+    });
+
+    // Select All Models
+    const selectAllButtons = this.querySelectorAll('[data-action="select-all"]');
+    selectAllButtons.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const keyId = target.dataset.keyId;
+        const settings = db.getSettings();
+        const keyIndex = settings.apiKeys.findIndex((k) => k.id === keyId);
+
+        if (keyIndex !== -1) {
+          const key = settings.apiKeys[keyIndex];
+          key.selectedModels = [...(key.availableModels || [])];
+          db.saveSettings({ apiKeys: settings.apiKeys });
+          this.render();
+          this.attachEvents();
+          window.dispatchEvent(new Event("settings-updated"));
+        }
+      });
+    });
+
     // Fetch Models
     const fetchButtons = this.querySelectorAll('[data-action="fetch-models"]');
     fetchButtons.forEach((btn) => {
@@ -224,8 +293,17 @@ export class ApiKeysManager extends HTMLElement {
             try {
               const models = await provider.fetchModels(key.value);
               if (models.length > 0) {
-                // Select all by default when fresh
-                key.selectedModels = models;
+                const isFirstFetch = !key.availableModels || key.availableModels.length === 0;
+                key.availableModels = models;
+
+                if (isFirstFetch) {
+                  // Select all by default when fresh
+                  key.selectedModels = models;
+                } else {
+                  // Keep only models that still exist in the new list
+                  key.selectedModels = key.selectedModels.filter((m) => models.includes(m));
+                }
+
                 db.saveSettings({ apiKeys: settings.apiKeys });
                 showAlert({
                   type: "success",
