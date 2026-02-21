@@ -38,12 +38,12 @@
 @layer base {
   html,
   body {
-    @apply flex flex-col min-h-screen overflow-x-hidden bg-background font-default text-text;
+    @apply flex flex-col min-h-screen overflow-x-hidden bg-background text-text;
   }
 
   button,
   a {
-    @apply not-disabled:cur-pointer;
+    @apply not-disabled:cursor-pointer;
   }
 
   img {
