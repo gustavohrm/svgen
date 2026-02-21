@@ -13,12 +13,25 @@ export class OpenRouterProvider implements AiProvider {
     },
   ];
 
-  async fetchModels(): Promise<string[]> {
+  async fetchModels(apiKey: string): Promise<string[]> {
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/models");
+      const res = await fetch("https://openrouter.ai/api/v1/models", {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
       if (!res.ok) throw new Error("Failed to fetch OpenRouter models");
       const data = await res.json();
-      return data.data.map((m: any) => m.id);
+      // Filter for models that likely support text/chat
+      // OpenRouter models usually have 'id'. Some might be image models (like dall-e-3).
+      // We can filter out known image models or check for specific properties.
+      return data.data
+        .filter((m: any) => {
+          const id = m.id.toLowerCase();
+          // Exclude known image-only models
+          return !id.includes("dall-e") && !id.includes("stable-diffusion") && !id.includes("flux");
+        })
+        .map((m: any) => m.id);
     } catch (e) {
       console.error(e);
       return [];

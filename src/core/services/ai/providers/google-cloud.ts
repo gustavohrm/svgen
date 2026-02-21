@@ -21,7 +21,10 @@ export class GoogleCloudProvider implements AiProvider {
       );
       if (!res.ok) throw new Error("Failed to fetch GCP models");
       const data = await res.json();
-      return data.models.map((m: any) => m.name.replace("models/", ""));
+      // Only include models that support generateContent (text/chat models)
+      return data.models
+        .filter((m: any) => m.supportedGenerationMethods.includes("generateContent"))
+        .map((m: any) => m.name.replace("models/", ""));
     } catch (e) {
       console.error(e);
       return [];
