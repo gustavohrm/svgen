@@ -6,40 +6,38 @@
 
     <title>SVGen AI</title>
     <link rel="stylesheet" href="./ui/main.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
     <script type="module" src="./index.ts"></script>
   </head>
   <body class="bg-background text-text font-sans antialiased min-h-screen flex flex-col">
     <!-- Navbar -->
     <nav class="bg-surface border-b border-border sticky top-0 z-30">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto px-6">
         <div class="flex items-center h-16 justify-between">
-          <div class="flex items-center h-full">
-            <h1
-              class="text-xl font-bold bg-linear-to-r from-primary to-accent bg-clip-text text-transparent mr-8"
-            >
-              SVGen
-            </h1>
-            <div class="flex space-x-4 h-full">
-              <button
-                id="nav-generation"
-                class="h-full px-3 text-sm font-medium border-b-2 border-primary text-primary transition-colors cursor-pointer focus:outline-none"
-              >
-                Generation
-              </button>
-              <button
-                id="nav-keys"
-                class="h-full px-3 text-sm font-medium border-b-2 border-transparent text-text-secondary hover:text-text transition-colors cursor-pointer focus:outline-none"
-              >
-                API Keys
-              </button>
-              <button
-                id="nav-gallery"
-                class="h-full px-3 text-sm font-medium border-b-2 border-transparent text-text-secondary hover:text-text transition-colors cursor-pointer focus:outline-none"
-              >
-                Gallery
-              </button>
+          <div class="flex items-center gap-4">
+            <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <i data-lucide="zap" class="w-5 h-5 text-white"></i>
             </div>
+            <h1 class="text-lg font-semibold tracking-tight text-text leading-none">SVGen</h1>
           </div>
+
+          <div class="flex items-center gap-2">
+            <button id="nav-generation" class="nav-item">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Generation</span>
+            </button>
+            <button id="nav-keys" class="nav-item">
+              <i data-lucide="key" class="w-4 h-4"></i>
+              <span>API Keys</span>
+            </button>
+            <button id="nav-gallery" class="nav-item">
+              <i data-lucide="images" class="w-4 h-4"></i>
+              <span>Gallery</span>
+            </button>
+          </div>
+
+          <div class="w-32 hidden md:block"></div>
+          <!-- Spacer for symmetry if needed -->
         </div>
       </div>
     </nav>

@@ -36,10 +36,11 @@ Requirements:
 
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
     const settings = this.db.getSettings();
-    const activeKey = settings.apiKeys.find((k) => k.id === settings.activeKeyId);
+    const activeKeyId = settings.activeKeys[options.providerId];
+    const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
 
     if (!activeKey) {
-      throw new Error("No active API key selected. Please configure one in settings.");
+      throw new Error(`No active API key selected for provider. Please configure one in settings.`);
     }
 
     const providerId = activeKey.providerId;

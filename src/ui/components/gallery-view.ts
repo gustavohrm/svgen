@@ -25,31 +25,36 @@ export class GalleryView extends HTMLElement {
   render() {
     let svgGrid = "";
     if (this.svgs.length === 0) {
-      svgGrid = `<p class="text-text-secondary text-center mt-8">Your gallery is empty. Generate some SVGs first!</p>`;
+      svgGrid = `
+        <div class="flex flex-col items-center justify-center py-24 bg-surface-hover/10 rounded-2xl border border-dashed border-border transition-all">
+          <i data-lucide="image-off" class="w-12 h-12 text-text-muted/20 mb-4"></i>
+          <p class="text-sm font-medium text-text-muted uppercase tracking-widest">Gallery is currently empty</p>
+        </div>
+      `;
     } else {
-      svgGrid = `<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">`;
+      svgGrid = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">`;
       this.svgs.forEach((item) => {
         svgGrid += `
-          <div class="bg-surface rounded-lg border border-border shadow-sm overflow-hidden flex flex-col">
-            <div class="p-4 border-b border-border">
-                <p class="text-sm font-medium text-text-primary mb-1">${item.prompt}</p>
-                <p class="text-xs text-text-secondary">Generated on: ${new Date(item.timestamp).toLocaleDateString()}</p>
+          <div class="card group hover:border-primary/40 transition-all duration-300">
+            <div class="px-5 py-3 border-b border-border bg-surface-hover/20">
+                <p class="text-[10px] font-bold text-text-muted truncate uppercase tracking-wider" title="${item.prompt}">${item.prompt || "Generated Artwork"}</p>
             </div>
-            <div class="flex-1 flex items-center justify-center p-4 bg-background">
-              <div class="w-full h-32 flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-md p-2">
-                ${item.svg}
+            <div class="flex-1 flex items-center justify-center p-8 bg-surface-hover/5 relative min-h-[220px]">
+                ${item.svg.replace(/<svg\b([^>]*)>/i, '<svg class="max-h-32 w-full drop-shadow-2xl" $1>')}
+            </div>
+            <div class="px-5 py-3 bg-surface border-t border-border flex justify-between items-center gap-2">
+              <span class="text-[9px] font-bold text-text-muted uppercase tracking-widest">${new Date(item.timestamp).toLocaleDateString()}</span>
+              <div class="flex gap-1.5">
+                <button data-action="copy-svg" data-id="${item.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Copy SVG">
+                   <i data-lucide="copy" class="w-4 h-4"></i>
+                </button>
+                <button data-action="download-svg" data-id="${item.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Download SVG">
+                   <i data-lucide="download" class="w-4 h-4"></i>
+                </button>
+                <button data-action="delete-svg" data-id="${item.id}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all" title="Delete">
+                   <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
               </div>
-            </div>
-            <div class="p-4 bg-surface flex justify-end gap-2">
-              <button data-action="copy-svg" data-id="${item.id}" class="text-xs bg-primary text-primary-contrast px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity cursor-pointer">
-                Copy
-              </button>
-              <button data-action="download-svg" data-id="${item.id}" class="text-xs bg-accent text-primary-contrast px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity cursor-pointer">
-                Download
-              </button>
-              <button data-action="delete-svg" data-id="${item.id}" class="text-xs bg-red-500 text-primary-contrast px-3 py-1.5 rounded-md hover:opacity-90 transition-opacity cursor-pointer">
-                Delete
-              </button>
             </div>
           </div>
         `;
@@ -58,12 +63,21 @@ export class GalleryView extends HTMLElement {
     }
 
     this.innerHTML = `
-      <div class="bg-surface rounded-xl p-6 border border-border shadow-sm mb-6">
-        <h2 class="text-xl font-bold mb-4">SVG Gallery</h2>
-        <p class="text-text-secondary text-sm mb-6">Your collection of generated SVG images.</p>
+      <div class="max-w-7xl mx-auto py-12 px-6">
+        <div class="flex items-center justify-between mb-10">
+            <h2 class="text-2xl font-semibold text-text tracking-tight">Gallery</h2>
+            <div class="text-[10px] font-bold text-text-muted uppercase tracking-widest">${this.svgs.length} Artifacts</div>
+        </div>
         ${svgGrid}
       </div>
     `;
+
+    // Initialize icons
+    // @ts-ignore
+    if (typeof lucide !== "undefined") {
+      // @ts-ignore
+      lucide.createIcons();
+    }
   }
 
   attachEvents() {

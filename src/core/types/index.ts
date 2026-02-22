@@ -26,5 +26,6 @@ export interface GenerateOptions {
   prompt: string;
   referenceSvgs?: string[];
   model: string;
+  providerId: AiProviderId;
   apiKey: string;
 }

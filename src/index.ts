@@ -9,6 +9,13 @@ const providerRegistry = createDefaultProviderRegistry();
 const aiService = createAiService(db, providerRegistry);
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Initialize icons
+  // @ts-ignore
+  if (typeof lucide !== "undefined") {
+    // @ts-ignore
+    lucide.createIcons();
+  }
+
   // Tab Switching Logic
   const genTabBtn = document.getElementById("nav-generation");
   const keysTabBtn = document.getElementById("nav-keys");
@@ -21,8 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const switchTab = (tab: "generation" | "keys" | "gallery") => {
     // Reset all
     [genTabBtn, keysTabBtn, galleryTabBtn].forEach((btn) => {
-      btn?.classList.remove("text-primary", "border-b-2", "border-primary");
-      btn?.classList.add("text-text-secondary");
+      btn?.classList.remove("active");
     });
     [genContent, keysContent, galleryContent].forEach((content) => {
       content?.classList.add("hidden");
@@ -30,18 +36,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Activate selected tab
     if (tab === "generation") {
-      genTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
-      genTabBtn?.classList.remove("text-text-secondary");
+      genTabBtn?.classList.add("active");
       genContent?.classList.remove("hidden");
     } else if (tab === "keys") {
-      keysTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
-      keysTabBtn?.classList.remove("text-text-secondary");
+      keysTabBtn?.classList.add("active");
       keysContent?.classList.remove("hidden");
     } else if (tab === "gallery") {
-      galleryTabBtn?.classList.add("text-primary", "border-b-2", "border-primary");
-      galleryTabBtn?.classList.remove("text-text-secondary");
+      galleryTabBtn?.classList.add("active");
       galleryContent?.classList.remove("hidden");
-      window.dispatchEvent(new Event("gallery-opened")); // Dispatch event when gallery is opened
+      window.dispatchEvent(new Event("gallery-opened"));
     }
   };
 
@@ -55,22 +58,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Global orchestration
   window.addEventListener("start-generation", async (e: Event) => {
     const customEvent = e as CustomEvent;
-    const { prompt, referenceSvgs, model } = customEvent.detail;
+    const { prompt, referenceSvgs, model, providerId } = customEvent.detail;
 
-    // Check if configuration exists
-    const settings = db.getSettings();
-    const activeKey = settings.apiKeys.find((k) => k.id === settings.activeKeyId);
-
-    if (!activeKey) {
-      showAlert({
-        type: "error",
-        message: "Please configure and select an API key in the API Keys tab.",
-      });
-      switchTab("keys");
-      return;
-    }
-
-    if (!model) {
+    if (!model || !providerId) {
       showAlert({
         type: "error",
         message: "Please select a model to generate with.",
@@ -78,7 +68,20 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const providerId = activeKey.providerId;
+    // Check if configuration exists
+    const settings = db.getSettings();
+    const activeKeyId = settings.activeKeys[providerId];
+    const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
+
+    if (!activeKey) {
+      showAlert({
+        type: "error",
+        message: `Please configure and select an API key for the chosen provider in the API Keys tab.`,
+      });
+      switchTab("keys");
+      return;
+    }
+
     const provider = providerRegistry.getProvider(providerId);
 
     if (!provider) {
@@ -97,8 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
           prompt,
           referenceSvgs,
           model,
+          providerId,
         },
-        settings.variations,
+        4, // Fixed at 4 variations
       );
 
       window.dispatchEvent(

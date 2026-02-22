@@ -12,13 +12,13 @@ export interface ApiKeyItem {
 
 export interface AppSettings {
   apiKeys: ApiKeyItem[];
-  activeKeyId: string | null;
+  activeKeys: Record<string, string>; // Add providerId -> active keyId mapping
   variations: number;
 }
 
 const defaultSettings: AppSettings = {
   apiKeys: [],
-  activeKeyId: null,
+  activeKeys: {},
   variations: 1,
 };
 
@@ -88,13 +88,26 @@ export const db = {
 
         const merged = { ...defaultSettings, ...parsed };
 
-        // Ensure activeKeyId is valid
-        if (
-          merged.apiKeys.length > 0 &&
-          (!merged.activeKeyId ||
-            !merged.apiKeys.find((k: ApiKeyItem) => k.id === merged.activeKeyId))
-        ) {
-          merged.activeKeyId = merged.apiKeys[0].id;
+        if (!merged.activeKeys) {
+          merged.activeKeys = {};
+        }
+
+        // Migrate older activeKeyId if it exists
+        if ((parsed as any).activeKeyId) {
+          const oldActiveKey = merged.apiKeys.find(
+            (k: ApiKeyItem) => k.id === (parsed as any).activeKeyId,
+          );
+          if (oldActiveKey) {
+            merged.activeKeys[oldActiveKey.providerId] = oldActiveKey.id;
+          }
+          delete (merged as any).activeKeyId;
+        }
+
+        // Auto-assign first key for any provider that doesn't have an active one
+        for (const key of merged.apiKeys) {
+          if (!merged.activeKeys[key.providerId]) {
+            merged.activeKeys[key.providerId] = key.id;
+          }
         }
 
         return merged;

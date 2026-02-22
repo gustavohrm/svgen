@@ -7,10 +7,10 @@ interface AlertOptions {
 }
 
 const alertColors = {
-  success: "bg-success text-success-contrast",
-  error: "bg-error text-error-contrast",
-  warning: "bg-warning text-warning-contrast",
-  info: "bg-info text-info-contrast",
+  success: "bg-emerald-500 text-white",
+  error: "bg-rose-500 text-white",
+  warning: "bg-amber-500 text-white",
+  info: "bg-primary text-white",
 };
 
 function getOrCreateContainer(): HTMLDivElement {
@@ -18,7 +18,7 @@ function getOrCreateContainer(): HTMLDivElement {
   if (!container) {
     container = document.createElement("div");
     container.id = "global-alert-container";
-    container.className = "fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none";
+    container.className = "fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none";
     document.body.appendChild(container);
   }
   return container;
@@ -28,7 +28,7 @@ function createAlertElement(options: AlertOptions): HTMLDivElement {
   const div = document.createElement("div");
 
   let classes =
-    "px-4 py-2 rounded-lg shadow-lg text-neutral-50 text-base font-medium transition duration-400 pointer-events-auto min-w-40 ";
+    "px-6 py-4 rounded-xl border-4 border-neutral-900 text-sm font-black uppercase tracking-widest pointer-events-auto min-w-[300px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ";
 
   classes += alertColors[options.type];
 
