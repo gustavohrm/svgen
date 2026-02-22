@@ -1,4 +1,9 @@
-import { AiProvider, ProviderGenerateOptions, ProviderConfigField, AiProviderId } from "../../../types/index";
+import {
+  AiProvider,
+  ProviderGenerateOptions,
+  ProviderConfigField,
+  AiProviderId,
+} from "../../../types/index";
 
 export class GoogleCloudProvider implements AiProvider {
   id: AiProviderId = "gcp";

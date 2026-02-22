@@ -66,11 +66,13 @@ describe("GoogleCloudProvider", () => {
   });
 
   it("should throw error if no API key is provided", async () => {
-    await expect(provider.generate({
-      prompt: "test",
-      systemPrompt: "test",
-      model: "test",
-      apiKey: "",
-    })).rejects.toThrow("GCP (Gemini) API key is required");
+    await expect(
+      provider.generate({
+        prompt: "test",
+        systemPrompt: "test",
+        model: "test",
+        apiKey: "",
+      }),
+    ).rejects.toThrow("GCP (Gemini) API key is required");
   });
 });

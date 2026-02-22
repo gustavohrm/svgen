@@ -10,7 +10,7 @@ describe("db module", () => {
   it("should return default settings when localStorage is empty", () => {
     const settings = db.getSettings();
     expect(settings.apiKeys).toEqual([]);
-    expect(settings.activeKeyId).toBeNull();
+    expect(settings.activeKeys).toEqual({});
     expect(settings.variations).toBe(1);
   });
 
@@ -34,7 +34,7 @@ describe("db module", () => {
 
     expect(retrieved.apiKeys.length).toBe(1);
     expect(retrieved.apiKeys[0].name).toBe("Test Key");
-    expect(retrieved.activeKeyId).toBe("1");
+    expect(retrieved.activeKeys["gcp"]).toBe("1");
   });
 
   it("should partial update settings", () => {
@@ -42,10 +42,10 @@ describe("db module", () => {
     let settings = db.getSettings();
     expect(settings.variations).toBe(3);
 
-    db.saveSettings({ activeKeyId: "some-id" });
+    db.saveSettings({ activeKeys: { gcp: "some-id" } });
     settings = db.getSettings();
     expect(settings.variations).toBe(3);
-    expect(settings.activeKeyId).toBe("some-id");
+    expect(settings.activeKeys["gcp"]).toBe("some-id");
   });
 
   it("should auto-select first key if none active", () => {
@@ -57,9 +57,9 @@ describe("db module", () => {
       createdAt: Date.now(),
       selectedModels: [],
     };
-    
+
     db.saveSettings({ apiKeys: [key] });
     const settings = db.getSettings();
-    expect(settings.activeKeyId).toBe("123");
+    expect(settings.activeKeys["open-router"]).toBe("123");
   });
 });

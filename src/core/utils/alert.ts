@@ -6,13 +6,6 @@ interface AlertOptions {
   duration?: number;
 }
 
-const alertColors = {
-  success: "bg-emerald-500 text-white",
-  error: "bg-rose-500 text-white",
-  warning: "bg-amber-500 text-white",
-  info: "bg-primary text-white",
-};
-
 function getOrCreateContainer(): HTMLDivElement {
   let container = document.getElementById("global-alert-container") as HTMLDivElement;
   if (!container) {
@@ -28,9 +21,16 @@ function createAlertElement(options: AlertOptions): HTMLDivElement {
   const div = document.createElement("div");
 
   let classes =
-    "px-6 py-4 rounded-xl border-4 border-neutral-900 text-sm font-black uppercase tracking-widest pointer-events-auto min-w-[300px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ";
+    "px-4 py-3 rounded-lg border border-border text-sm font-medium pointer-events-auto min-w-[280px] shadow-lg flex items-center transition-all ";
 
-  classes += alertColors[options.type];
+  const themeColors = {
+    success: "bg-surface text-emerald-500 border-emerald-500/20",
+    error: "bg-surface text-rose-500 border-rose-500/20",
+    warning: "bg-surface text-amber-500 border-amber-500/20",
+    info: "bg-surface text-primary border-primary/20",
+  };
+
+  classes += themeColors[options.type];
 
   div.className = classes;
   div.textContent = options.message;

@@ -20,7 +20,7 @@ describe("AiService", () => {
     mockDb = {
       getSettings: vi.fn().mockReturnValue({
         apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
-        activeKeyId: "key1",
+        activeKeys: { gcp: "key1" },
         variations: 1,
       }),
     };
@@ -47,6 +47,7 @@ describe("AiService", () => {
     const options: Omit<GenerateOptions, "apiKey"> = {
       prompt: "draw a circle",
       model: "gemini-pro",
+      providerId: "gcp",
     };
 
     const result = await service.generate(options);
@@ -65,6 +66,7 @@ describe("AiService", () => {
     const options: Omit<GenerateOptions, "apiKey"> = {
       prompt: "draw a circle",
       model: "gemini-pro",
+      providerId: "gcp",
     };
 
     const results = await service.generateMultiple(options, 2);
@@ -78,17 +80,19 @@ describe("AiService", () => {
   it("should throw error if no active key", async () => {
     (mockDb.getSettings as any).mockReturnValue({
       apiKeys: [],
-      activeKeyId: null,
+      activeKeys: {},
     });
 
-    await expect(service.generate({ prompt: "test", model: "test" }))
-      .rejects.toThrow("No active API key selected");
+    await expect(
+      service.generate({ prompt: "test", model: "test", providerId: "gcp" }),
+    ).rejects.toThrow("No active API key selected");
   });
 
   it("should throw error if provider not found", async () => {
     (mockProviderRegistry.getProvider as any).mockReturnValue(undefined);
 
-    await expect(service.generate({ prompt: "test", model: "test" }))
-      .rejects.toThrow("Provider implementation for 'gcp' not found");
+    await expect(
+      service.generate({ prompt: "test", model: "test", providerId: "gcp" }),
+    ).rejects.toThrow("Provider implementation for 'gcp' not found");
   });
 });

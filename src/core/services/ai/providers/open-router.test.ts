@@ -66,11 +66,13 @@ describe("OpenRouterProvider", () => {
       text: () => Promise.resolve("API Down"),
     });
 
-    await expect(provider.generate({
-      prompt: "test",
-      systemPrompt: "test",
-      model: "test",
-      apiKey: "test",
-    })).rejects.toThrow("OpenRouter API error: 500 Internal Server Error - API Down");
+    await expect(
+      provider.generate({
+        prompt: "test",
+        systemPrompt: "test",
+        model: "test",
+        apiKey: "test",
+      }),
+    ).rejects.toThrow("OpenRouter API error: 500 Internal Server Error - API Down");
   });
 });

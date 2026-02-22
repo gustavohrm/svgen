@@ -1,4 +1,9 @@
-import { AiProvider, ProviderGenerateOptions, ProviderConfigField, AiProviderId } from "../../../types/index";
+import {
+  AiProvider,
+  ProviderGenerateOptions,
+  ProviderConfigField,
+  AiProviderId,
+} from "../../../types/index";
 
 export class OpenRouterProvider implements AiProvider {
   id: AiProviderId = "open-router";
