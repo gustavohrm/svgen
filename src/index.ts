@@ -1,9 +1,12 @@
 import "./ui/components/index";
-import { aiService } from "./core/services/ai/index";
+import { createAiService } from "./core/services/ai/index";
+import { createDefaultProviderRegistry } from "./core/services/ai/providers/index";
 import { db } from "./core/modules/db/index";
 import { showAlert } from "./core/utils/alert";
 
-import { getProvider } from "./core/services/ai/providers/index";
+// Dependency Injection Setup
+const providerRegistry = createDefaultProviderRegistry();
+const aiService = createAiService(db, providerRegistry);
 
 document.addEventListener("DOMContentLoaded", () => {
   // Tab Switching Logic
@@ -76,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const providerId = activeKey.providerId;
-    const provider = getProvider(providerId);
+    const provider = providerRegistry.getProvider(providerId);
 
     if (!provider) {
       showAlert({
@@ -117,4 +120,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Export globally for components to trigger re-renders or switches
   (window as any).switchTab = switchTab;
+  // Export registry globally so components can use it (temporary until full DI in components)
+  (window as any).providerRegistry = providerRegistry;
 });

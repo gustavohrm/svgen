@@ -1,3 +1,5 @@
+export type AiProviderId = "open-router" | "gcp";
+
 export interface ProviderGenerateOptions {
   prompt: string;
   systemPrompt: string;
@@ -13,7 +15,7 @@ export interface ProviderConfigField {
 }
 
 export interface AiProvider {
-  id: string;
+  id: AiProviderId;
   name: string;
   configFields: ProviderConfigField[];
   generate(options: ProviderGenerateOptions): Promise<string>;

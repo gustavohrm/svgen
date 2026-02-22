@@ -1,8 +1,20 @@
-import { getProvider } from "./providers/index";
-import { GenerateOptions } from "../../types/index";
-import { db } from "../../modules/db/index";
+import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
+import { AppSettings } from "../../modules/db/index";
 
-export const aiService = {
+export interface Database {
+  getSettings(): AppSettings;
+}
+
+export interface ProviderRegistry {
+  getProvider(id: AiProviderId): AiProvider | undefined;
+}
+
+export class AiService {
+  constructor(
+    private readonly db: Database,
+    private readonly providerRegistry: ProviderRegistry,
+  ) {}
+
   buildSystemPrompt(referenceSvgs?: string[]): string {
     let systemPrompt = `You are an expert SVG designer. Your only job is to return valid, clean SVG code based on the user's request.
 Requirements:
@@ -20,10 +32,10 @@ Requirements:
     }
 
     return systemPrompt;
-  },
+  }
 
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
-    const settings = db.getSettings();
+    const settings = this.db.getSettings();
     const activeKey = settings.apiKeys.find((k) => k.id === settings.activeKeyId);
 
     if (!activeKey) {
@@ -31,7 +43,7 @@ Requirements:
     }
 
     const providerId = activeKey.providerId;
-    const provider = getProvider(providerId);
+    const provider = this.providerRegistry.getProvider(providerId);
     if (!provider) {
       throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
@@ -44,7 +56,7 @@ Requirements:
       model: options.model,
       apiKey: activeKey.value,
     });
-  },
+  }
 
   async generateMultiple(
     options: Omit<GenerateOptions, "apiKey">,
@@ -52,5 +64,12 @@ Requirements:
   ): Promise<string[]> {
     const promises = Array.from({ length: count }).map(() => this.generate(options));
     return Promise.all(promises);
-  },
-};
+  }
+}
+
+/**
+ * Factory function to create an instance of AiService
+ */
+export function createAiService(db: Database, providerRegistry: ProviderRegistry): AiService {
+  return new AiService(db, providerRegistry);
+}

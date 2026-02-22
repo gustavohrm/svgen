@@ -1,6 +1,9 @@
 import { db, ApiKeyItem } from "../../core/modules/db/index";
-import { providers, getProvider } from "../../core/services/ai/providers/index";
+import { createDefaultProviderRegistry } from "../../core/services/ai/providers/index";
 import { showAlert } from "../../core/utils/alert";
+import { AiProviderId } from "../../core/types/index";
+
+const providerRegistry = createDefaultProviderRegistry();
 
 export class ApiKeysManager extends HTMLElement {
   constructor() {
@@ -36,7 +39,7 @@ export class ApiKeysManager extends HTMLElement {
     `;
 
     // Render each provider
-    providers.forEach((provider) => {
+    providerRegistry.getAllProviders().forEach((provider) => {
       const providerKeys = settings.apiKeys.filter((k) => k.providerId === provider.id);
 
       content += `
@@ -282,7 +285,7 @@ export class ApiKeysManager extends HTMLElement {
 
         if (keyIndex !== -1) {
           const key = settings.apiKeys[keyIndex];
-          const provider = getProvider(key.providerId);
+          const provider = providerRegistry.getProvider(key.providerId);
           if (provider) {
             // UI feedback
             const originalHtml = target.innerHTML;
@@ -341,8 +344,8 @@ export class ApiKeysManager extends HTMLElement {
     addKeyButtons.forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const target = e.currentTarget as HTMLElement;
-        const providerId = target.dataset.provider;
-        const provider = getProvider(providerId!);
+        const providerId = target.dataset.provider as AiProviderId;
+        const provider = providerRegistry.getProvider(providerId);
         if (provider) {
           modalTitle.textContent = `Add ${provider.name} Key`;
           modalProviderId.value = provider.id;
@@ -360,7 +363,7 @@ export class ApiKeysManager extends HTMLElement {
     });
 
     saveNewKeyBtn.addEventListener("click", async () => {
-      const pId = modalProviderId.value;
+      const pId = modalProviderId.value as AiProviderId;
       const name = modalKeyName.value.trim();
       const value = modalKeyValue.value.trim();
 

@@ -1,13 +1,31 @@
 import { OpenRouterProvider } from "./open-router";
 import { GoogleCloudProvider } from "./google-cloud";
-import { AiProvider } from "../../../types/index";
+import { AiProvider, AiProviderId } from "../../../types/index";
+import { ProviderRegistry } from "../index";
 
-// Export the array of all available AI providers
-export const providers: AiProvider[] = [new OpenRouterProvider(), new GoogleCloudProvider()];
+export class AiProviderRegistry implements ProviderRegistry {
+  private providersMap: Map<AiProviderId, AiProvider> = new Map();
 
-// Helper to find a specific provider
-export function getProvider(id: string): AiProvider | undefined {
-  return providers.find((p) => p.id === id);
+  constructor(providersList: AiProvider[]) {
+    providersList.forEach((provider) => {
+      this.providersMap.set(provider.id, provider);
+    });
+  }
+
+  getProvider(id: AiProviderId): AiProvider | undefined {
+    return this.providersMap.get(id);
+  }
+
+  getAllProviders(): AiProvider[] {
+    return Array.from(this.providersMap.values());
+  }
+}
+
+/**
+ * Factory function to create the default provider registry
+ */
+export function createDefaultProviderRegistry(): AiProviderRegistry {
+  return new AiProviderRegistry([new OpenRouterProvider(), new GoogleCloudProvider()]);
 }
 
 // Re-export specific classes if needed by consumers

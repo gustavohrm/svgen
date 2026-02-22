@@ -19,7 +19,7 @@ describe("db module", () => {
       apiKeys: [
         {
           id: "1",
-          providerId: "test",
+          providerId: "gcp" as const,
           name: "Test Key",
           value: "secret",
           createdAt: Date.now(),
@@ -51,7 +51,7 @@ describe("db module", () => {
   it("should auto-select first key if none active", () => {
     const key = {
       id: "123",
-      providerId: "p1",
+      providerId: "open-router" as const,
       name: "Key 1",
       value: "v1",
       createdAt: Date.now(),

@@ -1,6 +1,8 @@
+import { AiProviderId } from "../../types/index";
+
 export interface ApiKeyItem {
   id: string; // unique identifier (e.g., timestamp or uuid)
-  providerId: string;
+  providerId: AiProviderId;
   name: string;
   value: string;
   createdAt: number;
@@ -36,8 +38,9 @@ export const db = {
             parsed.apiKeys = [];
             // Migrate from Record<string, string> -> Array<ApiKeyItem>
             if (oldRecord && typeof oldRecord === "object") {
-              for (const [providerId, value] of Object.entries<string>(oldRecord)) {
+              for (const [pId, value] of Object.entries<string>(oldRecord)) {
                 if (value && typeof value === "string") {
+                  const providerId = (pId === "openrouter" ? "open-router" : pId) as AiProviderId;
                   parsed.apiKeys.push({
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                     providerId,
@@ -59,9 +62,10 @@ export const db = {
           const oldRecord = parsed.apiKeys as any;
           const newApiKeys: ApiKeyItem[] = [];
 
-          for (const [providerId, value] of Object.entries<string>(oldRecord)) {
+          for (const [pId, value] of Object.entries<string>(oldRecord)) {
             if (value && typeof value === "string") {
               const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+              const providerId = (pId === "openrouter" ? "open-router" : pId) as AiProviderId;
               newApiKeys.push({
                 id,
                 providerId,
@@ -70,7 +74,7 @@ export const db = {
                 createdAt: Date.now(),
                 selectedModels: [],
               });
-              if (parsed.selectedProvider === providerId) {
+              if (parsed.selectedProvider === pId) {
                 parsed.activeKeyId = id;
               }
             }

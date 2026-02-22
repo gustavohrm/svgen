@@ -1,4 +1,3 @@
-import { db } from "../../core/modules/db/index";
 import { galleryDb, GalleryItem } from "../../core/modules/gallery-db/index";
 import { showAlert } from "../../core/utils/alert";
 
