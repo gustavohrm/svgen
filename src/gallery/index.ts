@@ -1,6 +1,7 @@
 import "../ui/components/app-header";
 import { galleryDb, GalleryItem } from "../core/modules/gallery-db/index";
 import { showAlert } from "../core/utils/alert";
+import { renderSvgCard, attachSvgCardEvents } from "../core/utils/svg-card";
 
 const container = document.getElementById("gallery-container");
 
@@ -31,30 +32,20 @@ function renderGallery(svgs: GalleryItem[]) {
   } else {
     svgGrid = `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">`;
     svgs.forEach((item) => {
-      svgGrid += `
-        <div class="flex flex-col bg-transparent border border-border/50 rounded-xl overflow-hidden hover:border-border transition-all hover:bg-surface-hover/5">
-          <div class="flex-1 flex items-center justify-center p-8 relative min-h-[220px]">
-              ${item.svg.replace(/<svg\b([^>]*)>/i, '<svg class="max-h-32 w-full" $1>')}
-          </div>
-          <div class="px-5 py-4 border-t border-border/50 flex flex-col gap-3">
-            <p class="text-sm font-medium text-text truncate" title="${item.prompt}">${item.prompt || "Generated Artwork"}</p>
-            <div class="flex justify-between items-center">
-              <span class="text-xs text-text-muted">${new Date(item.timestamp).toLocaleDateString()}</span>
-              <div class="flex gap-1">
-                <button data-action="copy-svg" data-id="${item.id}" class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Copy SVG">
-                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                </button>
-                <button data-action="download-svg" data-id="${item.id}" class="p-1.5 rounded-md text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Download SVG">
-                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                </button>
-                <button data-action="delete-svg" data-id="${item.id}" class="p-1.5 rounded-md text-text-secondary hover:text-error hover:bg-error/10 transition-all" title="Delete">
-                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
+      svgGrid += renderSvgCard({
+        svg: item.svg,
+        cardId: item.id,
+        label: item.prompt || "Generated Artwork",
+        sublabel: new Date(item.timestamp).toLocaleDateString(),
+        extraActions: [
+          {
+            id: "delete-svg",
+            icon: "trash",
+            title: "Delete",
+            hoverClass: "hover:text-error hover:bg-error/10",
+          },
+        ],
+      });
     });
     svgGrid += `</div>`;
   }
@@ -64,50 +55,27 @@ function renderGallery(svgs: GalleryItem[]) {
 
 function attachEvents(svgs: GalleryItem[]) {
   if (!container) return;
-  container.querySelectorAll('[data-action="copy-svg"]').forEach((button) => {
-    button.addEventListener("click", async (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.id;
-      const svgItem = svgs.find((s) => s.id === id);
-      if (svgItem) {
-        try {
-          await navigator.clipboard.writeText(svgItem.svg);
-          showAlert({ type: "success", message: "SVG copied to clipboard!" });
-        } catch (err) {
-          showAlert({ type: "error", message: "Failed to copy SVG." });
-          console.error("Failed to copy SVG:", err);
+
+  const svgResolver = (cardId: string): string | undefined => {
+    const item = svgs.find((s) => s.id === cardId);
+    return item?.svg;
+  };
+
+  attachSvgCardEvents(container, svgResolver, [
+    {
+      actionId: "delete-svg",
+      handler: async (cardId: string) => {
+        if (confirm("Are you sure you want to delete this SVG?")) {
+          await galleryDb.deleteSvg(cardId);
+          showAlert({
+            type: "success",
+            message: "SVG deleted from gallery.",
+          });
+          loadGallery();
         }
-      }
-    });
-  });
-
-  container.querySelectorAll('[data-action="download-svg"]').forEach((button) => {
-    button.addEventListener("click", (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.id;
-      const svgItem = svgs.find((s) => s.id === id);
-      if (svgItem) {
-        const blob = new Blob([svgItem.svg], { type: "image/svg+xml" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `svgen-gallery-${svgItem.id}.svg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    });
-  });
-
-  container.querySelectorAll('[data-action="delete-svg"]').forEach((button) => {
-    button.addEventListener("click", async (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.id;
-      if (id && confirm("Are you sure you want to delete this SVG?")) {
-        await galleryDb.deleteSvg(id);
-        showAlert({ type: "success", message: "SVG deleted from gallery." });
-        loadGallery(); // Reload and re-render the gallery
-      }
-    });
-  });
+      },
+    },
+  ]);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

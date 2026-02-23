@@ -4,6 +4,7 @@ import { createDefaultProviderRegistry } from "./core/services/ai/providers/inde
 import { db } from "./core/modules/db/index";
 import { galleryDb, GalleryItem } from "./core/modules/gallery-db/index";
 import { showAlert } from "./core/utils/alert";
+import { renderSvgCard, renderSvgCardSkeleton, attachSvgCardEvents } from "./core/utils/svg-card";
 
 // Dependency Injection Setup
 const providerRegistry = createDefaultProviderRegistry();
@@ -378,14 +379,6 @@ let currentSvgs: string[] = [];
 let currentPrompt: string = "";
 let currentModel: string = "";
 
-// Ensures dangerous SVG payloads are visually somewhat contained
-function sanitizeSvgDisplay(rawSvg: string): string {
-  return rawSvg.replace(
-    /<svg\b([^>]*)>/i,
-    '<svg class="w-full h-full max-h-56 drop-shadow-xl" $1>',
-  );
-}
-
 function renderResults() {
   if (!resultsContainer) return;
 
@@ -401,31 +394,22 @@ function renderResults() {
   resultsContainer.classList.remove("hidden");
 
   resultsInner.innerHTML = currentSvgs
-    .map(
-      (svgCode, i) => `
-        <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border">
-          <div class="p-8 flex-1 min-h-[280px] flex items-center justify-center relative">
-            ${sanitizeSvgDisplay(svgCode)}
-          </div>
-          
-          <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
-            <span class="text-sm font-medium text-text">Variation ${i + 1}</span>
-            <div class="flex gap-1">
-              <button data-action="copy" data-index="${i}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Copy SVG">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-copy"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-              </button>
-              <button data-action="download" data-index="${i}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Download SVG">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-              </button>
-              <button data-action="save-to-gallery" data-index="${i}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Save to Gallery">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-heart"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.54 4.07 3 5.5l7 7Z"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      `,
+    .map((svgCode, i) =>
+      renderSvgCard({
+        svg: svgCode,
+        cardId: `result-${i}`,
+        label: `Variation ${i + 1}`,
+        extraActions: [
+          {
+            id: "save-to-gallery",
+            icon: "heart",
+            title: "Save to Gallery",
+          },
+        ],
+      }),
     )
     .join("");
+
   attachResultsEvents();
 }
 
@@ -435,86 +419,52 @@ function renderResultsSkeleton() {
   if (!resultsInner) return;
 
   resultsContainer.classList.remove("hidden");
-  // Render a loading skeleton
+
   resultsInner.innerHTML = Array.from({ length: 4 })
-    .map(
-      () => `
-        <div class="bg-transparent border border-border/50 rounded-xl overflow-hidden transition-all h-[340px] animate-pulse flex flex-col">
-          <div class="flex-1"></div>
-          <div class="p-5 flex items-center justify-between border-t border-border/50">
-            <div class="h-2 w-16 bg-surface-hover/40 rounded-full"></div>
-            <div class="flex gap-1">
-              <div class="h-8 w-8 bg-surface-hover/40 rounded-lg"></div>
-              <div class="h-8 w-8 bg-surface-hover/40 rounded-lg"></div>
-              <div class="h-8 w-8 bg-surface-hover/40 rounded-lg"></div>
-            </div>
-          </div>
-        </div>
-      `,
-    )
+    .map(() => renderSvgCardSkeleton())
     .join("");
+}
+
+function resolveSvgByCardId(cardId: string): string | undefined {
+  const index = parseInt(cardId.replace("result-", ""), 10);
+  return currentSvgs[index];
 }
 
 function attachResultsEvents() {
   if (!resultsContainer) return;
-  resultsContainer.querySelectorAll("button[data-action='copy']").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const index = parseInt((btn as HTMLButtonElement).dataset.index || "0");
-      const svgContent = currentSvgs[index];
-      navigator.clipboard
-        .writeText(svgContent)
-        .then(() => {
-          showAlert({ type: "success", message: "SVG copied to clipboard" });
-        })
-        .catch(() => {
-          showAlert({ type: "error", message: "Failed to copy SVG" });
-        });
-    });
-  });
 
-  resultsContainer.querySelectorAll("button[data-action='download']").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const index = parseInt((btn as HTMLButtonElement).dataset.index || "0");
-      const svgContent = currentSvgs[index];
-      const blob = new Blob([svgContent], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `svgen-result-${Date.now()}-${index + 1}.svg`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  });
+  attachSvgCardEvents(resultsContainer, resolveSvgByCardId, [
+    {
+      actionId: "save-to-gallery",
+      handler: async (cardId: string) => {
+        const svgContent = resolveSvgByCardId(cardId);
 
-  resultsContainer.querySelectorAll("button[data-action='save-to-gallery']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const index = parseInt((btn as HTMLButtonElement).dataset.index || "0");
-      const svgContent = currentSvgs[index];
+        if (!svgContent) {
+          showAlert({ type: "error", message: "No SVG content to save." });
+          return;
+        }
 
-      if (!svgContent) {
-        showAlert({ type: "error", message: "No SVG content to save." });
-        return;
-      }
+        const galleryItem: GalleryItem = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          svg: svgContent,
+          prompt: currentPrompt,
+          model: currentModel,
+          timestamp: Date.now(),
+        };
 
-      const galleryItem: GalleryItem = {
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        svg: svgContent,
-        prompt: currentPrompt,
-        model: currentModel,
-        timestamp: Date.now(),
-      };
-
-      try {
-        await galleryDb.saveSvg(galleryItem);
-        showAlert({ type: "success", message: "SVG saved to gallery!" });
-      } catch (error) {
-        console.error("Failed to save SVG to gallery:", error);
-        showAlert({ type: "error", message: "Failed to save SVG to gallery." });
-      }
-    });
-  });
+        try {
+          await galleryDb.saveSvg(galleryItem);
+          showAlert({ type: "success", message: "SVG saved to gallery!" });
+        } catch (error) {
+          console.error("Failed to save SVG to gallery:", error);
+          showAlert({
+            type: "error",
+            message: "Failed to save SVG to gallery.",
+          });
+        }
+      },
+    },
+  ]);
 }
 
 /** --- ORCHESTRATION --- */
