@@ -7,6 +7,23 @@ export class ModelDropdown extends HTMLElement {
   public selectedModel = "";
   public providerId = "";
 
+  private handleDocumentClick = (e: Event) => {
+    const modelDropdownBtn = this.querySelector("#model-dropdown-btn") as HTMLButtonElement | null;
+    const modelDropdownMenu = this.querySelector("#model-dropdown-menu") as HTMLDivElement | null;
+    const modelDropdownIcon = this.querySelector("#model-dropdown-icon") as HTMLElement | null;
+
+    if (
+      modelDropdownBtn &&
+      modelDropdownMenu &&
+      !modelDropdownBtn.contains(e.target as Node) &&
+      !modelDropdownMenu.contains(e.target as Node)
+    ) {
+      modelDropdownMenu.classList.add("hidden");
+      modelDropdownMenu.classList.remove("flex");
+      if (modelDropdownIcon) modelDropdownIcon.style.transform = "rotate(0deg)";
+    }
+  };
+
   constructor() {
     super();
   }
@@ -14,6 +31,10 @@ export class ModelDropdown extends HTMLElement {
   connectedCallback() {
     this.render();
     this.attachEvents();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener("click", this.handleDocumentClick);
   }
 
   render() {
@@ -200,16 +221,7 @@ export class ModelDropdown extends HTMLElement {
       }
     });
 
-    document.addEventListener("click", (e) => {
-      if (
-        !modelDropdownBtn.contains(e.target as Node) &&
-        !modelDropdownMenu.contains(e.target as Node)
-      ) {
-        modelDropdownMenu.classList.add("hidden");
-        modelDropdownMenu.classList.remove("flex");
-        if (modelDropdownIcon) modelDropdownIcon.style.transform = "rotate(0deg)";
-      }
-    });
+    document.addEventListener("click", this.handleDocumentClick);
 
     this.querySelectorAll(".provider-tab").forEach((tab) => {
       tab.addEventListener("click", (e) => {

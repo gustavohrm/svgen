@@ -13,6 +13,30 @@ export class ResultsGrid extends HTMLElement {
   private currentModel: string = "";
   private isGenerating: boolean = false;
 
+  private handleGenerationStarted = () => {
+    this.currentSvgs = [];
+    this.currentPrompt = "";
+    this.currentModel = "";
+    this.isGenerating = true;
+    this.render();
+  };
+
+  private handleGenerationFinished = () => {
+    this.isGenerating = false;
+    // Don't render here, rely on SVGEN_RESULTS to populate and render
+  };
+
+  private handleSVGenResults = (e: Event) => {
+    const customEvent = e as CustomEvent;
+    if (customEvent.detail?.svgs) {
+      this.currentSvgs = customEvent.detail.svgs;
+      this.currentPrompt = customEvent.detail.prompt || "";
+      this.currentModel = customEvent.detail.model || "";
+      this.isGenerating = false;
+      this.render();
+    }
+  };
+
   constructor() {
     super();
   }
@@ -20,6 +44,12 @@ export class ResultsGrid extends HTMLElement {
   connectedCallback() {
     this.render();
     this.attachEvents();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
+    window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    window.removeEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
   }
 
   private render() {
@@ -69,29 +99,9 @@ export class ResultsGrid extends HTMLElement {
 
   private attachEvents() {
     // Listen to global app events
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, () => {
-      this.currentSvgs = [];
-      this.currentPrompt = "";
-      this.currentModel = "";
-      this.isGenerating = true;
-      this.render();
-    });
-
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, () => {
-      this.isGenerating = false;
-      // Don't render here, rely on SVGEN_RESULTS to populate and render
-    });
-
-    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, (e: Event) => {
-      const customEvent = e as CustomEvent;
-      if (customEvent.detail?.svgs) {
-        this.currentSvgs = customEvent.detail.svgs;
-        this.currentPrompt = customEvent.detail.prompt || "";
-        this.currentModel = customEvent.detail.model || "";
-        this.isGenerating = false;
-        this.render();
-      }
-    });
+    window.addEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
+    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
   }
 
   private resolveSvgByCardId = (cardId: string): string | undefined => {
