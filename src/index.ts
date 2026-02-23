@@ -62,9 +62,12 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         variations || settings.variations || 4,
       );
+      const generatedAt = Date.now();
 
       window.dispatchEvent(
-        new CustomEvent(APP_EVENTS.SVGEN_RESULTS, { detail: { svgs: results, prompt, model } }),
+        new CustomEvent(APP_EVENTS.SVGEN_RESULTS, {
+          detail: { svgs: results, prompt, model, generatedAt },
+        }),
       );
       showAlert({ type: "success", message: "SVGs generated successfully" });
     } catch (error: unknown) {

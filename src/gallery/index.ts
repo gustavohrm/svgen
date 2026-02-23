@@ -5,6 +5,25 @@ import { renderSvgCard, attachSvgCardEvents } from "../core/utils/svg-card";
 
 let currentSvgs: GalleryItem[] = [];
 
+const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+function formatGeneratedAt(timestamp: number): string {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: userTimeZone,
+  }).formatToParts(new Date(timestamp));
+
+  const pick = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${pick("day")}/${pick("month")}/${pick("year")} - ${pick("hour")}:${pick("minute")}`;
+}
+
 async function loadGallery() {
   currentSvgs = await galleryDb.getAllSvgs();
   renderGallery(currentSvgs);
@@ -35,7 +54,7 @@ function renderGallery(svgs: GalleryItem[]) {
         svg: item.svg,
         cardId: item.id,
         label: item.prompt || "Generated Artwork",
-        sublabel: new Date(item.timestamp).toLocaleDateString(),
+        sublabel: formatGeneratedAt(item.timestamp),
         extraActions: [
           {
             id: "delete-svg",

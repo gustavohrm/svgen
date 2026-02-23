@@ -12,12 +12,14 @@ export class ResultsGrid extends HTMLElement {
   private currentSvgs: string[] = [];
   private currentPrompt: string = "";
   private currentModel: string = "";
+  private currentGeneratedAt: number | null = null;
   private isGenerating: boolean = false;
 
   private handleGenerationStarted = () => {
     this.currentSvgs = [];
     this.currentPrompt = "";
     this.currentModel = "";
+    this.currentGeneratedAt = null;
     this.isGenerating = true;
     this.render();
   };
@@ -33,6 +35,8 @@ export class ResultsGrid extends HTMLElement {
       this.currentSvgs = customEvent.detail.svgs;
       this.currentPrompt = customEvent.detail.prompt || "";
       this.currentModel = customEvent.detail.model || "";
+      this.currentGeneratedAt =
+        typeof customEvent.detail.generatedAt === "number" ? customEvent.detail.generatedAt : null;
       this.isGenerating = false;
       this.render();
     }
@@ -131,7 +135,7 @@ export class ResultsGrid extends HTMLElement {
               svg: svgContent,
               prompt: this.currentPrompt,
               model: this.currentModel,
-              timestamp: Date.now(),
+              timestamp: this.currentGeneratedAt ?? Date.now(),
             };
 
             try {
