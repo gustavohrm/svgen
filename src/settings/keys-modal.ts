@@ -85,11 +85,39 @@ export function renderKeysModalBody(container: HTMLElement) {
     .join("");
 }
 
+// Track if the delegated listener has been attached
+let isKeysModalEventsAttached = false;
+
 export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => void) {
-  // Add key buttons
-  container.querySelectorAll('[data-action="add-key"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const providerId = (e.currentTarget as HTMLElement).dataset.provider as AiProviderId;
+  if (isKeysModalEventsAttached) return;
+
+  container.addEventListener("click", async (e) => {
+    const target = e.target as HTMLElement;
+
+    // --- Active Key Selection (radio buttons) ---
+    if (target.matches("input.key-radio")) {
+      const radio = target as HTMLInputElement;
+      const id = radio.value;
+      const providerId = radio.dataset.providerId;
+      if (providerId) {
+        const settings = db.getSettings();
+        settings.activeKeys[providerId] = id;
+        db.saveSettings(settings);
+        renderKeysModalBody(container);
+        onUpdate();
+      }
+      return;
+    }
+
+    // --- Buttons ---
+    const btn = target.closest("button[data-action]");
+    if (!btn) return;
+
+    const action = btn.getAttribute("data-action");
+
+    // Add key
+    if (action === "add-key") {
+      const providerId = (btn as HTMLElement).dataset.provider as AiProviderId;
       const provider = providerRegistry.getProvider(providerId);
       if (provider) {
         const titleEl = container.querySelector("#add-key-title");
@@ -103,29 +131,12 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
         if (valueInput) valueInput.value = "";
         openModal(container, "add-key-modal");
       }
-    });
-  });
+      return;
+    }
 
-  // Active key selection
-  container.querySelectorAll(".key-radio").forEach((radio) => {
-    radio.addEventListener("change", (e) => {
-      const id = (e.target as HTMLInputElement).value;
-      const providerId = (e.target as HTMLInputElement).dataset.providerId;
-      if (providerId) {
-        const settings = db.getSettings();
-        settings.activeKeys[providerId] = id;
-        db.saveSettings(settings);
-        renderKeysModalBody(container);
-        attachKeysModalEvents(container, onUpdate);
-        onUpdate();
-      }
-    });
-  });
-
-  // Delete keys
-  container.querySelectorAll('[data-action="delete-key"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.keyId;
+    // Delete keys
+    if (action === "delete-key") {
+      const id = (btn as HTMLElement).dataset.keyId;
       if (confirm("Delete this key?")) {
         const settings = db.getSettings();
         const keyToDelete = settings.apiKeys.find((k) => k.id === id);
@@ -141,16 +152,14 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
           db.saveSettings(settings);
         }
         renderKeysModalBody(container);
-        attachKeysModalEvents(container, onUpdate);
         onUpdate();
       }
-    });
-  });
+      return;
+    }
 
-  // Sync models
-  container.querySelectorAll('[data-action="fetch-models"]').forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const keyId = (e.currentTarget as HTMLElement).dataset.keyId;
+    // Sync models
+    if (action === "fetch-models") {
+      const keyId = (btn as HTMLElement).dataset.keyId;
       const settings = db.getSettings();
       const key = settings.apiKeys.find((k) => k.id === keyId);
       if (!key) return;
@@ -158,7 +167,7 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
       const provider = providerRegistry.getProvider(key.providerId);
       if (!provider) return;
 
-      const btnEl = e.currentTarget as HTMLButtonElement;
+      const btnEl = btn as HTMLButtonElement;
       btnEl.disabled = true;
       btnEl.classList.add("opacity-50", "pointer-events-none", "animate-spin");
 
@@ -169,7 +178,6 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
         db.saveSettings(settings);
         showAlert({ type: "success", message: "Models synced." });
         renderKeysModalBody(container);
-        attachKeysModalEvents(container, onUpdate);
         onUpdate();
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Unknown error";
@@ -178,14 +186,13 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
         btnEl.disabled = false;
         btnEl.classList.remove("opacity-50", "pointer-events-none", "animate-spin");
       }
-    });
-  });
+      return;
+    }
 
-  // Edit key name
-  container.querySelectorAll('[data-action="edit-key"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.keyId;
-      const currentName = (e.currentTarget as HTMLElement).dataset.keyName;
+    // Edit key name
+    if (action === "edit-key") {
+      const id = (btn as HTMLElement).dataset.keyId;
+      const currentName = (btn as HTMLElement).dataset.keyName;
       if (id && currentName) {
         const keyIdInput = container.querySelector("#edit-modal-key-id") as HTMLInputElement;
         const nameInput = container.querySelector("#edit-modal-key-name") as HTMLInputElement;
@@ -193,8 +200,11 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
         if (nameInput) nameInput.value = currentName;
         openModal(container, "edit-key-modal");
       }
-    });
+      return;
+    }
   });
+
+  isKeysModalEventsAttached = true;
 }
 
 export function bindKeysModalStaticEvents(container: HTMLElement, onUpdate: () => void) {
@@ -244,7 +254,6 @@ export function bindKeysModalStaticEvents(container: HTMLElement, onUpdate: () =
     showAlert({ type: "success", message: "Key added." });
     closeModal(container, "add-key-modal");
     renderKeysModalBody(container);
-    attachKeysModalEvents(container, onUpdate);
     window.dispatchEvent(new Event("settings-updated"));
   });
 
@@ -269,7 +278,6 @@ export function bindKeysModalStaticEvents(container: HTMLElement, onUpdate: () =
       showAlert({ type: "success", message: "Key name updated." });
       closeModal(container, "edit-key-modal");
       renderKeysModalBody(container);
-      attachKeysModalEvents(container, onUpdate);
       window.dispatchEvent(new Event("settings-updated"));
     }
   });

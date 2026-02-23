@@ -178,6 +178,9 @@ export function downloadSvg(svgContent: string, filename: string): void {
  * buttons within a container. Also accepts custom handlers for any
  * extra actions rendered on the cards.
  *
+ * Uses Event Delegation so this can be safely called multiple times
+ * without memory leaks (though ideally called once per container).
+ *
  * @param container - The parent DOM element containing the cards
  * @param svgResolver - A function that returns the SVG content for a given cardId
  * @param customHandlers - Additional handlers for non-built-in actions
@@ -187,31 +190,35 @@ export function attachSvgCardEvents(
   svgResolver: (cardId: string) => string | undefined,
   customHandlers: SvgCardActionHandler[] = [],
 ): void {
-  // Copy
-  container.querySelectorAll<HTMLButtonElement>('[data-action="copy"]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const cardId = btn.dataset.cardId ?? "";
-      const svg = svgResolver(cardId);
-      if (svg) copySvgToClipboard(svg);
-    });
+  // Prevent duplicate delegated listeners on the same container
+  if (container.dataset.svgEventsAttached === "true") return;
+
+  container.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const btn = target.closest("button[data-action]");
+
+    if (!btn) return;
+
+    const actionId = btn.getAttribute("data-action");
+    const cardId = btn.getAttribute("data-card-id") ?? "";
+    const svg = svgResolver(cardId);
+
+    if (actionId === "copy" && svg) {
+      copySvgToClipboard(svg);
+      return;
+    }
+
+    if (actionId === "download" && svg) {
+      downloadSvg(svg, `svgen-${cardId}.svg`);
+      return;
+    }
+
+    // Try custom handlers
+    const customMatch = customHandlers.find((h) => h.actionId === actionId);
+    if (customMatch) {
+      customMatch.handler(cardId);
+    }
   });
 
-  // Download
-  container.querySelectorAll<HTMLButtonElement>('[data-action="download"]').forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const cardId = btn.dataset.cardId ?? "";
-      const svg = svgResolver(cardId);
-      if (svg) downloadSvg(svg, `svgen-${cardId}.svg`);
-    });
-  });
-
-  // Custom handlers
-  for (const { actionId, handler } of customHandlers) {
-    container.querySelectorAll<HTMLButtonElement>(`[data-action="${actionId}"]`).forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const cardId = btn.dataset.cardId ?? "";
-        handler(cardId);
-      });
-    });
-  }
+  container.dataset.svgEventsAttached = "true";
 }

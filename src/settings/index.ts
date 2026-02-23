@@ -3,13 +3,10 @@ import "../ui/components/app-modal";
 import { db } from "../core/modules/db/index";
 import { createDefaultProviderRegistry } from "../core/services/ai/providers/index";
 import { AiProviderId } from "../core/types/index";
-import {
-  renderKeysModalBody,
-  attachKeysModalEvents,
-  bindKeysModalStaticEvents,
-  openModal,
-} from "./keys-modal";
 import { APP_EVENTS } from "../core/constants/events";
+import { createStore } from "../core/utils/store";
+import "../ui/components/api-keys-modal";
+import { ApiKeysModal } from "../ui/components/api-keys-modal";
 
 const providerRegistry = createDefaultProviderRegistry();
 const container = document.getElementById("settings-container");
@@ -23,10 +20,18 @@ interface ModelEntry {
   isSelected: boolean;
 }
 
+interface SettingsState {
+  searchTerm: string;
+  filterProvider: AiProviderId | "all";
+  sortDirection: "asc" | "desc";
+}
+
 /* ── State ── */
-let searchTerm = "";
-let filterProvider: AiProviderId | "all" = "all";
-let sortDirection: "asc" | "desc" = "asc";
+const store = createStore<SettingsState>({
+  searchTerm: "",
+  filterProvider: "all",
+  sortDirection: "asc",
+});
 
 /* ── Helpers ── */
 function getAllModels(): ModelEntry[] {
@@ -57,35 +62,35 @@ function getAllModels(): ModelEntry[] {
   return entries;
 }
 
-function getFilteredModels(models: ModelEntry[]): ModelEntry[] {
+function getFilteredModels(models: ModelEntry[], state: SettingsState): ModelEntry[] {
   let filtered = models;
 
-  if (filterProvider !== "all") {
-    filtered = filtered.filter((m) => m.providerId === filterProvider);
+  if (state.filterProvider !== "all") {
+    filtered = filtered.filter((m) => m.providerId === state.filterProvider);
   }
 
-  if (searchTerm) {
-    const term = searchTerm.toLowerCase();
+  if (state.searchTerm) {
+    const term = state.searchTerm.toLowerCase();
     filtered = filtered.filter((m) => m.model.toLowerCase().includes(term));
   }
 
   filtered.sort((a, b) => {
     const comparison = a.model.localeCompare(b.model);
-    return sortDirection === "asc" ? comparison : -comparison;
+    return state.sortDirection === "asc" ? comparison : -comparison;
   });
 
   return filtered;
 }
 
 /* ── Render: Models Table ── */
-function renderModels() {
+function renderModels(state: SettingsState) {
   if (!container) return;
   const table = container.querySelector("#models-table");
   const emptyState = container.querySelector("#empty-state");
   if (!table || !emptyState) return;
 
   const allModels = getAllModels();
-  const filtered = getFilteredModels(allModels);
+  const filtered = getFilteredModels(allModels, state);
 
   if (filtered.length === 0) {
     table.parentElement?.classList.add("hidden");
@@ -122,7 +127,7 @@ function renderModels() {
 }
 
 /* ── Render: Provider Filter ── */
-function renderFilterDropdown() {
+function renderFilterDropdown(state: SettingsState) {
   if (!container) return;
   const dropdown = container.querySelector("#filter-dropdown");
   if (!dropdown) return;
@@ -131,7 +136,7 @@ function renderFilterDropdown() {
 
   dropdown.innerHTML = `
     <button data-filter="all" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
-      filterProvider === "all" ? "text-text" : "text-text-secondary"
+      state.filterProvider === "all" ? "text-text" : "text-text-secondary"
     } hover:text-text hover:bg-surface-hover transition-all flex items-center gap-2.5">
       <span class="w-5 h-5 flex items-center justify-center shrink-0">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -144,7 +149,7 @@ function renderFilterDropdown() {
       .map(
         (p) => `
       <button data-filter="${p.id}" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
-        filterProvider === p.id ? "text-text" : "text-text-secondary"
+        state.filterProvider === p.id ? "text-text" : "text-text-secondary"
       } hover:text-text hover:bg-surface-hover transition-all flex items-center gap-2.5">
         <img src="${p.icon}" alt="${p.name}" class="w-5 h-5 object-contain shrink-0" />
         ${p.name}
@@ -156,9 +161,9 @@ function renderFilterDropdown() {
 }
 
 /* ── Full render ── */
-function render() {
-  renderModels();
-  renderFilterDropdown();
+function render(state: SettingsState = store.get()) {
+  renderModels(state);
+  renderFilterDropdown(state);
 }
 
 /* ── Event Bindings ── */
@@ -167,27 +172,16 @@ let isInitialized = false;
 function bindStaticEvents() {
   if (!container || isInitialized) return;
 
-  const onUpdate = () => {
-    render();
-    attachDynamicEvents();
-    window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
-  };
-
   // Direct API Keys button
   container.querySelector("#open-keys-modal-btn")?.addEventListener("click", () => {
-    renderKeysModalBody(container);
-    openModal(container, "keys-modal");
-    attachKeysModalEvents(container, onUpdate);
+    const modal = document.querySelector("api-keys-modal") as ApiKeysModal;
+    modal?.open();
   });
-
-  bindKeysModalStaticEvents(container, onUpdate);
 
   // Search
   const searchInput = container.querySelector("#model-search") as HTMLInputElement;
   searchInput?.addEventListener("input", (e) => {
-    searchTerm = (e.target as HTMLInputElement).value;
-    renderModels();
-    attachDynamicEvents();
+    store.set({ searchTerm: (e.target as HTMLInputElement).value });
   });
 
   // Filter dropdown toggle
@@ -210,22 +204,49 @@ function bindStaticEvents() {
   const sortLabel = container.querySelector("#sort-label");
 
   sortBtn?.addEventListener("click", () => {
-    sortDirection = sortDirection === "asc" ? "desc" : "asc";
-    if (sortLabel) sortLabel.textContent = sortDirection === "asc" ? "A → Z" : "Z → A";
-    renderModels();
-    attachDynamicEvents();
+    const current = store.get().sortDirection;
+    const next = current === "asc" ? "desc" : "asc";
+    if (sortLabel) sortLabel.textContent = next === "asc" ? "A → Z" : "Z → A";
+    store.set({ sortDirection: next });
   });
 
   isInitialized = true;
 }
 
-function attachDynamicEvents() {
-  if (!container) return;
+let isDynamicEventsAttached = false;
 
-  // Model checkboxes
-  container.querySelectorAll(".model-checkbox").forEach((cb) => {
-    cb.addEventListener("change", (e) => {
-      const target = e.target as HTMLInputElement;
+function attachDynamicEvents() {
+  if (!container || isDynamicEventsAttached) return;
+
+  container.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+
+    // Filter options
+    const filterBtn = target.closest(".filter-option") as HTMLElement | null;
+    if (filterBtn) {
+      const value = filterBtn.dataset.filter as AiProviderId | "all";
+      store.set({ filterProvider: value });
+
+      const filterLabel = container?.querySelector("#filter-label");
+      if (filterLabel) {
+        filterLabel.textContent =
+          value === "all"
+            ? "All Providers"
+            : (providerRegistry.getProvider(value)?.name ?? "All Providers");
+      }
+
+      const filterDropdown = container?.querySelector("#filter-dropdown") as HTMLElement;
+      filterDropdown?.classList.add("hidden");
+
+      return;
+    }
+  });
+
+  container.addEventListener("change", (e) => {
+    const target = e.target as HTMLInputElement;
+
+    // Model checkboxes
+    if (target.matches(".model-checkbox")) {
       const keyId = target.dataset.keyId;
       const model = target.value;
       const settings = db.getSettings();
@@ -239,36 +260,19 @@ function attachDynamicEvents() {
         db.saveSettings(settings);
         window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
       }
-    });
+    }
   });
 
-  // Filter options
-  container.querySelectorAll(".filter-option").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const target = e.currentTarget as HTMLElement;
-      const value = target.dataset.filter as AiProviderId | "all";
-      filterProvider = value;
-
-      const filterLabel = container?.querySelector("#filter-label");
-      if (filterLabel) {
-        filterLabel.textContent =
-          value === "all"
-            ? "All Providers"
-            : (providerRegistry.getProvider(value)?.name ?? "All Providers");
-      }
-
-      const filterDropdown = container?.querySelector("#filter-dropdown") as HTMLElement;
-      filterDropdown?.classList.add("hidden");
-
-      render();
-      attachDynamicEvents();
-    });
-  });
+  isDynamicEventsAttached = true;
 }
 
 /* ── Init ── */
 document.addEventListener("DOMContentLoaded", () => {
-  render();
+  store.subscribe((state) => {
+    render(state);
+  });
+
+  render(store.get());
   bindStaticEvents();
   attachDynamicEvents();
 });
