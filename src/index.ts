@@ -48,7 +48,7 @@ function renderGenerator() {
         providerTabsHtml += `
           <button data-tab-target="provider-pane-${provider.id}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
              <div class="flex items-center gap-2 max-w-full overflow-hidden">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+               <img src="${provider.icon}" alt="${provider.name}" class="w-4 h-4 shrink-0 object-contain" />
                <span class="truncate">${provider.name}</span>
              </div>
              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 opacity-50 shrink-0"><path d="m9 18 6-6-6-6"/></svg>
@@ -67,6 +67,7 @@ function renderGenerator() {
           }
           providerPanesHtml += `
             <button data-model="${model}" data-provider-id="${provider.id}" class="model-option w-full text-left px-3 py-2.5 text-xs font-medium text-text-secondary hover:text-text hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2">
+              <img src="${provider.icon}" alt="${provider.name}" class="w-4 h-4 shrink-0 object-contain opacity-60" />
               <span class="truncate">${model}</span>
             </button>
           `;

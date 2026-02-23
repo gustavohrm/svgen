@@ -186,7 +186,7 @@ function renderKeysModalBody() {
                     const isActive = key.id === activeKeyId;
                     return `
                     <div class="flex items-center gap-3 group">
-                      <label class="flex-1 flex items-center gap-3 cursor-pointer p-3 rounded-xl border ${isActive ? "border-text/30 bg-surface-hover/10" : "border-border/50 bg-transparent hover:bg-surface-hover/5"} transition-all">
+                      <label class="flex-1 flex items-center gap-3 p-2 cursor-pointer rounded-lg transition-all hover:bg-surface">
                         <input type="radio" name="active-key-${provider.id}" value="${key.id}" data-provider-id="${provider.id}" ${isActive ? "checked" : ""} class="w-4 h-4 accent-primary key-radio" />
                         <div class="flex flex-col min-w-0">
                           <span class="text-sm font-medium ${isActive ? "text-text" : "text-text-secondary"} truncate">${key.name}</span>
@@ -194,14 +194,14 @@ function renderKeysModalBody() {
                         </div>
                       </label>
                       <div class="flex items-center gap-1">
-                        <button data-action="fetch-models" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Sync Models">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-                        </button>
                         <button data-action="edit-key" data-key-id="${key.id}" data-key-name="${key.name}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all opacity-0 group-hover:opacity-100" title="Edit Name">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                         </button>
                         <button data-action="delete-key" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100" title="Delete Key">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                        </button>
+                        <button data-action="fetch-models" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Sync Models">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
                         </button>
                       </div>
                     </div>
@@ -244,22 +244,8 @@ let isInitialized = false;
 function bindStaticEvents() {
   if (!container || isInitialized) return;
 
-  // 3-dot menu toggle
-  const menuTrigger = container.querySelector("#menu-trigger");
-  const menuDropdown = container.querySelector("#menu-dropdown") as HTMLElement;
-
-  menuTrigger?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    menuDropdown.classList.toggle("hidden");
-  });
-
-  document.addEventListener("click", () => {
-    menuDropdown?.classList.add("hidden");
-  });
-
-  // Open Keys Modal from menu
+  // Direct API Keys button
   container.querySelector("#open-keys-modal-btn")?.addEventListener("click", () => {
-    menuDropdown.classList.add("hidden");
     renderKeysModalBody();
     openModal("keys-modal");
     attachKeysModalEvents();

@@ -19,12 +19,12 @@ export class AppModal extends HTMLElement {
           <div
             class="bg-background border border-border rounded-2xl w-full max-w-md overflow-hidden scale-100 flex flex-col"
           >
-            <div class="px-8 py-6 border-b border-border flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-text" id="${titleId}">${title}</h3>
+            <div class="p-4 border-b border-border flex items-center justify-between">
+              <h3 class="text-lg font-semibold" id="${titleId}">${title}</h3>
               <button
                 id="${closeBtnId}"
                 type="button"
-                class="p-2 text-text-secondary hover:text-text transition-all rounded-lg hover:bg-surface-hover cursor-pointer"
+                class="p-1 rounded-lg hover:bg-surface-hover cursor-pointer"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
