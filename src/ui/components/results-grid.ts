@@ -6,6 +6,7 @@ import {
   attachSvgCardEvents,
 } from "../../core/utils/svg-card";
 import { APP_EVENTS } from "../../core/constants/events";
+import { db } from "../../core/modules/db/index";
 
 export class ResultsGrid extends HTMLElement {
   private currentSvgs: string[] = [];
@@ -64,7 +65,9 @@ export class ResultsGrid extends HTMLElement {
     let contentHtml = "";
 
     if (this.isGenerating) {
-      contentHtml = Array.from({ length: 4 })
+      const settings = db.getSettings();
+      const count = settings.variations || 4;
+      contentHtml = Array.from({ length: count })
         .map(() => renderSvgCardSkeleton())
         .join("");
     } else {

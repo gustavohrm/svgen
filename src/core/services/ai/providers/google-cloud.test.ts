@@ -62,7 +62,7 @@ describe("GoogleCloudProvider", () => {
       apiKey: "test-key",
     });
 
-    expect(result).toBe("<svg>gcp-test</svg>");
+    expect(result).toEqual(["<svg>gcp-test</svg>"]);
   });
 
   it("should throw error if no API key is provided", async () => {

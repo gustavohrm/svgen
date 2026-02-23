@@ -49,8 +49,8 @@ export class OpenRouterProvider implements AiProvider {
     }
   }
 
-  async generate(options: ProviderGenerateOptions): Promise<string> {
-    const { prompt, systemPrompt, model, apiKey } = options;
+  async generate(options: ProviderGenerateOptions): Promise<string[]> {
+    const { prompt, systemPrompt, model, apiKey, count = 1 } = options;
 
     if (!apiKey) {
       throw new Error("OpenRouter API key is required");
@@ -70,6 +70,7 @@ export class OpenRouterProvider implements AiProvider {
           { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
+        n: count,
       }),
     });
 
@@ -79,7 +80,7 @@ export class OpenRouterProvider implements AiProvider {
     }
 
     const data = await res.json();
-    const result = data.choices[0]?.message?.content || "";
-    return extractSvgFromResult(result);
+    const choices = data.choices || [];
+    return choices.map((choice: any) => extractSvgFromResult(choice.message?.content || ""));
   }
 }

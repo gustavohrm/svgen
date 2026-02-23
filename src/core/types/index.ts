@@ -5,6 +5,7 @@ export interface ProviderGenerateOptions {
   systemPrompt: string;
   model: string;
   apiKey: string;
+  count?: number;
 }
 
 export interface ProviderConfigField {
@@ -19,7 +20,7 @@ export interface AiProvider {
   name: string;
   icon: string;
   configFields: ProviderConfigField[];
-  generate(options: ProviderGenerateOptions): Promise<string>;
+  generate(options: ProviderGenerateOptions): Promise<string[]>;
   fetchModels(apiKey: string): Promise<string[]>;
 }
 

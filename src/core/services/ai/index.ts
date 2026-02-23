@@ -35,6 +35,14 @@ Requirements:
   }
 
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
+    const results = await this.generateVariationSet(options, 1);
+    return results[0] || "";
+  }
+
+  private async generateVariationSet(
+    options: Omit<GenerateOptions, "apiKey">,
+    count: number,
+  ): Promise<string[]> {
     const settings = this.db.getSettings();
     const activeKeyId = settings.activeKeys[options.providerId];
     const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
@@ -56,6 +64,7 @@ Requirements:
       systemPrompt,
       model: options.model,
       apiKey: activeKey.value,
+      count,
     });
   }
 
@@ -63,8 +72,7 @@ Requirements:
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
   ): Promise<string[]> {
-    const promises = Array.from({ length: count }).map(() => this.generate(options));
-    return Promise.all(promises);
+    return this.generateVariationSet(options, count);
   }
 }
 

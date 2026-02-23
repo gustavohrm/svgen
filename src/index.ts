@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
           model,
           providerId,
         },
-        4, // Fixed at 4 variations
+        settings.variations || 4,
       );
 
       window.dispatchEvent(

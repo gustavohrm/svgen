@@ -21,7 +21,7 @@ export interface AppSettings {
 const defaultSettings: AppSettings = {
   apiKeys: [],
   activeKeys: {},
-  variations: 1,
+  variations: 4,
   lastSelectedModel: undefined,
   lastSelectedProviderId: undefined,
 };

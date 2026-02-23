@@ -13,7 +13,7 @@ describe("AiService", () => {
       id: "gcp",
       name: "GCP",
       configFields: [],
-      generate: vi.fn().mockResolvedValue("<svg>test</svg>"),
+      generate: vi.fn().mockResolvedValue(["<svg>test</svg>"]),
       fetchModels: vi.fn().mockResolvedValue(["model1"]),
     } as any;
 
@@ -62,7 +62,8 @@ describe("AiService", () => {
     );
   });
 
-  it("should generate multiple SVGs", async () => {
+  it("should generate multiple SVGs in a single request", async () => {
+    (mockProvider.generate as any).mockResolvedValue(["<svg>test1</svg>", "<svg>test2</svg>"]);
     const options: Omit<GenerateOptions, "apiKey"> = {
       prompt: "draw a circle",
       model: "gemini-pro",
@@ -72,9 +73,14 @@ describe("AiService", () => {
     const results = await service.generateMultiple(options, 2);
 
     expect(results).toHaveLength(2);
-    expect(results[0]).toBe("<svg>test</svg>");
-    expect(results[1]).toBe("<svg>test</svg>");
-    expect(mockProvider.generate).toHaveBeenCalledTimes(2);
+    expect(results[0]).toBe("<svg>test1</svg>");
+    expect(results[1]).toBe("<svg>test2</svg>");
+    expect(mockProvider.generate).toHaveBeenCalledTimes(1);
+    expect(mockProvider.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        count: 2,
+      }),
+    );
   });
 
   it("should throw error if no active key", async () => {

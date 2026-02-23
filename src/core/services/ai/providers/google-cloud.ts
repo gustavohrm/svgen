@@ -43,8 +43,8 @@ export class GoogleCloudProvider implements AiProvider {
     }
   }
 
-  async generate(options: ProviderGenerateOptions): Promise<string> {
-    const { prompt, systemPrompt, model, apiKey } = options;
+  async generate(options: ProviderGenerateOptions): Promise<string[]> {
+    const { prompt, systemPrompt, model, apiKey, count = 1 } = options;
 
     if (!apiKey) {
       throw new Error("GCP (Gemini) API key is required");
@@ -60,6 +60,9 @@ export class GoogleCloudProvider implements AiProvider {
           parts: [{ text: prompt }],
         },
       ],
+      generationConfig: {
+        candidateCount: count,
+      },
     };
 
     const res = await fetch(
@@ -79,7 +82,9 @@ export class GoogleCloudProvider implements AiProvider {
     }
 
     const data = await res.json();
-    const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return extractSvgFromResult(result);
+    const candidates = data?.candidates || [];
+    return candidates.map((candidate: any) =>
+      extractSvgFromResult(candidate.content?.parts?.[0]?.text || ""),
+    );
   }
 }

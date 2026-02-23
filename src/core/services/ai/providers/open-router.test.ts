@@ -55,7 +55,7 @@ describe("OpenRouterProvider", () => {
       apiKey: "test-key",
     });
 
-    expect(result).toBe("<svg>test</svg>");
+    expect(result).toEqual(["<svg>test</svg>"]);
   });
 
   it("should throw error when generation fails", async () => {
