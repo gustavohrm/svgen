@@ -107,38 +107,18 @@
               <!-- populated dynamically -->
             </div>
           </div>
-
-          <!-- Sort Toggle -->
-          <button
-            id="sort-btn"
-            class="flex items-center gap-2 px-4 py-2.5 border border-border/50 rounded-xl text-sm text-text-secondary hover:text-text hover:border-border transition-all cursor-pointer"
-            title="Sort alphabetically"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="m3 8 4-4 4 4" />
-              <path d="M7 4v16" />
-              <path d="M11 12h4" />
-              <path d="M11 16h7" />
-              <path d="M11 20h10" />
-            </svg>
-            <span id="sort-label">A → Z</span>
-          </button>
         </div>
 
         <!-- Models Table (scrollable) -->
         <div
           class="border border-border/50 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col"
         >
+          <div
+            id="models-table-header"
+            class="flex items-center gap-4 px-5 py-3 border-b border-border/50 bg-surface/50 shrink-0"
+          >
+            <!-- Populated dynamically -->
+          </div>
           <div
             id="models-table"
             class="divide-y divide-border/30 overflow-y-auto flex-1 min-h-0 custom-scrollbar"

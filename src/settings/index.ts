@@ -82,6 +82,44 @@ function getFilteredModels(models: ModelEntry[], state: SettingsState): ModelEnt
   return filtered;
 }
 
+/* ── Render: Table Header ── */
+function renderTableHeader(state: SettingsState, filteredModels: ModelEntry[]) {
+  if (!container) return;
+  const header = container.querySelector("#models-table-header");
+  if (!header) return;
+
+  const allSelected = filteredModels.length > 0 && filteredModels.every((m) => m.isSelected);
+  const someSelected = filteredModels.some((m) => m.isSelected);
+
+  header.innerHTML = `
+    <div class="flex items-center gap-4 w-full">
+      <input
+        type="checkbox"
+        id="select-all-models"
+        ${allSelected ? "checked" : ""}
+        class="w-4 h-4 accent-primary rounded border-border shrink-0 cursor-pointer"
+      />
+      <span class="text-sm font-bold text-text tracking-wider w-24 shrink-0">Provider</span>
+      <span class="text-sm font-bold text-text tracking-wider flex-1">Model</span>
+      <button
+        id="sort-btn"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold text-text-muted hover:text-text hover:bg-surface-hover/50 uppercase tracking-wider transition-all cursor-pointer shrink-0"
+        title="Sort alphabetically"
+      >
+        <span>${state.sortDirection === "asc" ? "A-Z" : "Z-A"}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-3 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m3 8 4-4 4 4" /><path d="M7 4v16" />
+        </svg>
+      </button>
+    </div>
+  `;
+
+  const selectAllCheckbox = header.querySelector("#select-all-models") as HTMLInputElement;
+  if (selectAllCheckbox) {
+    selectAllCheckbox.indeterminate = someSelected && !allSelected;
+  }
+}
+
 /* ── Render: Models Table ── */
 function renderModels(state: SettingsState) {
   if (!container) return;
@@ -91,6 +129,8 @@ function renderModels(state: SettingsState) {
 
   const allModels = getAllModels();
   const filtered = getFilteredModels(allModels, state);
+
+  renderTableHeader(state, filtered);
 
   if (filtered.length === 0) {
     table.parentElement?.classList.add("hidden");
@@ -114,12 +154,15 @@ function renderModels(state: SettingsState) {
           ${entry.isSelected ? "checked" : ""}
           class="model-checkbox w-4 h-4 accent-primary rounded border-border shrink-0"
         />
-        <img
-          src="${entry.providerIcon}"
-          alt="${entry.providerName}"
-          class="w-5 h-5 shrink-0 object-contain opacity-60 group-hover:opacity-100 transition-opacity"
-        />
-        <span class="text-sm text-text-secondary group-hover:text-text transition-colors truncate">${entry.model}</span>
+        <div class="w-24 shrink-0 flex items-center gap-2">
+          <img
+            src="${entry.providerIcon}"
+            alt="${entry.providerName}"
+            class="w-4 h-4 shrink-0 object-contain opacity-60 group-hover:opacity-100 transition-opacity"
+          />
+          <span class="text-xs text-text opacity-60 group-hover:opacity-100 transition-colors">${entry.providerName}</span>
+        </div>
+        <span class="text-sm text-text opacity-60 group-hover:opacity-100 transition-colors flex-1">${entry.model}</span>
       </label>
     `,
     )
@@ -199,17 +242,6 @@ function bindStaticEvents() {
     }
   });
 
-  // Sort toggle
-  const sortBtn = container.querySelector("#sort-btn");
-  const sortLabel = container.querySelector("#sort-label");
-
-  sortBtn?.addEventListener("click", () => {
-    const current = store.get().sortDirection;
-    const next = current === "asc" ? "desc" : "asc";
-    if (sortLabel) sortLabel.textContent = next === "asc" ? "A → Z" : "Z → A";
-    store.set({ sortDirection: next });
-  });
-
   isInitialized = true;
 }
 
@@ -240,10 +272,47 @@ function attachDynamicEvents() {
 
       return;
     }
+
+    // Sort button (now in header)
+    const sortBtn = target.closest("#sort-btn");
+    if (sortBtn) {
+      const current = store.get().sortDirection;
+      const next = current === "asc" ? "desc" : "asc";
+      store.set({ sortDirection: next });
+      return;
+    }
   });
 
   container.addEventListener("change", (e) => {
     const target = e.target as HTMLInputElement;
+
+    // Select All
+    if (target.id === "select-all-models") {
+      const isChecked = target.checked;
+      const state = store.get();
+      const allModels = getAllModels();
+      const filtered = getFilteredModels(allModels, state);
+
+      const settings = db.getSettings();
+
+      for (const entry of filtered) {
+        const key = settings.apiKeys.find((k) => k.id === entry.keyId);
+        if (key) {
+          if (isChecked) {
+            if (!key.selectedModels.includes(entry.model)) {
+              key.selectedModels.push(entry.model);
+            }
+          } else {
+            key.selectedModels = key.selectedModels.filter((m) => m !== entry.model);
+          }
+        }
+      }
+
+      db.saveSettings(settings);
+      window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
+      render(store.get());
+      return;
+    }
 
     // Model checkboxes
     if (target.matches(".model-checkbox")) {
@@ -259,6 +328,7 @@ function attachDynamicEvents() {
         }
         db.saveSettings(settings);
         window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
+        render(store.get()); // Re-render to update the Select All checkbox state
       }
     }
   });

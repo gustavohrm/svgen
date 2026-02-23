@@ -1,26 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #fafafa; /* neutral-50 */
-  --color-primary-contrast: #0a0a0a; /* neutral-950 */
-  --color-primary-dark: #e5e5e5; /* neutral-200 */
-  --color-primary-light: #ffffff; /* white */
+  --color-primary: var(--color-neutral-50);
+  --color-primary-contrast: var(--color-neutral-950);
+  --color-primary-dark: var(--color-neutral-200);
+  --color-primary-light: var(--color-neutral-100);
 
-  --color-background: #0a0a0a; /* neutral-950 */
-  --color-surface: #171717; /* neutral-900 */
-  --color-surface-hover: #262626; /* neutral-800 */
+  --color-background: var(--color-neutral-950);
+  --color-surface: var(--color-neutral-900);
+  --color-surface-hover: var(--color-neutral-800);
 
-  --color-border: #262626; /* neutral-800 */
-  --color-border-bright: #404040; /* neutral-700 */
+  --color-border: var(--color-neutral-700);
+  --color-border-bright: var(--color-neutral-600);
 
-  --color-text: #fafafa; /* neutral-50 */
-  --color-text-secondary: #a3a3a3; /* neutral-400 */
-  --color-text-muted: #737373; /* neutral-500 */
+  --color-text: var(--color-neutral-50);
+  --color-text-secondary: var(--color-neutral-400);
+  --color-text-muted: var(--color-neutral-500);
 
-  --color-success: #10b981; /* emerald-500 */
-  --color-warning: #f59e0b; /* amber-500 */
-  --color-error: #ef4444; /* red-500 */
-  --color-info: #0ea5e9; /* sky-500 */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #0ea5e9;
 
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }

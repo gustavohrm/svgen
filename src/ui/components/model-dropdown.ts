@@ -105,7 +105,7 @@ export class ModelDropdown extends HTMLElement {
       } else {
         modelOptionsHtml = `
           <div class="flex flex-col w-[500px]">
-            <div class="p-3 border-b border-border/10 bg-background shrink-0">
+            <div class="p-3 border-b border-border bg-background shrink-0">
               <div class="relative w-full">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 <input type="text" id="model-dropdown-search" autocomplete="off" placeholder="Search models..." class="w-full bg-surface-hover/30 border border-border/50 rounded-lg pl-9 pr-3 py-2 text-xs text-text placeholder:text-text-muted outline-none focus:border-border-bright transition-all">
@@ -142,7 +142,7 @@ export class ModelDropdown extends HTMLElement {
       <div class="relative" id="model-dropdown-container">
         <button
           id="model-dropdown-btn"
-          class="flex items-center gap-2 bg-surface-hover/30 hover:bg-surface-hover/50 border border-transparent hover:border-border-bright rounded-lg px-4 py-2 cursor-pointer transition-all"
+          class="flex items-center gap-2 bg-surface hover:bg-surface-hover rounded-lg px-3 py-2 cursor-pointer transition-all"
         >
           <span
             class="text-xs font-semibold text-text max-w-[150px] truncate"
@@ -167,7 +167,7 @@ export class ModelDropdown extends HTMLElement {
 
         <div
           id="model-dropdown-menu"
-          class="absolute left-0 top-[calc(100%+8px)] bg-background rounded-xl hidden flex-col overflow-hidden transform origin-top-left transition-all z-50 border border-border/50"
+          class="absolute left-0 top-[calc(100%+8px)] bg-background rounded-xl hidden flex-col overflow-hidden transform origin-top-left transition-all z-50 border border-border"
         >
           ${modelOptionsHtml}
         </div>

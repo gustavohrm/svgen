@@ -62,7 +62,7 @@ export class GeneratorControls extends HTMLElement {
 
               <div class="flex items-center gap-2">
                 <label
-                  class="flex items-center gap-2 bg-surface-hover/30 hover:bg-surface-hover/50 border border-transparent hover:border-border-bright rounded-lg px-4 py-2 cursor-pointer transition-all group"
+                  class="cursor-pointer"
                   title="Attach reference SVG"
                 >
                   <svg
@@ -73,15 +73,12 @@ export class GeneratorControls extends HTMLElement {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-4 h-4 text-text-muted group-hover:text-text-secondary"
+                    class="w-4 h-4 text-text-secondary hover:text-text transition duration-400"
                   >
                     <path
                       d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
                     />
                   </svg>
-                  <span class="text-xs font-medium text-text-secondary group-hover:text-text">
-                    Attach
-                  </span>
                   <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
                 </label>
               </div>
