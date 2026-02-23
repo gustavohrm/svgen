@@ -21,9 +21,9 @@ function render() {
       const keys = settings.apiKeys.filter((k) => k.providerId === provider.id);
       return `
         <div class="card">
-          <div class="px-6 py-4 bg-surface-hover/20 border-b border-border flex items-center justify-between">
+          <div class="px-6 py-4 border-b border-border/50 flex items-center justify-between">
             <span class="text-sm font-semibold text-text">${provider.name}</span>
-            <button data-action="add-key" data-provider="${provider.id}" class="text-xs font-medium text-primary-light hover:text-primary transition-all cursor-pointer flex items-center gap-1.5">
+            <button data-action="add-key" data-provider="${provider.id}" class="text-xs font-medium text-text-secondary hover:text-text transition-all cursor-pointer flex items-center gap-1.5">
                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               <span>Add Key</span>
             </button>
@@ -31,7 +31,7 @@ function render() {
           <div class="p-6 space-y-6">
             ${
               keys.length === 0
-                ? `<div class="flex flex-col items-center justify-center py-8 text-center bg-surface-hover/10 rounded-xl border border-dashed border-border">
+                ? `<div class="flex flex-col items-center justify-center py-8 text-center bg-transparent rounded-xl border border-dashed border-border/50 hover:border-border transition-all">
                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key text-text-muted/30 mb-2"><path d="m21 2-2 2.5-2-2.5"/><path d="M15.5 7.5L14 9l1.5 1.5M10.5 16s1.5 1.5 1.5 3.5c0 2-2 3.5-4 3.5s-4-1.5-4-3.5c0-2 1.5-3.5 1.5-3.5L10.5 16z"/><path d="m10.5 16 3-3"/><path d="m14 9 7-7"/><path d="m16 9 1-1"/></svg>
                      <p class="text-xs text-text-muted">No keys configured for ${provider.name}</p>
                    </div>`
@@ -41,7 +41,7 @@ function render() {
                       return `
               <div class="space-y-4">
                 <div class="flex items-center gap-4 group">
-                  <label class="flex-1 flex items-center gap-4 cursor-pointer p-4 rounded-xl border ${isActive ? "border-primary/50 bg-primary/5" : "border-border bg-surface-hover/5 hover:bg-surface-hover/10"} transition-all">
+                  <label class="flex-1 flex items-center gap-4 cursor-pointer p-4 rounded-xl border ${isActive ? "border-text/30 bg-surface-hover/10" : "border-border/50 bg-transparent hover:bg-surface-hover/5"} transition-all">
                     <input type="radio" name="active-key-${key.providerId}" value="${key.id}" data-provider-id="${key.providerId}" ${isActive ? "checked" : ""} 
                            class="w-4 h-4 accent-primary" 
                            onchange="this.dispatchEvent(new CustomEvent('key-selected', { bubbles: true, detail: { id: '${key.id}' } }))">
@@ -66,19 +66,19 @@ function render() {
                 ${
                   isActive
                     ? `
-                  <div class="ml-12 p-5 bg-surface-hover/20 rounded-xl border border-border">
+                  <div class="ml-12 p-5 bg-transparent rounded-xl border border-border/50">
                     <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div class="flex items-center gap-3">
                           <span class="text-sm font-medium text-text">Available Models</span>
                           <div class="flex items-center gap-2 text-xs">
-                            <button data-action="select-all" data-key-id="${key.id}" class="text-primary-light hover:text-primary transition-colors cursor-pointer">Select All</button>
+                            <button data-action="select-all" data-key-id="${key.id}" class="text-text-secondary hover:text-text transition-colors cursor-pointer">Select All</button>
                             <span class="text-border">|</span>
                             <button data-action="deselect-all" data-key-id="${key.id}" class="text-text-muted hover:text-text transition-colors cursor-pointer">Deselect All</button>
                           </div>
                         </div>
                         <div class="relative w-full sm:max-w-[200px]">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                          <input type="text" placeholder="Search models..." class="model-search-input w-full bg-background border border-border rounded-lg pl-9 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted outline-none focus:border-primary-light transition-all" data-list-id="model-list-${key.id}">
+                          <input type="text" placeholder="Search models..." class="model-search-input w-full bg-transparent border border-border/50 rounded-lg pl-9 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted outline-none focus:border-border transition-all" data-list-id="model-list-${key.id}">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2" id="model-list-${key.id}">
@@ -89,7 +89,7 @@ function render() {
                           .map((m) => {
                             const isChecked = key.selectedModels.includes(m);
                             return `
-                            <label class="model-item flex items-center gap-3 text-xs font-medium text-text-secondary cursor-pointer hover:text-text transition-colors p-2 rounded-lg hover:bg-surface-hover/30">
+                            <label class="model-item flex items-center gap-3 text-xs font-medium text-text-secondary cursor-pointer hover:text-text transition-colors p-2 rounded-lg hover:bg-surface-hover/10 border border-transparent hover:border-border/20">
                               <input type="checkbox" data-key-id="${key.id}" value="${m}" ${isChecked ? "checked" : ""} class="accent-primary rounded border-border model-checkbox">
                               <span class="truncate">${m}</span>
                             </label>
@@ -98,7 +98,7 @@ function render() {
                           .join("");
                       }
                       return `<div class="col-span-full py-4 text-center">
-                               <button data-action="fetch-models" data-key-id="${key.id}" class="text-sm font-medium text-primary-light hover:text-primary transition-all">Click Sync to load models</button>
+                               <button data-action="fetch-models" data-key-id="${key.id}" class="text-sm font-medium text-text-secondary hover:text-text transition-all">Click Sync to load models</button>
                               </div>`;
                     })()}
                     </div>

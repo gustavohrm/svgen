@@ -46,7 +46,7 @@ function renderGenerator() {
       if (providerModels.size > 0) {
         // Add Provider Tab
         providerTabsHtml += `
-          <button data-tab-target="provider-pane-${provider.id}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-primary-light bg-surface" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
+          <button data-tab-target="provider-pane-${provider.id}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
              <div class="flex items-center gap-2 max-w-full overflow-hidden">
                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 shrink-0"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
                <span class="truncate">${provider.name}</span>
@@ -58,7 +58,6 @@ function renderGenerator() {
         // Add Provider Pane
         providerPanesHtml += `
           <div id="provider-pane-${provider.id}" class="provider-pane flex-col gap-1 ${isFirstProvider ? "flex" : "hidden"}">
-            <div class="sticky -top-3 -mt-3 -mx-3 px-4 py-2.5 mb-2 bg-surface z-10 text-xs font-semibold text-text-secondary border-b border-border/10">${provider.name} Models</div>
         `;
 
         for (const model of providerModels) {
@@ -68,8 +67,7 @@ function renderGenerator() {
           }
           providerPanesHtml += `
             <button data-model="${model}" data-provider-id="${provider.id}" class="model-option w-full text-left px-3 py-2.5 text-xs font-medium text-text-secondary hover:text-text hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2">
-               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5 text-text-muted shrink-0"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
-               <span class="truncate">${model}</span>
+              <span class="truncate">${model}</span>
             </button>
           `;
         }
@@ -84,10 +82,10 @@ function renderGenerator() {
     } else {
       modelOptionsHtml = `
         <div class="flex flex-col w-[500px]">
-          <div class="p-3 border-b border-border/10 bg-surface shrink-0">
+          <div class="p-3 border-b border-border/10 bg-background shrink-0">
             <div class="relative w-full">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" id="model-dropdown-search" autocomplete="off" placeholder="Search models..." class="w-full bg-surface-hover/30 border border-border/50 rounded-lg pl-9 pr-3 py-2 text-xs text-text placeholder:text-text-muted outline-none focus:border-primary-light transition-all">
+              <input type="text" id="model-dropdown-search" autocomplete="off" placeholder="Search models..." class="w-full bg-surface-hover/30 border border-border/50 rounded-lg pl-9 pr-3 py-2 text-xs text-text placeholder:text-text-muted outline-none focus:border-border-bright transition-all">
             </div>
           </div>
           <div class="flex h-[320px]">
@@ -96,7 +94,7 @@ function renderGenerator() {
               ${providerTabsHtml}
             </div>
             <!-- Models Area -->
-            <div class="flex-1 overflow-y-auto custom-scrollbar p-3 bg-surface relative">
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-3 bg-background relative">
               ${providerPanesHtml}
             </div>
           </div>
@@ -146,7 +144,7 @@ const renderAttachments = async () => {
 
     const div = document.createElement("div");
     div.className =
-      "relative group w-20 h-20 rounded-xl border border-border/50 overflow-hidden bg-surface-hover flex items-center justify-center";
+      "relative group w-20 h-20 rounded-xl border border-border/50 overflow-hidden bg-transparent flex items-center justify-center";
     div.innerHTML = `
         <img src="${dataUrl}" class="w-full h-full object-contain p-2" alt="attachment" />
         <button data-index="${i}" class="absolute top-1 right-1 w-6 h-6 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
@@ -233,12 +231,12 @@ function attachGeneratorEvents() {
 
         // Reset all tabs
         genContainer.querySelectorAll(".provider-tab").forEach((t) => {
-          t.classList.remove("text-primary-light", "bg-surface");
+          t.classList.remove("text-text", "bg-surface-hover/30");
           t.classList.add("text-text-muted");
         });
 
         // Set active tab
-        target.classList.add("text-primary-light", "bg-surface");
+        target.classList.add("text-text", "bg-surface-hover/30");
         target.classList.remove("text-text-muted");
 
         // Hide all panes
@@ -367,12 +365,12 @@ function renderResults() {
   resultsInner.innerHTML = currentSvgs
     .map(
       (svgCode, i) => `
-        <div class="card group hover:border-primary/30 transition-all duration-300">
-          <div class="p-8 bg-surface-hover/10 flex-1 min-h-[280px] flex items-center justify-center relative">
+        <div class="card group hover:border-border transition-all duration-300">
+          <div class="p-8 flex-1 min-h-[280px] flex items-center justify-center relative">
             ${sanitizeSvgDisplay(svgCode)}
           </div>
           
-          <div class="px-5 py-4 bg-surface border-t border-border flex items-center justify-between gap-3">
+          <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
             <span class="text-sm font-medium text-text">Variation ${i + 1}</span>
             <div class="flex gap-1">
               <button data-action="copy" data-index="${i}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Copy SVG">
@@ -403,9 +401,9 @@ function renderResultsSkeleton() {
   resultsInner.innerHTML = Array.from({ length: 4 })
     .map(
       () => `
-        <div class="card h-[340px] animate-pulse flex flex-col">
-          <div class="flex-1 bg-surface-hover/20"></div>
-          <div class="p-5 flex items-center justify-between border-t border-border">
+        <div class="card h-[340px] animate-pulse flex flex-col border-border/50 bg-transparent">
+          <div class="flex-1"></div>
+          <div class="p-5 flex items-center justify-between border-t border-border/50">
             <div class="h-2 w-16 bg-surface-hover/40 rounded-full"></div>
             <div class="flex gap-1">
               <div class="h-8 w-8 bg-surface-hover/40 rounded-lg"></div>
@@ -571,7 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (generateBtn) {
       generateBtn.disabled = true;
       generateBtn.innerHTML = `
-          <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
         `;
     }
 

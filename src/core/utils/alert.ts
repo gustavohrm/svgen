@@ -21,13 +21,13 @@ function createAlertElement(options: AlertOptions): HTMLDivElement {
   const div = document.createElement("div");
 
   let classes =
-    "px-4 py-3 rounded-lg border border-border text-sm font-medium pointer-events-auto min-w-[280px] shadow-lg flex items-center transition-all ";
+    "px-4 py-3 rounded-lg border text-sm font-medium pointer-events-auto min-w-[280px] flex items-center transition-all ";
 
   const themeColors = {
-    success: "bg-surface text-emerald-500 border-emerald-500/20",
-    error: "bg-surface text-rose-500 border-rose-500/20",
-    warning: "bg-surface text-amber-500 border-amber-500/20",
-    info: "bg-surface text-primary border-primary/20",
+    success: "bg-background text-emerald-500 border-emerald-500/20",
+    error: "bg-background text-rose-500 border-rose-500/20",
+    warning: "bg-background text-amber-500 border-amber-500/20",
+    info: "bg-background text-text border-border/50",
   };
 
   classes += themeColors[options.type];
