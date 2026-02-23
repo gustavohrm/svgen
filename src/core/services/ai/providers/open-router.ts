@@ -4,6 +4,11 @@ import {
   ProviderConfigField,
   AiProviderId,
 } from "../../../types/index";
+import { extractSvgFromResult } from "../../../utils/svg-parser";
+
+interface OpenRouterApiModel {
+  id: string;
+}
 
 export class OpenRouterProvider implements AiProvider {
   id: AiProviderId = "open-router";
@@ -27,17 +32,17 @@ export class OpenRouterProvider implements AiProvider {
         },
       });
       if (!res.ok) throw new Error("Failed to fetch OpenRouter models");
-      const data = await res.json();
+      const data = (await res.json()) as { data: OpenRouterApiModel[] };
       // Filter for models that likely support text/chat
       // OpenRouter models usually have 'id'. Some might be image models (like dall-e-3).
       // We can filter out known image models or check for specific properties.
       return data.data
-        .filter((m: any) => {
+        .filter((m) => {
           const id = m.id.toLowerCase();
           // Exclude known image-only models
           return !id.includes("dall-e") && !id.includes("stable-diffusion") && !id.includes("flux");
         })
-        .map((m: any) => m.id);
+        .map((m) => m.id);
     } catch (e) {
       console.error(e);
       return [];
@@ -75,15 +80,6 @@ export class OpenRouterProvider implements AiProvider {
 
     const data = await res.json();
     const result = data.choices[0]?.message?.content || "";
-    return this.extractResult(result);
-  }
-
-  private extractResult(text: string): string {
-    const start = text.indexOf("<svg");
-    const end = text.lastIndexOf("</svg>");
-    if (start !== -1 && end !== -1) {
-      return text.substring(start, end + 6);
-    }
-    return text;
+    return extractSvgFromResult(result);
   }
 }

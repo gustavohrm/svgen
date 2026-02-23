@@ -4,6 +4,12 @@ import {
   ProviderConfigField,
   AiProviderId,
 } from "../../../types/index";
+import { extractSvgFromResult } from "../../../utils/svg-parser";
+
+interface GCPApiModel {
+  name: string;
+  supportedGenerationMethods: string[];
+}
 
 export class GoogleCloudProvider implements AiProvider {
   id: AiProviderId = "gcp";
@@ -26,11 +32,11 @@ export class GoogleCloudProvider implements AiProvider {
         `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       );
       if (!res.ok) throw new Error("Failed to fetch GCP models");
-      const data = await res.json();
+      const data = (await res.json()) as { models: GCPApiModel[] };
       // Only include models that support generateContent (text/chat models)
       return data.models
-        .filter((m: any) => m.supportedGenerationMethods.includes("generateContent"))
-        .map((m: any) => m.name.replace("models/", ""));
+        .filter((m) => m.supportedGenerationMethods.includes("generateContent"))
+        .map((m) => m.name.replace("models/", ""));
     } catch (e) {
       console.error(e);
       return [];
@@ -74,15 +80,6 @@ export class GoogleCloudProvider implements AiProvider {
 
     const data = await res.json();
     const result = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return this.extractResult(result);
-  }
-
-  private extractResult(text: string): string {
-    const start = text.indexOf("<svg");
-    const end = text.lastIndexOf("</svg>");
-    if (start !== -1 && end !== -1) {
-      return text.substring(start, end + 6);
-    }
-    return text;
+    return extractSvgFromResult(result);
   }
 }

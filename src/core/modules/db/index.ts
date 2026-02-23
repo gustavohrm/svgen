@@ -36,13 +36,13 @@ export const db = {
         // Handle migration from very old format
         if (parsed.openRouterKey || parsed.gcpKey) {
           parsed.apiKeys = parsed.apiKeys || (Array.isArray(parsed.apiKeys) ? parsed.apiKeys : []);
-          const oldRecord = parsed.apiKeys as any;
+          const oldRecord = parsed.apiKeys as Record<string, unknown>;
 
           if (!Array.isArray(parsed.apiKeys)) {
             parsed.apiKeys = [];
             // Migrate from Record<string, string> -> Array<ApiKeyItem>
             if (oldRecord && typeof oldRecord === "object") {
-              for (const [pId, value] of Object.entries<string>(oldRecord)) {
+              for (const [pId, value] of Object.entries(oldRecord)) {
                 if (value && typeof value === "string") {
                   const providerId = (pId === "openrouter" ? "open-router" : pId) as AiProviderId;
                   parsed.apiKeys.push({
@@ -63,10 +63,10 @@ export const db = {
 
         // Migrate from mid-level format
         if (parsed.apiKeys && !Array.isArray(parsed.apiKeys)) {
-          const oldRecord = parsed.apiKeys as any;
+          const oldRecord = parsed.apiKeys as Record<string, unknown>;
           const newApiKeys: ApiKeyItem[] = [];
 
-          for (const [pId, value] of Object.entries<string>(oldRecord)) {
+          for (const [pId, value] of Object.entries(oldRecord)) {
             if (value && typeof value === "string") {
               const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
               const providerId = (pId === "openrouter" ? "open-router" : pId) as AiProviderId;
@@ -97,14 +97,15 @@ export const db = {
         }
 
         // Migrate older activeKeyId if it exists
-        if ((parsed as any).activeKeyId) {
+        const oldParsed = parsed as { activeKeyId?: string };
+        if (oldParsed.activeKeyId) {
           const oldActiveKey = merged.apiKeys.find(
-            (k: ApiKeyItem) => k.id === (parsed as any).activeKeyId,
+            (k: ApiKeyItem) => k.id === oldParsed.activeKeyId,
           );
           if (oldActiveKey) {
             merged.activeKeys[oldActiveKey.providerId] = oldActiveKey.id;
           }
-          delete (merged as any).activeKeyId;
+          delete oldParsed.activeKeyId;
         }
 
         // Auto-assign first key for any provider that doesn't have an active one
