@@ -33,6 +33,10 @@ export const db = {
       try {
         const parsed = JSON.parse(saved);
 
+        if (!parsed || typeof parsed !== "object") {
+          throw new Error("Invalid settings payload in localStorage");
+        }
+
         // Handle migration from very old format
         if (parsed.openRouterKey || parsed.gcpKey) {
           parsed.apiKeys = parsed.apiKeys || (Array.isArray(parsed.apiKeys) ? parsed.apiKeys : []);
@@ -116,7 +120,8 @@ export const db = {
         }
 
         return merged;
-      } catch (e) {
+      } catch (error: unknown) {
+        console.warn("Failed to parse settings, falling back to defaults", error);
         return defaultSettings;
       }
     }

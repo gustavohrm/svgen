@@ -11,18 +11,15 @@ const DB_VERSION = 1;
 const STORE_NAME = "svgs";
 
 class GalleryDatabase {
-  private db: IDBDatabase | null = null;
+  private dbPromise: Promise<IDBDatabase>;
+  private dbInstance: IDBDatabase | null = null;
 
   constructor() {
-    this.openDb();
+    this.dbPromise = this.initDb();
   }
 
-  private openDb(): Promise<IDBDatabase> {
+  private initDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      if (this.db) {
-        return resolve(this.db);
-      }
-
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
@@ -33,19 +30,25 @@ class GalleryDatabase {
       };
 
       request.onsuccess = (event) => {
-        this.db = (event.target as IDBOpenDBRequest).result;
-        resolve(this.db);
+        const db = (event.target as IDBOpenDBRequest).result;
+        this.dbInstance = db;
+        resolve(db);
       };
 
       request.onerror = (event) => {
-        console.error("IndexedDB error:", (event.target as IDBOpenDBRequest).error);
-        reject((event.target as IDBOpenDBRequest).error);
+        const error = (event.target as IDBOpenDBRequest).error;
+        console.error("IndexedDB error:", error);
+        reject(error);
       };
     });
   }
 
+  private async getDb(): Promise<IDBDatabase> {
+    return this.dbPromise;
+  }
+
   async saveSvg(item: GalleryItem): Promise<void> {
-    const db = await this.openDb();
+    const db = await this.getDb();
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     return new Promise((resolve, reject) => {
@@ -56,7 +59,7 @@ class GalleryDatabase {
   }
 
   async getAllSvgs(): Promise<GalleryItem[]> {
-    const db = await this.openDb();
+    const db = await this.getDb();
     const transaction = db.transaction(STORE_NAME, "readonly");
     const store = transaction.objectStore(STORE_NAME);
     return new Promise((resolve, reject) => {
@@ -67,7 +70,7 @@ class GalleryDatabase {
   }
 
   async deleteSvg(id: string): Promise<void> {
-    const db = await this.openDb();
+    const db = await this.getDb();
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
     return new Promise((resolve, reject) => {
@@ -78,9 +81,9 @@ class GalleryDatabase {
   }
 
   close() {
-    if (this.db) {
-      this.db.close();
-      this.db = null;
+    if (this.dbInstance) {
+      this.dbInstance.close();
+      this.dbInstance = null;
     }
   }
 

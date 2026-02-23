@@ -110,38 +110,41 @@ export class ResultsGrid extends HTMLElement {
   };
 
   private attachSvgEvents() {
-    attachSvgCardEvents(this, this.resolveSvgByCardId, [
-      {
-        actionId: "save-to-gallery",
-        handler: async (cardId: string) => {
-          const svgContent = this.resolveSvgByCardId(cardId);
+    attachSvgCardEvents(this, {
+      svgResolver: this.resolveSvgByCardId,
+      customHandlers: [
+        {
+          actionId: "save-to-gallery",
+          handler: async (cardId: string) => {
+            const svgContent = this.resolveSvgByCardId(cardId);
 
-          if (!svgContent) {
-            showAlert({ type: "error", message: "No SVG content to save." });
-            return;
-          }
+            if (!svgContent) {
+              showAlert({ type: "error", message: "No SVG content to save." });
+              return;
+            }
 
-          const galleryItem: GalleryItem = {
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            svg: svgContent,
-            prompt: this.currentPrompt,
-            model: this.currentModel,
-            timestamp: Date.now(),
-          };
+            const galleryItem: GalleryItem = {
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              svg: svgContent,
+              prompt: this.currentPrompt,
+              model: this.currentModel,
+              timestamp: Date.now(),
+            };
 
-          try {
-            await galleryDb.saveSvg(galleryItem);
-            showAlert({ type: "success", message: "SVG saved to gallery!" });
-          } catch (error) {
-            console.error("Failed to save SVG to gallery:", error);
-            showAlert({
-              type: "error",
-              message: "Failed to save SVG to gallery.",
-            });
-          }
+            try {
+              await galleryDb.saveSvg(galleryItem);
+              showAlert({ type: "success", message: "SVG saved to gallery!" });
+            } catch (error: unknown) {
+              console.error("Failed to save SVG to gallery:", error);
+              showAlert({
+                type: "error",
+                message: "Failed to save SVG to gallery.",
+              });
+            }
+          },
         },
-      },
-    ]);
+      ],
+    });
   }
 }
 

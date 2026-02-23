@@ -43,8 +43,8 @@ export class OpenRouterProvider implements AiProvider {
           return !id.includes("dall-e") && !id.includes("stable-diffusion") && !id.includes("flux");
         })
         .map((m) => m.id);
-    } catch (e) {
-      console.error(e);
+    } catch (error: unknown) {
+      console.error("Failed to fetch OpenRouter models:", error);
       return [];
     }
   }

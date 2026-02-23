@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
         new CustomEvent(APP_EVENTS.SVGEN_RESULTS, { detail: { svgs: results, prompt, model } }),
       );
       showAlert({ type: "success", message: "SVGs generated successfully" });
-    } catch (error: Error | unknown) {
+    } catch (error: unknown) {
       // Use stricter error type than any
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate SVG. Please try again.";

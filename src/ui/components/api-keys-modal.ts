@@ -291,6 +291,7 @@ export class ApiKeysModal extends HTMLElement {
           this.renderBody();
           window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         } catch (err: unknown) {
+          console.error("Failed to sync models:", err);
           const message = err instanceof Error ? err.message : "Unknown error";
           showAlert({ type: "error", message: `Sync failed: ${message}` });
         } finally {

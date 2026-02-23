@@ -180,6 +180,7 @@ export function attachKeysModalEvents(container: HTMLElement, onUpdate: () => vo
         renderKeysModalBody(container);
         onUpdate();
       } catch (err: unknown) {
+        console.error("Failed to sync models:", err);
         const message = err instanceof Error ? err.message : "Unknown error";
         showAlert({ type: "error", message: `Sync failed: ${message}` });
       } finally {

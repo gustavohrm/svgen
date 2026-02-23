@@ -185,11 +185,16 @@ export function downloadSvg(svgContent: string, filename: string): void {
  * @param svgResolver - A function that returns the SVG content for a given cardId
  * @param customHandlers - Additional handlers for non-built-in actions
  */
+export interface AttachSvgCardEventsOptions {
+  svgResolver: (cardId: string) => string | undefined;
+  customHandlers?: SvgCardActionHandler[];
+}
+
 export function attachSvgCardEvents(
   container: HTMLElement,
-  svgResolver: (cardId: string) => string | undefined,
-  customHandlers: SvgCardActionHandler[] = [],
+  options: AttachSvgCardEventsOptions,
 ): void {
+  const { svgResolver, customHandlers = [] } = options;
   // Prevent duplicate delegated listeners on the same container
   if (container.dataset.svgEventsAttached === "true") return;
 

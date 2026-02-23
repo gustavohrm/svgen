@@ -3,16 +3,15 @@ import { galleryDb, GalleryItem } from "../core/modules/gallery-db/index";
 import { showAlert } from "../core/utils/alert";
 import { renderSvgCard, attachSvgCardEvents } from "../core/utils/svg-card";
 
-const container = document.getElementById("gallery-container");
+let currentSvgs: GalleryItem[] = [];
 
 async function loadGallery() {
-  if (!container) return;
-  const svgs = await galleryDb.getAllSvgs();
-  renderGallery(svgs);
-  attachEvents(svgs);
+  currentSvgs = await galleryDb.getAllSvgs();
+  renderGallery(currentSvgs);
 }
 
 function renderGallery(svgs: GalleryItem[]) {
+  const container = document.getElementById("gallery-container");
   if (!container) return;
 
   const countDiv = container.querySelector("#gallery-count");
@@ -53,31 +52,36 @@ function renderGallery(svgs: GalleryItem[]) {
   gridDiv.innerHTML = svgGrid;
 }
 
-function attachEvents(svgs: GalleryItem[]) {
+function initEvents() {
+  const container = document.getElementById("gallery-container");
   if (!container) return;
 
   const svgResolver = (cardId: string): string | undefined => {
-    const item = svgs.find((s) => s.id === cardId);
+    const item = currentSvgs.find((s) => s.id === cardId);
     return item?.svg;
   };
 
-  attachSvgCardEvents(container, svgResolver, [
-    {
-      actionId: "delete-svg",
-      handler: async (cardId: string) => {
-        if (confirm("Are you sure you want to delete this SVG?")) {
-          await galleryDb.deleteSvg(cardId);
-          showAlert({
-            type: "success",
-            message: "SVG deleted from gallery.",
-          });
-          loadGallery();
-        }
+  attachSvgCardEvents(container, {
+    svgResolver,
+    customHandlers: [
+      {
+        actionId: "delete-svg",
+        handler: async (cardId: string) => {
+          if (confirm("Are you sure you want to delete this SVG?")) {
+            await galleryDb.deleteSvg(cardId);
+            showAlert({
+              type: "success",
+              message: "SVG deleted from gallery.",
+            });
+            loadGallery();
+          }
+        },
       },
-    },
-  ]);
+    ],
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initEvents();
   loadGallery();
 });
