@@ -1,4 +1,5 @@
 import "../ui/components/app-header";
+import "../ui/components/app-modal";
 import { db, ApiKeyItem } from "../core/modules/db/index";
 import { createDefaultProviderRegistry } from "../core/services/ai/providers/index";
 import { showAlert } from "../core/utils/alert";
@@ -20,7 +21,7 @@ function render() {
     .map((provider) => {
       const keys = settings.apiKeys.filter((k) => k.providerId === provider.id);
       return `
-        <div class="card">
+        <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all">
           <div class="px-6 py-4 border-b border-border/50 flex items-center justify-between">
             <span class="text-sm font-semibold text-text">${provider.name}</span>
             <button data-action="add-key" data-provider="${provider.id}" class="text-xs font-medium text-text-secondary hover:text-text transition-all cursor-pointer flex items-center gap-1.5">

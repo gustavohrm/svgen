@@ -365,7 +365,7 @@ function renderResults() {
   resultsInner.innerHTML = currentSvgs
     .map(
       (svgCode, i) => `
-        <div class="card group hover:border-border transition-all duration-300">
+        <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border">
           <div class="p-8 flex-1 min-h-[280px] flex items-center justify-center relative">
             ${sanitizeSvgDisplay(svgCode)}
           </div>
@@ -401,7 +401,7 @@ function renderResultsSkeleton() {
   resultsInner.innerHTML = Array.from({ length: 4 })
     .map(
       () => `
-        <div class="card h-[340px] animate-pulse flex flex-col border-border/50 bg-transparent">
+        <div class="bg-transparent border border-border/50 rounded-xl overflow-hidden transition-all h-[340px] animate-pulse flex flex-col">
           <div class="flex-1"></div>
           <div class="p-5 flex items-center justify-between border-t border-border/50">
             <div class="h-2 w-16 bg-surface-hover/40 rounded-full"></div>

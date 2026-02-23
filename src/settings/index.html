@@ -18,111 +18,71 @@
         <div id="provider-list" class="space-y-8"></div>
 
         <!-- Add Key Modal -->
-        <div
-          id="add-key-modal"
-          class="fixed inset-0 z-50 items-center justify-center p-4 bg-background/80 hidden backdrop-blur-md transition-all duration-300"
+        <app-modal
+          modal-id="add-key-modal"
+          title-id="add-key-title"
+          modal-title="Add API Key"
+          close-btn-id="close-modal-btn"
         >
-          <div
-            class="bg-background border border-border rounded-2xl w-full max-w-md overflow-hidden scale-100"
-          >
-            <div class="px-8 py-6 border-b border-border flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-text" id="add-key-title">Add API Key</h3>
-              <button
-                id="close-modal-btn"
-                class="p-2 text-text-secondary hover:text-text transition-all rounded-lg hover:bg-surface-hover"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="lucide lucide-x"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </button>
+          <div class="p-8 space-y-6">
+            <input type="hidden" id="modal-provider-id" />
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-text-secondary ml-1">Key Name</label>
+              <input
+                type="text"
+                id="modal-key-name"
+                placeholder="e.g. Primary Key"
+                class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+              />
             </div>
-            <div class="p-8 space-y-6">
-              <input type="hidden" id="modal-provider-id" />
-              <div class="space-y-2">
-                <label class="block text-sm font-medium text-text-secondary ml-1">Key Name</label>
-                <input
-                  type="text"
-                  id="modal-key-name"
-                  placeholder="e.g. Primary Key"
-                  class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
-                />
-              </div>
-              <div class="space-y-2">
-                <label class="block text-sm font-medium text-text-secondary ml-1">Key Value</label>
-                <input
-                  type="password"
-                  id="modal-key-value"
-                  placeholder="sk-••••••••••••••••••••••••"
-                  class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
-                />
-              </div>
-            </div>
-            <div class="px-8 py-6 border-t border-border flex justify-end">
-              <button id="save-new-key" class="btn-primary px-8 py-3">Save Configuration</button>
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-text-secondary ml-1">Key Value</label>
+              <input
+                type="password"
+                id="modal-key-value"
+                placeholder="sk-••••••••••••••••••••••••"
+                class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+              />
             </div>
           </div>
-        </div>
+          <div class="px-8 py-6 border-t border-border flex justify-end">
+            <button
+              id="save-new-key"
+              class="bg-text text-background font-medium rounded-lg hover:bg-primary-dark active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all px-8 py-3"
+            >
+              Save Configuration
+            </button>
+          </div>
+        </app-modal>
 
         <!-- Edit Key Name Modal -->
-        <div
-          id="edit-key-modal"
-          class="fixed inset-0 z-50 items-center justify-center p-4 bg-background/80 hidden backdrop-blur-md transition-all duration-300"
+        <app-modal
+          modal-id="edit-key-modal"
+          title-id="edit-key-title"
+          modal-title="Edit API Key Name"
+          close-btn-id="close-edit-modal-btn"
         >
-          <div
-            class="bg-background border border-border rounded-2xl w-full max-w-md overflow-hidden scale-100"
-          >
-            <div class="px-8 py-6 border-b border-border flex items-center justify-between">
-              <h3 class="text-lg font-semibold text-text">Edit API Key Name</h3>
-              <button
-                id="close-edit-modal-btn"
-                class="p-2 text-text-secondary hover:text-text transition-all rounded-lg hover:bg-surface-hover"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="lucide lucide-x"
-                >
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </button>
-            </div>
-            <div class="p-8 space-y-6">
-              <input type="hidden" id="edit-modal-key-id" />
-              <div class="space-y-2">
-                <label class="block text-sm font-medium text-text-secondary ml-1">Key Name</label>
-                <input
-                  type="text"
-                  id="edit-modal-key-name"
-                  placeholder="e.g. Primary Key"
-                  class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
-                />
-              </div>
-            </div>
-            <div class="px-8 py-6 border-t border-border flex justify-end">
-              <button id="save-edit-key" class="btn-primary px-8 py-3">Save Changes</button>
+          <div class="p-8 space-y-6">
+            <input type="hidden" id="edit-modal-key-id" />
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-text-secondary ml-1">Key Name</label>
+              <input
+                type="text"
+                id="edit-modal-key-name"
+                placeholder="e.g. Primary Key"
+                class="w-full bg-transparent border border-border/50 rounded-xl px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+              />
             </div>
           </div>
-        </div>
+          <div class="px-8 py-6 border-t border-border flex justify-end">
+            <button
+              id="save-edit-key"
+              class="bg-text text-background font-medium rounded-lg hover:bg-primary-dark active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all px-8 py-3"
+            >
+              Save Changes
+            </button>
+          </div>
+        </app-modal>
       </div>
     </main>
   </body>
