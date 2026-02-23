@@ -53,15 +53,46 @@ document.addEventListener("DOMContentLoaded", () => {
     window.dispatchEvent(new Event(APP_EVENTS.GENERATION_STARTED));
 
     try {
-      const results = await aiService.generateMultiple(
-        {
-          prompt,
-          referenceSvgs,
-          model,
-          providerId,
-        },
-        variations || settings.variations || 4,
-      );
+      const requestedVariations = variations || settings.variations || 4;
+      let results: string[];
+
+      try {
+        results = await aiService.generateMultiple(
+          {
+            prompt,
+            referenceSvgs,
+            model,
+            providerId,
+          },
+          requestedVariations,
+        );
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "";
+        const shouldFallbackToSingle =
+          providerId === "gcp" &&
+          requestedVariations > 1 &&
+          /Multiple candidates is not enabled for this model/i.test(errorMessage);
+
+        if (!shouldFallbackToSingle) {
+          throw error;
+        }
+
+        showAlert({
+          type: "warning",
+          message: `Model ${model} does not support multiple candidates. Generated 1 variation instead.`,
+        });
+
+        results = await aiService.generateMultiple(
+          {
+            prompt,
+            referenceSvgs,
+            model,
+            providerId,
+          },
+          1,
+        );
+      }
+
       const generatedAt = Date.now();
 
       window.dispatchEvent(

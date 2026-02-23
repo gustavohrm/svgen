@@ -11,7 +11,8 @@ describe("db module", () => {
     const settings = db.getSettings();
     expect(settings.apiKeys).toEqual([]);
     expect(settings.activeKeys).toEqual({});
-    expect(settings.variations).toBe(1);
+    expect(settings.variations).toBe(4);
+    expect(settings.systemPrompt).toBe("");
   });
 
   it("should save and retrieve settings", () => {
@@ -42,9 +43,14 @@ describe("db module", () => {
     let settings = db.getSettings();
     expect(settings.variations).toBe(3);
 
+    db.saveSettings({ systemPrompt: "Custom prompt" });
+    settings = db.getSettings();
+    expect(settings.systemPrompt).toBe("Custom prompt");
+
     db.saveSettings({ activeKeys: { gcp: "some-id" } });
     settings = db.getSettings();
     expect(settings.variations).toBe(3);
+    expect(settings.systemPrompt).toBe("Custom prompt");
     expect(settings.activeKeys["gcp"]).toBe("some-id");
   });
 

@@ -11,7 +11,8 @@ function getOrCreateContainer(): HTMLDivElement {
   if (!container) {
     container = document.createElement("div");
     container.id = "global-alert-container";
-    container.className = "fixed bottom-8 right-8 z-50 flex flex-col gap-3 pointer-events-none";
+    container.className =
+      "fixed bottom-4 right-4 sm:bottom-8 sm:right-8 z-50 flex flex-col items-end gap-3 pointer-events-none max-w-[calc(100vw-2rem)]";
     document.body.appendChild(container);
   }
   return container;
@@ -21,7 +22,7 @@ function createAlertElement(options: AlertOptions): HTMLDivElement {
   const div = document.createElement("div");
 
   let classes =
-    "px-4 py-3 rounded-lg border text-sm font-medium pointer-events-auto min-w-[280px] flex items-center transition-all ";
+    "px-4 py-3 rounded-lg border text-sm font-medium pointer-events-auto min-w-[280px] max-w-[min(36rem,calc(100vw-2rem))] break-words whitespace-pre-wrap flex items-center transition-all ";
 
   const themeColors = {
     success: "bg-background text-emerald-500 border-emerald-500/20",

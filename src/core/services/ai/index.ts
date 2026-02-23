@@ -9,20 +9,30 @@ export interface ProviderRegistry {
   getProvider(id: AiProviderId): AiProvider | undefined;
 }
 
+export const DEFAULT_SYSTEM_PROMPT = `You are an expert SVG designer creating production-ready SVG artwork from user instructions.
+
+Design goals:
+- Translate the request into a clear visual composition with intentional hierarchy and spacing.
+- Favor clean geometry, balanced proportions, and strong readability at small and large sizes.
+- Use cohesive color palettes with sufficient contrast between key shapes.
+- Prefer reusable structure (grouping, transforms, shared styles) when it keeps output clear and compact.`;
+
+const SYSTEM_PROMPT_GUARDRAILS = `Output contract:
+1. Return exactly one complete <svg>...</svg> document and nothing else.
+2. Do not use markdown, code fences, explanations, or comments outside SVG.
+3. Ensure the SVG is valid and self-contained (no external assets, fonts, CSS, or scripts).
+4. Prefer a viewBox and responsive coordinates over fixed pixel width/height.
+5. Keep markup concise and deterministic while preserving visual quality.`;
+
 export class AiService {
   constructor(
     private readonly db: Database,
     private readonly providerRegistry: ProviderRegistry,
   ) {}
 
-  buildSystemPrompt(referenceSvgs?: string[]): string {
-    let systemPrompt = `You are an expert SVG designer. Your only job is to return valid, clean SVG code based on the user's request.
-Requirements:
-1. ONLY return the SVG code, nothing else.
-2. NO markdown formatting, NO backticks.
-3. Use Tailwind colors (hex/rgb) or semantic colors.
-4. Make sure the SVG is self-contained.
-5. viewBox is preferred over fixed width/height.`;
+  buildSystemPrompt(referenceSvgs?: string[], customSystemPrompt?: string): string {
+    const basePrompt = customSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
+    let systemPrompt = `${basePrompt}\n\n${SYSTEM_PROMPT_GUARDRAILS}`;
 
     if (referenceSvgs && referenceSvgs.length > 0) {
       systemPrompt += `\n\nReference SVGs are provided below to guide the style or structure:\n`;
@@ -57,7 +67,7 @@ Requirements:
       throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
 
-    const systemPrompt = this.buildSystemPrompt(options.referenceSvgs);
+    const systemPrompt = this.buildSystemPrompt(options.referenceSvgs, settings.systemPrompt);
 
     return provider.generate({
       prompt: options.prompt,

@@ -14,6 +14,7 @@ export interface AppSettings {
   apiKeys: ApiKeyItem[];
   activeKeys: Record<string, string>; // providerId -> active keyId mapping
   variations: number;
+  systemPrompt: string;
   lastSelectedModel?: string;
   lastSelectedProviderId?: string;
 }
@@ -22,6 +23,7 @@ const defaultSettings: AppSettings = {
   apiKeys: [],
   activeKeys: {},
   variations: 4,
+  systemPrompt: "",
   lastSelectedModel: undefined,
   lastSelectedProviderId: undefined,
 };

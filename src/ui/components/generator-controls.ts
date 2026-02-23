@@ -1,6 +1,7 @@
 import { APP_EVENTS } from "../../core/constants/events";
 import { ModelDropdown } from "./model-dropdown";
 import { db } from "../../core/modules/db/index";
+import { DEFAULT_SYSTEM_PROMPT } from "../../core/services/ai/index";
 
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
@@ -119,10 +120,10 @@ export class GeneratorControls extends HTMLElement {
                 </button>
                 <div
                   id="settings-menu"
-                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden items-center p-3 shadow-2xl z-50 min-w-max duration-200"
+                  class="absolute left-1/2 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-3 p-3 shadow-2xl z-50 min-w-3xs duration-200"
                 >
-                  <div class="flex items-center gap-3">
-                    <label class="text-xs font-medium text-text-secondary whitespace-nowrap">Variations</label>
+                  <div class="flex items-center justify-between gap-3">
+                    <label class="text-sm font-medium text-text-secondary whitespace-nowrap" for="variation-input">Variations</label>
                     <input
                       type="number"
                       id="variation-input"
@@ -131,6 +132,17 @@ export class GeneratorControls extends HTMLElement {
                       value="${db.getSettings().variations}"
                       class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
                     />
+                  </div>
+
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-sm font-medium text-text-secondary">System prompt</span>
+                    <button
+                      id="edit-system-prompt-btn"
+                      type="button"
+                      class="text-xs text-text-secondary hover:text-text transition cursor-pointer"
+                    >
+                      Edit
+                    </button>
                   </div>
                 </div>
               </div>
@@ -157,6 +169,60 @@ export class GeneratorControls extends HTMLElement {
           </div>
         </div>
         <div id="attachments-container" class="flex flex-wrap gap-4 mt-6 empty:hidden"></div>
+      </div>
+
+      <div
+        id="system-prompt-modal"
+        class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-background/80 backdrop-blur-md"
+      >
+        <div class="bg-background border border-border rounded-2xl w-full max-w-2xl overflow-hidden flex flex-col">
+          <div class="p-4 border-b border-border flex items-center justify-between">
+            <h3 class="text-base font-semibold">System Prompt</h3>
+            <button
+              id="close-system-prompt-modal-btn"
+              type="button"
+              class="p-1 rounded-lg hover:bg-surface-hover cursor-pointer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="p-4">
+            <textarea
+              id="system-prompt-modal-input"
+              rows="12"
+              class="w-full bg-transparent border border-border rounded-xl px-3 py-2.5 text-sm text-text outline-none resize-y leading-relaxed"
+            ></textarea>
+          </div>
+          <div class="p-4 border-t border-border flex items-center justify-end gap-2">
+            <button
+              id="cancel-system-prompt-btn"
+              type="button"
+              class="px-3 py-1.5 text-sm text-text-secondary hover:text-text transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              id="save-system-prompt-btn"
+              type="button"
+              class="px-3 py-1.5 text-sm bg-surface-hover hover:bg-text text-text hover:text-background rounded-lg transition cursor-pointer"
+            >
+              Save
+            </button>
+          </div>
+        </div>
       </div>
     `;
 
@@ -196,6 +262,23 @@ export class GeneratorControls extends HTMLElement {
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement;
     const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement;
     const variationInput = this.querySelector("#variation-input") as HTMLInputElement;
+    const editSystemPromptBtn = this.querySelector("#edit-system-prompt-btn") as HTMLButtonElement;
+    const systemPromptModal = this.querySelector("#system-prompt-modal") as HTMLDivElement;
+    const systemPromptModalInput = this.querySelector(
+      "#system-prompt-modal-input",
+    ) as HTMLTextAreaElement;
+    const closeSystemPromptModalBtn = this.querySelector(
+      "#close-system-prompt-modal-btn",
+    ) as HTMLButtonElement;
+    const cancelSystemPromptBtn = this.querySelector(
+      "#cancel-system-prompt-btn",
+    ) as HTMLButtonElement;
+    const saveSystemPromptBtn = this.querySelector("#save-system-prompt-btn") as HTMLButtonElement;
+
+    const closeSystemPromptModal = () => {
+      systemPromptModal?.classList.add("hidden");
+      systemPromptModal?.classList.remove("flex");
+    };
 
     settingsBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -223,6 +306,38 @@ export class GeneratorControls extends HTMLElement {
       if (val > 4) val = 4;
       (e.target as HTMLInputElement).value = val.toString();
       db.saveSettings({ variations: val });
+    });
+
+    editSystemPromptBtn?.addEventListener("click", () => {
+      if (!systemPromptModal || !systemPromptModalInput) return;
+
+      const savedPrompt = db.getSettings().systemPrompt?.trim();
+      systemPromptModalInput.value = savedPrompt || DEFAULT_SYSTEM_PROMPT;
+
+      settingsMenu?.classList.add("hidden");
+      settingsMenu?.classList.remove("flex");
+
+      systemPromptModal.classList.remove("hidden");
+      systemPromptModal.classList.add("flex");
+      requestAnimationFrame(() => systemPromptModalInput.focus());
+    });
+
+    closeSystemPromptModalBtn?.addEventListener("click", closeSystemPromptModal);
+    cancelSystemPromptBtn?.addEventListener("click", closeSystemPromptModal);
+
+    saveSystemPromptBtn?.addEventListener("click", () => {
+      if (!systemPromptModalInput) return;
+
+      const value = systemPromptModalInput.value.trim();
+      const normalizedDefault = DEFAULT_SYSTEM_PROMPT.trim();
+      db.saveSettings({ systemPrompt: value === normalizedDefault ? "" : value });
+      closeSystemPromptModal();
+    });
+
+    systemPromptModal?.addEventListener("click", (e) => {
+      if (e.target === systemPromptModal) {
+        closeSystemPromptModal();
+      }
     });
 
     document.addEventListener("click", this.handleDocumentClick);

@@ -22,6 +22,7 @@ describe("AiService", () => {
         apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
         activeKeys: { gcp: "key1" },
         variations: 1,
+        systemPrompt: "",
       }),
     };
 
@@ -35,12 +36,20 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const prompt = service.buildSystemPrompt();
     expect(prompt).toContain("expert SVG designer");
+    expect(prompt).toContain("Output contract");
+    expect(prompt).toContain("Return exactly one complete <svg>...</svg>");
   });
 
   it("should build system prompt with references", () => {
     const prompt = service.buildSystemPrompt(["<svg>ref</svg>"]);
     expect(prompt).toContain("Reference SVGs");
     expect(prompt).toContain("<svg>ref</svg>");
+  });
+
+  it("should use custom system prompt when provided", () => {
+    const prompt = service.buildSystemPrompt([], "Always prefer monochrome icon style.");
+    expect(prompt).toContain("Always prefer monochrome icon style.");
+    expect(prompt).toContain("Output contract");
   });
 
   it("should generate SVG using injected provider", async () => {
