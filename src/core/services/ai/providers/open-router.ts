@@ -8,6 +8,7 @@ import {
 export class OpenRouterProvider implements AiProvider {
   id: AiProviderId = "open-router";
   name = "OpenRouter";
+  icon = "/assets/open-router.svg";
 
   configFields: ProviderConfigField[] = [
     {

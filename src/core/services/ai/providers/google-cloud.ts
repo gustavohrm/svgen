@@ -8,6 +8,7 @@ import {
 export class GoogleCloudProvider implements AiProvider {
   id: AiProviderId = "gcp";
   name = "Google Cloud (Gemini)";
+  icon = "/assets/google.svg";
 
   configFields: ProviderConfigField[] = [
     {

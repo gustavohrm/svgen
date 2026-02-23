@@ -17,6 +17,7 @@ export interface ProviderConfigField {
 export interface AiProvider {
   id: AiProviderId;
   name: string;
+  icon: string;
   configFields: ProviderConfigField[];
   generate(options: ProviderGenerateOptions): Promise<string>;
   fetchModels(apiKey: string): Promise<string[]>;

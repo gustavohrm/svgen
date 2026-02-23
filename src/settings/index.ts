@@ -8,139 +8,287 @@ import { AiProviderId } from "../core/types/index";
 const providerRegistry = createDefaultProviderRegistry();
 const container = document.getElementById("settings-container");
 
-function render() {
+interface ModelEntry {
+  model: string;
+  providerId: AiProviderId;
+  providerName: string;
+  providerIcon: string;
+  keyId: string;
+  isSelected: boolean;
+}
+
+/* ── State ── */
+let searchTerm = "";
+let filterProvider: AiProviderId | "all" = "all";
+let sortDirection: "asc" | "desc" = "asc";
+
+/* ── Helpers ── */
+function getAllModels(): ModelEntry[] {
+  const settings = db.getSettings();
+  const providers = providerRegistry.getAllProviders();
+  const entries: ModelEntry[] = [];
+
+  for (const provider of providers) {
+    const activeKeyId = settings.activeKeys[provider.id];
+    const activeKey = settings.apiKeys.find(
+      (k) => k.id === activeKeyId && k.providerId === provider.id,
+    );
+
+    if (!activeKey || !activeKey.availableModels) continue;
+
+    for (const model of activeKey.availableModels) {
+      entries.push({
+        model,
+        providerId: provider.id,
+        providerName: provider.name,
+        providerIcon: provider.icon,
+        keyId: activeKey.id,
+        isSelected: activeKey.selectedModels.includes(model),
+      });
+    }
+  }
+
+  return entries;
+}
+
+function getFilteredModels(models: ModelEntry[]): ModelEntry[] {
+  let filtered = models;
+
+  if (filterProvider !== "all") {
+    filtered = filtered.filter((m) => m.providerId === filterProvider);
+  }
+
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
+    filtered = filtered.filter((m) => m.model.toLowerCase().includes(term));
+  }
+
+  filtered.sort((a, b) => {
+    const comparison = a.model.localeCompare(b.model);
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
+  return filtered;
+}
+
+/* ── Render: Models Table ── */
+function renderModels() {
   if (!container) return;
-  const providerList = container.querySelector("#provider-list");
-  if (!providerList) return;
+  const table = container.querySelector("#models-table");
+  const emptyState = container.querySelector("#empty-state");
+  if (!table || !emptyState) return;
+
+  const allModels = getAllModels();
+  const filtered = getFilteredModels(allModels);
+
+  if (filtered.length === 0) {
+    table.parentElement?.classList.add("hidden");
+    emptyState.classList.remove("hidden");
+    emptyState.classList.add("flex");
+    return;
+  }
+
+  table.parentElement?.classList.remove("hidden");
+  emptyState.classList.add("hidden");
+  emptyState.classList.remove("flex");
+
+  table.innerHTML = filtered
+    .map(
+      (entry) => `
+      <label class="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-hover/5 transition-all cursor-pointer group">
+        <input
+          type="checkbox"
+          data-key-id="${entry.keyId}"
+          value="${entry.model}"
+          ${entry.isSelected ? "checked" : ""}
+          class="model-checkbox w-4 h-4 accent-primary rounded border-border shrink-0"
+        />
+        <img
+          src="${entry.providerIcon}"
+          alt="${entry.providerName}"
+          class="w-5 h-5 shrink-0 object-contain opacity-60 group-hover:opacity-100 transition-opacity"
+        />
+        <span class="text-sm text-text-secondary group-hover:text-text transition-colors truncate">${entry.model}</span>
+      </label>
+    `,
+    )
+    .join("");
+}
+
+/* ── Render: Provider Filter ── */
+function renderFilterDropdown() {
+  if (!container) return;
+  const dropdown = container.querySelector("#filter-dropdown");
+  if (!dropdown) return;
+
+  const providers = providerRegistry.getAllProviders();
+
+  dropdown.innerHTML = `
+    <button data-filter="all" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
+      filterProvider === "all" ? "text-text" : "text-text-secondary"
+    } hover:text-text hover:bg-surface-hover transition-all flex items-center gap-2.5">
+      <span class="w-5 h-5 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>
+        </svg>
+      </span>
+      All Providers
+    </button>
+    ${providers
+      .map(
+        (p) => `
+      <button data-filter="${p.id}" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
+        filterProvider === p.id ? "text-text" : "text-text-secondary"
+      } hover:text-text hover:bg-surface-hover transition-all flex items-center gap-2.5">
+        <img src="${p.icon}" alt="${p.name}" class="w-5 h-5 object-contain shrink-0" />
+        ${p.name}
+      </button>
+    `,
+      )
+      .join("")}
+  `;
+}
+
+/* ── Render: Keys Modal Body ── */
+function renderKeysModalBody() {
+  if (!container) return;
+  const body = container.querySelector("#keys-modal-body");
+  if (!body) return;
 
   const settings = db.getSettings();
-  const activeKeys = settings.activeKeys || {};
+  const providers = providerRegistry.getAllProviders();
 
-  providerList.innerHTML = providerRegistry
-    .getAllProviders()
+  body.innerHTML = providers
     .map((provider) => {
       const keys = settings.apiKeys.filter((k) => k.providerId === provider.id);
+      const activeKeyId = settings.activeKeys[provider.id];
+
       return `
-        <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all">
-          <div class="px-6 py-4 border-b border-border/50 flex items-center justify-between">
-            <span class="text-sm font-semibold text-text">${provider.name}</span>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <img src="${provider.icon}" alt="${provider.name}" class="w-5 h-5 object-contain" />
+              <span class="text-sm font-semibold text-text">${provider.name}</span>
+            </div>
             <button data-action="add-key" data-provider="${provider.id}" class="text-xs font-medium text-text-secondary hover:text-text transition-all cursor-pointer flex items-center gap-1.5">
-               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
               <span>Add Key</span>
             </button>
           </div>
-          <div class="p-6 space-y-6">
-            ${
-              keys.length === 0
-                ? `<div class="flex flex-col items-center justify-center py-8 text-center bg-transparent rounded-xl border border-dashed border-border/50 hover:border-border transition-all">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-key text-text-muted/30 mb-2"><path d="m21 2-2 2.5-2-2.5"/><path d="M15.5 7.5L14 9l1.5 1.5M10.5 16s1.5 1.5 1.5 3.5c0 2-2 3.5-4 3.5s-4-1.5-4-3.5c0-2 1.5-3.5 1.5-3.5L10.5 16z"/><path d="m10.5 16 3-3"/><path d="m14 9 7-7"/><path d="m16 9 1-1"/></svg>
-                     <p class="text-xs text-text-muted">No keys configured for ${provider.name}</p>
-                   </div>`
-                : keys
-                    .map((key) => {
-                      const isActive = key.id === activeKeys[key.providerId];
-                      return `
-              <div class="space-y-4">
-                <div class="flex items-center gap-4 group">
-                  <label class="flex-1 flex items-center gap-4 cursor-pointer p-4 rounded-xl border ${isActive ? "border-text/30 bg-surface-hover/10" : "border-border/50 bg-transparent hover:bg-surface-hover/5"} transition-all">
-                    <input type="radio" name="active-key-${key.providerId}" value="${key.id}" data-provider-id="${key.providerId}" ${isActive ? "checked" : ""} 
-                           class="w-4 h-4 accent-primary" 
-                           onchange="this.dispatchEvent(new CustomEvent('key-selected', { bubbles: true, detail: { id: '${key.id}' } }))">
-                    <div class="flex flex-col min-w-0">
-                      <span class="text-sm font-medium ${isActive ? "text-text" : "text-text-secondary"} transition-colors truncate">${key.name}</span>
-                      <span class="text-xs text-text-muted font-mono mt-1">${key.value.substring(0, 4)}••••••••${key.value.substring(key.value.length - 4)}</span>
-                    </div>
-                  </label>
-                  <div class="flex items-center gap-2">
-                     <button data-action="edit-key" data-key-id="${key.id}" data-key-name="${key.name}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all opacity-0 group-hover:opacity-100" title="Edit Name">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                     </button>
-                     <button data-action="fetch-models" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Sync Models">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-                    </button>
-                    <button data-action="delete-key" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100" title="Delete Key">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-                    </button>
-                  </div>
-                </div>
 
-                ${
-                  isActive
-                    ? `
-                  <div class="ml-12 p-5 bg-transparent rounded-xl border border-border/50">
-                    <div class="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div class="flex items-center gap-3">
-                          <span class="text-sm font-medium text-text">Available Models</span>
-                          <div class="flex items-center gap-2 text-xs">
-                            <button data-action="select-all" data-key-id="${key.id}" class="text-text-secondary hover:text-text transition-colors cursor-pointer">Select All</button>
-                            <span class="text-border">|</span>
-                            <button data-action="deselect-all" data-key-id="${key.id}" class="text-text-muted hover:text-text transition-colors cursor-pointer">Deselect All</button>
-                          </div>
+          ${
+            keys.length === 0
+              ? `<div class="py-4 text-center border border-dashed border-border/50 rounded-xl">
+                   <p class="text-xs text-text-muted">No keys configured</p>
+                 </div>`
+              : keys
+                  .map((key) => {
+                    const isActive = key.id === activeKeyId;
+                    return `
+                    <div class="flex items-center gap-3 group">
+                      <label class="flex-1 flex items-center gap-3 cursor-pointer p-3 rounded-xl border ${isActive ? "border-text/30 bg-surface-hover/10" : "border-border/50 bg-transparent hover:bg-surface-hover/5"} transition-all">
+                        <input type="radio" name="active-key-${provider.id}" value="${key.id}" data-provider-id="${provider.id}" ${isActive ? "checked" : ""} class="w-4 h-4 accent-primary key-radio" />
+                        <div class="flex flex-col min-w-0">
+                          <span class="text-sm font-medium ${isActive ? "text-text" : "text-text-secondary"} truncate">${key.name}</span>
+                          <span class="text-xs text-text-muted font-mono mt-0.5">${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}</span>
                         </div>
-                        <div class="relative w-full sm:max-w-[200px]">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                          <input type="text" placeholder="Search models..." class="model-search-input w-full bg-transparent border border-border/50 rounded-lg pl-9 pr-3 py-1.5 text-xs text-text placeholder:text-text-muted outline-none focus:border-border transition-all" data-list-id="model-list-${key.id}">
-                        </div>
+                      </label>
+                      <div class="flex items-center gap-1">
+                        <button data-action="fetch-models" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all" title="Sync Models">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                        </button>
+                        <button data-action="edit-key" data-key-id="${key.id}" data-key-name="${key.name}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all opacity-0 group-hover:opacity-100" title="Edit Name">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                        </button>
+                        <button data-action="delete-key" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100" title="Delete Key">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                        </button>
+                      </div>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-2" id="model-list-${key.id}">
-                    ${(() => {
-                      const models = key.availableModels || [];
-                      if (models.length > 0) {
-                        return models
-                          .map((m) => {
-                            const isChecked = key.selectedModels.includes(m);
-                            return `
-                            <label class="model-item flex items-center gap-3 text-xs font-medium text-text-secondary cursor-pointer hover:text-text transition-colors p-2 rounded-lg hover:bg-surface-hover/10 border border-transparent hover:border-border/20">
-                              <input type="checkbox" data-key-id="${key.id}" value="${m}" ${isChecked ? "checked" : ""} class="accent-primary rounded border-border model-checkbox">
-                              <span class="truncate">${m}</span>
-                            </label>
-                          `;
-                          })
-                          .join("");
-                      }
-                      return `<div class="col-span-full py-4 text-center">
-                               <button data-action="fetch-models" data-key-id="${key.id}" class="text-sm font-medium text-text-secondary hover:text-text transition-all">Click Sync to load models</button>
-                              </div>`;
-                    })()}
-                    </div>
-                  </div>
-                `
-                    : ""
-                }
-              </div>
-            `;
-                    })
-                    .join("")
-            }
-          </div>
+                  `;
+                  })
+                  .join("")
+          }
         </div>
       `;
     })
     .join("");
 }
 
-let modalsBound = false;
+/* ── Full render ── */
+function render() {
+  renderModels();
+  renderFilterDropdown();
+}
 
-function bindModalEvents() {
-  if (!container || modalsBound) return;
-  const addModal = container.querySelector("#add-key-modal") as HTMLElement;
-  const editModal = container.querySelector("#edit-key-modal") as HTMLElement;
+/* ── Modal helpers ── */
+function openModal(id: string) {
+  const modal = container?.querySelector(`#${id}`) as HTMLElement | null;
+  if (modal) {
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  }
+}
 
-  const closeAddBtn = container.querySelector("#close-modal-btn");
-  const saveAddBtn = container.querySelector("#save-new-key");
-  const modalProviderId = container.querySelector("#modal-provider-id") as HTMLInputElement;
-  const modalKeyName = container.querySelector("#modal-key-name") as HTMLInputElement;
-  const modalKeyValue = container.querySelector("#modal-key-value") as HTMLInputElement;
+function closeModal(id: string) {
+  const modal = container?.querySelector(`#${id}`) as HTMLElement | null;
+  if (modal) {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+}
 
-  closeAddBtn?.addEventListener("click", () => {
-    addModal.classList.add("hidden");
-    addModal.classList.remove("flex");
+/* ── Event Bindings ── */
+let isInitialized = false;
+
+function bindStaticEvents() {
+  if (!container || isInitialized) return;
+
+  // 3-dot menu toggle
+  const menuTrigger = container.querySelector("#menu-trigger");
+  const menuDropdown = container.querySelector("#menu-dropdown") as HTMLElement;
+
+  menuTrigger?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menuDropdown.classList.toggle("hidden");
   });
 
-  saveAddBtn?.addEventListener("click", async () => {
-    const providerId = modalProviderId.value as AiProviderId;
-    const name = modalKeyName.value.trim();
-    const value = modalKeyValue.value.trim();
+  document.addEventListener("click", () => {
+    menuDropdown?.classList.add("hidden");
+  });
+
+  // Open Keys Modal from menu
+  container.querySelector("#open-keys-modal-btn")?.addEventListener("click", () => {
+    menuDropdown.classList.add("hidden");
+    renderKeysModalBody();
+    openModal("keys-modal");
+    attachKeysModalEvents();
+  });
+
+  // Close buttons for modals
+  container.querySelector("#close-keys-modal-btn")?.addEventListener("click", () => {
+    closeModal("keys-modal");
+    render();
+    attachDynamicEvents();
+  });
+
+  container.querySelector("#close-add-key-btn")?.addEventListener("click", () => {
+    closeModal("add-key-modal");
+  });
+
+  container.querySelector("#close-edit-key-btn")?.addEventListener("click", () => {
+    closeModal("edit-key-modal");
+  });
+
+  // Save new key
+  container.querySelector("#save-new-key")?.addEventListener("click", async () => {
+    const providerIdInput = container?.querySelector("#modal-provider-id") as HTMLInputElement;
+    const nameInput = container?.querySelector("#modal-key-name") as HTMLInputElement;
+    const valueInput = container?.querySelector("#modal-key-value") as HTMLInputElement;
+
+    const providerId = providerIdInput.value as AiProviderId;
+    const name = nameInput.value.trim();
+    const value = valueInput.value.trim();
 
     if (!name || !value) {
       showAlert({ type: "error", message: "Name and Key are required." });
@@ -162,26 +310,19 @@ function bindModalEvents() {
     db.saveSettings(settings);
 
     showAlert({ type: "success", message: "Key added." });
-    addModal.classList.add("hidden");
-    addModal.classList.remove("flex");
-    render();
-    attachEvents();
+    closeModal("add-key-modal");
+    renderKeysModalBody();
+    attachKeysModalEvents();
     window.dispatchEvent(new Event("settings-updated"));
   });
 
-  const closeEditBtn = container.querySelector("#close-edit-modal-btn");
-  const saveEditBtn = container.querySelector("#save-edit-key");
-  const editModalKeyId = container.querySelector("#edit-modal-key-id") as HTMLInputElement;
-  const editModalKeyName = container.querySelector("#edit-modal-key-name") as HTMLInputElement;
+  // Save edit key
+  container.querySelector("#save-edit-key")?.addEventListener("click", () => {
+    const keyIdInput = container?.querySelector("#edit-modal-key-id") as HTMLInputElement;
+    const nameInput = container?.querySelector("#edit-modal-key-name") as HTMLInputElement;
 
-  closeEditBtn?.addEventListener("click", () => {
-    editModal.classList.add("hidden");
-    editModal.classList.remove("flex");
-  });
-
-  saveEditBtn?.addEventListener("click", () => {
-    const id = editModalKeyId.value;
-    const newName = editModalKeyName.value.trim();
+    const id = keyIdInput.value;
+    const newName = nameInput.value.trim();
 
     if (!newName) {
       showAlert({ type: "error", message: "Key Name is required." });
@@ -194,118 +335,52 @@ function bindModalEvents() {
       keyToEdit.name = newName;
       db.saveSettings(settings);
       showAlert({ type: "success", message: "Key name updated." });
-      editModal.classList.add("hidden");
-      editModal.classList.remove("flex");
-      render();
-      attachEvents();
+      closeModal("edit-key-modal");
+      renderKeysModalBody();
+      attachKeysModalEvents();
       window.dispatchEvent(new Event("settings-updated"));
     }
   });
 
-  modalsBound = true;
+  // Search
+  const searchInput = container.querySelector("#model-search") as HTMLInputElement;
+  searchInput?.addEventListener("input", (e) => {
+    searchTerm = (e.target as HTMLInputElement).value;
+    renderModels();
+    attachDynamicEvents();
+  });
+
+  // Filter dropdown toggle
+  const filterBtn = container.querySelector("#filter-btn");
+  const filterDropdown = container.querySelector("#filter-dropdown") as HTMLElement;
+
+  filterBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    filterDropdown.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!filterBtn?.contains(e.target as Node)) {
+      filterDropdown?.classList.add("hidden");
+    }
+  });
+
+  // Sort toggle
+  const sortBtn = container.querySelector("#sort-btn");
+  const sortLabel = container.querySelector("#sort-label");
+
+  sortBtn?.addEventListener("click", () => {
+    sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    if (sortLabel) sortLabel.textContent = sortDirection === "asc" ? "A → Z" : "Z → A";
+    renderModels();
+    attachDynamicEvents();
+  });
+
+  isInitialized = true;
 }
 
-function attachEvents() {
+function attachDynamicEvents() {
   if (!container) return;
-  const addModal = container.querySelector("#add-key-modal") as HTMLElement;
-  const editModal = container.querySelector("#edit-key-modal") as HTMLElement;
-  const modalTitle = container.querySelector("#add-key-title")!;
-  const modalProviderId = container.querySelector("#modal-provider-id") as HTMLInputElement;
-  const modalKeyName = container.querySelector("#modal-key-name") as HTMLInputElement;
-  const modalKeyValue = container.querySelector("#modal-key-value") as HTMLInputElement;
-  const editModalKeyId = container.querySelector("#edit-modal-key-id") as HTMLInputElement;
-  const editModalKeyName = container.querySelector("#edit-modal-key-name") as HTMLInputElement;
-
-  container.querySelectorAll('[data-action="add-key"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const providerId = (e.currentTarget as HTMLElement).dataset.provider as AiProviderId;
-      const provider = providerRegistry.getProvider(providerId);
-      if (provider) {
-        modalTitle.textContent = `Add ${provider.name} Key`;
-        modalProviderId.value = provider.id;
-        modalKeyName.value = "";
-        modalKeyValue.value = "";
-        addModal.classList.remove("hidden");
-        addModal.classList.add("flex");
-      }
-    });
-  });
-
-  // Active key selection
-  container.querySelectorAll('input[type="radio"][data-provider-id]').forEach((radio) => {
-    radio.addEventListener("change", (e) => {
-      const id = (e.target as HTMLInputElement).value;
-      const providerId = (e.target as HTMLInputElement).dataset.providerId;
-      if (providerId) {
-        const settings = db.getSettings();
-        settings.activeKeys[providerId] = id;
-        db.saveSettings(settings);
-        render();
-        attachEvents();
-        window.dispatchEvent(new Event("settings-updated"));
-      }
-    });
-  });
-
-  // Delete key
-  container.querySelectorAll('[data-action="delete-key"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const id = (e.currentTarget as HTMLElement).dataset.keyId;
-      if (confirm("Delete this key?")) {
-        const settings = db.getSettings();
-        const keyToDelete = settings.apiKeys.find((k) => k.id === id);
-        if (keyToDelete) {
-          settings.apiKeys = settings.apiKeys.filter((k) => k.id !== id);
-          if (settings.activeKeys[keyToDelete.providerId] === id) {
-            const remainingKeys = settings.apiKeys.filter(
-              (k) => k.providerId === keyToDelete.providerId,
-            );
-            if (remainingKeys.length > 0)
-              settings.activeKeys[keyToDelete.providerId] = remainingKeys[0].id;
-            else delete settings.activeKeys[keyToDelete.providerId];
-          }
-          db.saveSettings(settings);
-        }
-        render();
-        attachEvents();
-        window.dispatchEvent(new Event("settings-updated"));
-      }
-    });
-  });
-
-  // Sync models
-  container.querySelectorAll('[data-action="fetch-models"]').forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      const keyId = (e.currentTarget as HTMLElement).dataset.keyId;
-      const settings = db.getSettings();
-      const key = settings.apiKeys.find((k) => k.id === keyId);
-      if (!key) return;
-
-      const provider = providerRegistry.getProvider(key.providerId);
-      if (!provider) return;
-
-      const btnEl = e.currentTarget as HTMLElement;
-      const originalText = btnEl.textContent;
-      btnEl.textContent = "Syncing...";
-      btnEl.classList.add("opacity-50", "pointer-events-none");
-
-      try {
-        const models = await provider.fetchModels(key.value);
-        key.availableModels = models;
-        if (key.selectedModels.length === 0) key.selectedModels = [...models];
-        db.saveSettings(settings);
-        showAlert({ type: "success", message: "Models synced." });
-        render();
-        attachEvents();
-        window.dispatchEvent(new Event("settings-updated"));
-      } catch (err: any) {
-        showAlert({ type: "error", message: `Sync failed: ${err.message}` });
-      } finally {
-        btnEl.textContent = originalText;
-        btnEl.classList.remove("opacity-50", "pointer-events-none");
-      }
-    });
-  });
 
   // Model checkboxes
   container.querySelectorAll(".model-checkbox").forEach((cb) => {
@@ -327,76 +402,153 @@ function attachEvents() {
     });
   });
 
-  // Model Search Filter
-  container.querySelectorAll(".model-search-input").forEach((input) => {
-    input.addEventListener("input", (e) => {
-      const target = e.target as HTMLInputElement;
-      const searchTerm = target.value.toLowerCase();
-      const listId = target.dataset.listId;
-      if (listId && container) {
-        const list = container.querySelector(`#${listId}`);
-        if (list) {
-          const labels = list.querySelectorAll("label.model-item");
-          labels.forEach((label) => {
-            const modelName = label.querySelector("span")?.textContent?.toLowerCase() || "";
-            if (modelName.includes(searchTerm)) {
-              (label as HTMLElement).style.display = "flex";
-            } else {
-              (label as HTMLElement).style.display = "none";
-            }
-          });
+  // Filter options
+  container.querySelectorAll(".filter-option").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const value = target.dataset.filter as AiProviderId | "all";
+      filterProvider = value;
+
+      const filterLabel = container?.querySelector("#filter-label");
+      if (filterLabel) {
+        filterLabel.textContent =
+          value === "all"
+            ? "All Providers"
+            : (providerRegistry.getProvider(value)?.name ?? "All Providers");
+      }
+
+      const filterDropdown = container?.querySelector("#filter-dropdown") as HTMLElement;
+      filterDropdown?.classList.add("hidden");
+
+      render();
+      attachDynamicEvents();
+    });
+  });
+}
+
+function attachKeysModalEvents() {
+  if (!container) return;
+
+  // Add key buttons
+  container.querySelectorAll('[data-action="add-key"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const providerId = (e.currentTarget as HTMLElement).dataset.provider as AiProviderId;
+      const provider = providerRegistry.getProvider(providerId);
+      if (provider) {
+        const titleEl = container?.querySelector("#add-key-title");
+        const providerInput = container?.querySelector("#modal-provider-id") as HTMLInputElement;
+        const nameInput = container?.querySelector("#modal-key-name") as HTMLInputElement;
+        const valueInput = container?.querySelector("#modal-key-value") as HTMLInputElement;
+
+        if (titleEl) titleEl.textContent = `Add ${provider.name} Key`;
+        providerInput.value = provider.id;
+        nameInput.value = "";
+        valueInput.value = "";
+        openModal("add-key-modal");
+      }
+    });
+  });
+
+  // Active key selection
+  container.querySelectorAll(".key-radio").forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      const id = (e.target as HTMLInputElement).value;
+      const providerId = (e.target as HTMLInputElement).dataset.providerId;
+      if (providerId) {
+        const settings = db.getSettings();
+        settings.activeKeys[providerId] = id;
+        db.saveSettings(settings);
+        renderKeysModalBody();
+        attachKeysModalEvents();
+        render();
+        attachDynamicEvents();
+        window.dispatchEvent(new Event("settings-updated"));
+      }
+    });
+  });
+
+  // Delete keys
+  container.querySelectorAll('[data-action="delete-key"]').forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const id = (e.currentTarget as HTMLElement).dataset.keyId;
+      if (confirm("Delete this key?")) {
+        const settings = db.getSettings();
+        const keyToDelete = settings.apiKeys.find((k) => k.id === id);
+        if (keyToDelete) {
+          settings.apiKeys = settings.apiKeys.filter((k) => k.id !== id);
+          if (settings.activeKeys[keyToDelete.providerId] === id) {
+            const remaining = settings.apiKeys.filter(
+              (k) => k.providerId === keyToDelete.providerId,
+            );
+            if (remaining.length > 0) settings.activeKeys[keyToDelete.providerId] = remaining[0].id;
+            else delete settings.activeKeys[keyToDelete.providerId];
+          }
+          db.saveSettings(settings);
         }
-      }
-    });
-  });
-
-  // Select all / Deselect all models
-  container.querySelectorAll('[data-action="select-all"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const keyId = (e.currentTarget as HTMLElement).dataset.keyId;
-      const settings = db.getSettings();
-      const key = settings.apiKeys.find((k) => k.id === keyId);
-      if (key && key.availableModels) {
-        key.selectedModels = [...key.availableModels];
-        db.saveSettings(settings);
+        renderKeysModalBody();
+        attachKeysModalEvents();
         render();
-        attachEvents();
+        attachDynamicEvents();
         window.dispatchEvent(new Event("settings-updated"));
       }
     });
   });
 
-  container.querySelectorAll('[data-action="deselect-all"]').forEach((btn) => {
-    btn.addEventListener("click", (e) => {
+  // Sync models
+  container.querySelectorAll('[data-action="fetch-models"]').forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
       const keyId = (e.currentTarget as HTMLElement).dataset.keyId;
       const settings = db.getSettings();
       const key = settings.apiKeys.find((k) => k.id === keyId);
-      if (key) {
-        key.selectedModels = [];
+      if (!key) return;
+
+      const provider = providerRegistry.getProvider(key.providerId);
+      if (!provider) return;
+
+      const btnEl = e.currentTarget as HTMLButtonElement;
+      btnEl.disabled = true;
+      btnEl.classList.add("opacity-50", "pointer-events-none", "animate-spin");
+
+      try {
+        const models = await provider.fetchModels(key.value);
+        key.availableModels = models;
+        if (key.selectedModels.length === 0) key.selectedModels = [...models];
         db.saveSettings(settings);
+        showAlert({ type: "success", message: "Models synced." });
+        renderKeysModalBody();
+        attachKeysModalEvents();
         render();
-        attachEvents();
+        attachDynamicEvents();
         window.dispatchEvent(new Event("settings-updated"));
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unknown error";
+        showAlert({ type: "error", message: `Sync failed: ${message}` });
+      } finally {
+        btnEl.disabled = false;
+        btnEl.classList.remove("opacity-50", "pointer-events-none", "animate-spin");
       }
     });
   });
 
+  // Edit key name
   container.querySelectorAll('[data-action="edit-key"]').forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const id = (e.currentTarget as HTMLElement).dataset.keyId;
       const currentName = (e.currentTarget as HTMLElement).dataset.keyName;
       if (id && currentName) {
-        editModalKeyId.value = id;
-        editModalKeyName.value = currentName;
-        editModal.classList.remove("hidden");
-        editModal.classList.add("flex");
+        const keyIdInput = container?.querySelector("#edit-modal-key-id") as HTMLInputElement;
+        const nameInput = container?.querySelector("#edit-modal-key-name") as HTMLInputElement;
+        keyIdInput.value = id;
+        nameInput.value = currentName;
+        openModal("edit-key-modal");
       }
     });
   });
 }
 
+/* ── Init ── */
 document.addEventListener("DOMContentLoaded", () => {
   render();
-  bindModalEvents();
-  attachEvents();
+  bindStaticEvents();
+  attachDynamicEvents();
 });
