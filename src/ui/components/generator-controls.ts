@@ -1,9 +1,24 @@
 import { APP_EVENTS } from "../../core/constants/events";
 import { ModelDropdown } from "./model-dropdown";
+import { db } from "../../core/modules/db/index";
 
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
   private isGenerating: boolean = false;
+
+  private handleDocumentClick = (e: Event) => {
+    const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement | null;
+    const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement | null;
+
+    if (
+      settingsBtn &&
+      settingsMenu &&
+      !settingsBtn.contains(e.target as Node) &&
+      !settingsMenu.contains(e.target as Node)
+    ) {
+      settingsMenu.classList.add("hidden");
+    }
+  };
 
   private handleGenerationStarted = () => {
     this.isGenerating = true;
@@ -39,6 +54,7 @@ export class GeneratorControls extends HTMLElement {
   disconnectedCallback() {
     window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
     window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    document.removeEventListener("click", this.handleDocumentClick);
   }
 
   private render() {
@@ -60,10 +76,32 @@ export class GeneratorControls extends HTMLElement {
             <div class="flex items-center gap-4 pt-2">
               <model-dropdown id="model-selector"></model-dropdown>
 
-              <div class="flex items-center gap-2">
-                <label
-                  class="cursor-pointer"
-                  title="Attach reference SVG"
+              <label
+                class="cursor-pointer"
+                title="Attach reference SVG"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="w-4 h-4 text-text-secondary hover:text-text transition duration-400"
+                >
+                  <path
+                    d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
+                  />
+                </svg>
+                <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
+              </label>
+
+              <div class="relative flex items-center" id="settings-container">
+                <button
+                  id="settings-btn"
+                  class="cursor-pointer text-text-secondary hover:text-text transition duration-400 flex items-center"
+                  title="Settings"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -73,14 +111,28 @@ export class GeneratorControls extends HTMLElement {
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-4 h-4 text-text-secondary hover:text-text transition duration-400"
+                    class="w-4 h-4"
                   >
-                    <path
-                      d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"
-                    />
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                    <circle cx="12" cy="12" r="3" />
                   </svg>
-                  <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
-                </label>
+                </button>
+                <div
+                  id="settings-menu"
+                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden items-center p-3 shadow-2xl z-50 min-w-max duration-200"
+                >
+                  <div class="flex items-center gap-3">
+                    <label class="text-xs font-medium text-text-secondary whitespace-nowrap">Variations</label>
+                    <input
+                      type="number"
+                      id="variation-input"
+                      min="1"
+                      max="4"
+                      value="${db.getSettings().variations}"
+                      class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -141,6 +193,39 @@ export class GeneratorControls extends HTMLElement {
     // Component level events
     const referenceInput = this.querySelector("#reference-input") as HTMLInputElement;
     const attachmentsContainer = this.querySelector("#attachments-container") as HTMLDivElement;
+    const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement;
+    const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement;
+    const variationInput = this.querySelector("#variation-input") as HTMLInputElement;
+
+    settingsBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isHidden = settingsMenu?.classList.contains("hidden");
+      if (isHidden) {
+        settingsMenu?.classList.remove("hidden");
+        settingsMenu?.classList.add("flex");
+      } else {
+        settingsMenu?.classList.add("hidden");
+        settingsMenu?.classList.remove("flex");
+      }
+    });
+
+    variationInput?.addEventListener("input", (e) => {
+      let val = parseInt((e.target as HTMLInputElement).value);
+      if (isNaN(val)) return;
+      if (val < 1) val = 1;
+      if (val > 4) val = 4;
+      db.saveSettings({ variations: val });
+    });
+
+    variationInput?.addEventListener("blur", (e) => {
+      let val = parseInt((e.target as HTMLInputElement).value);
+      if (isNaN(val) || val < 1) val = 1;
+      if (val > 4) val = 4;
+      (e.target as HTMLInputElement).value = val.toString();
+      db.saveSettings({ variations: val });
+    });
+
+    document.addEventListener("click", this.handleDocumentClick);
 
     // File uploads
     referenceInput?.addEventListener("change", (e) => {
@@ -182,10 +267,11 @@ export class GeneratorControls extends HTMLElement {
       if (!prompt) return;
 
       const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
+      const variations = db.getSettings().variations || 1;
 
       window.dispatchEvent(
         new CustomEvent(APP_EVENTS.START_GENERATION, {
-          detail: { prompt, referenceSvgs: svgsAsText, model, providerId },
+          detail: { prompt, referenceSvgs: svgsAsText, model, providerId, variations },
         }),
       );
     });

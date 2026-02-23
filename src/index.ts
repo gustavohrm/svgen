@@ -16,7 +16,7 @@ const aiService = createAiService(db, providerRegistry);
 document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener(APP_EVENTS.START_GENERATION, async (e: Event) => {
     const customEvent = e as CustomEvent;
-    const { prompt, referenceSvgs, model, providerId } = customEvent.detail;
+    const { prompt, referenceSvgs, model, providerId, variations } = customEvent.detail;
 
     if (!model || !providerId) {
       showAlert({
@@ -60,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
           model,
           providerId,
         },
-        settings.variations || 4,
+        variations || settings.variations || 4,
       );
 
       window.dispatchEvent(
