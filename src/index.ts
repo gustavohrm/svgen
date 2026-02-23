@@ -111,18 +111,49 @@ function renderGenerator() {
     menu.innerHTML = modelOptionsHtml;
   }
 
+  // Restore saved model or fall back to first available
+  const savedModel = settings.lastSelectedModel;
+  const savedProviderId = settings.lastSelectedProviderId;
+  const hasSavedModel =
+    savedModel &&
+    savedProviderId &&
+    genContainer.querySelector(
+      `.model-option[data-model="${savedModel}"][data-provider-id="${savedProviderId}"]`,
+    ) !== null;
+
+  const activeModel = hasSavedModel ? savedModel : firstModel;
+  const activeProviderId = hasSavedModel ? savedProviderId : firstProviderId;
+
   const textBtn = genContainer.querySelector("#model-dropdown-text");
   const modelBtn = genContainer.querySelector("#model-dropdown-btn") as HTMLElement;
   if (textBtn && modelBtn) {
-    if (firstModel) {
-      textBtn.textContent = firstModel;
-      modelBtn.dataset.selectedModel = firstModel;
-      modelBtn.dataset.providerId = firstProviderId || "";
+    if (activeModel) {
+      textBtn.textContent = activeModel;
+      modelBtn.dataset.selectedModel = activeModel;
+      modelBtn.dataset.providerId = activeProviderId || "";
     } else {
       textBtn.textContent = "Select an AI model...";
       modelBtn.dataset.selectedModel = "";
       modelBtn.dataset.providerId = "";
     }
+  }
+
+  // Activate the correct provider tab/pane for the selected model
+  if (activeProviderId && hasSavedModel) {
+    const targetPaneId = `provider-pane-${activeProviderId}`;
+
+    genContainer.querySelectorAll(".provider-tab").forEach((t) => {
+      const isTarget = (t as HTMLElement).dataset.tabTarget === targetPaneId;
+      t.classList.toggle("text-text", isTarget);
+      t.classList.toggle("bg-surface-hover/30", isTarget);
+      t.classList.toggle("text-text-muted", !isTarget);
+    });
+
+    genContainer.querySelectorAll(".provider-pane").forEach((p) => {
+      const isTarget = p.id === targetPaneId;
+      p.classList.toggle("flex", isTarget);
+      p.classList.toggle("hidden", !isTarget);
+    });
   }
 
   attachGeneratorEvents();
@@ -268,6 +299,12 @@ function attachGeneratorEvents() {
           modelDropdownBtn.dataset.selectedModel = model;
           modelDropdownBtn.dataset.providerId = providerId;
           modelDropdownText.textContent = model;
+
+          // Persist selection across sessions
+          db.saveSettings({
+            lastSelectedModel: model,
+            lastSelectedProviderId: providerId,
+          });
 
           modelDropdownMenu.classList.add("hidden");
           modelDropdownMenu.classList.remove("flex");

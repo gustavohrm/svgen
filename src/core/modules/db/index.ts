@@ -12,14 +12,18 @@ export interface ApiKeyItem {
 
 export interface AppSettings {
   apiKeys: ApiKeyItem[];
-  activeKeys: Record<string, string>; // Add providerId -> active keyId mapping
+  activeKeys: Record<string, string>; // providerId -> active keyId mapping
   variations: number;
+  lastSelectedModel?: string;
+  lastSelectedProviderId?: string;
 }
 
 const defaultSettings: AppSettings = {
   apiKeys: [],
   activeKeys: {},
   variations: 1,
+  lastSelectedModel: undefined,
+  lastSelectedProviderId: undefined,
 };
 
 export const db = {
