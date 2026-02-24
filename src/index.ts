@@ -1,22 +1,20 @@
 import "./ui/components/app-header";
 import "./ui/components/model-dropdown";
-import { createAiService } from "./core/services/ai/index";
-import { createDefaultProviderRegistry } from "./core/services/ai/providers/index";
 import "./ui/components/generator-controls";
-import { db } from "./core/modules/db/index";
 import "./ui/components/results-grid";
+import { appComposition } from "./core/app/composition-root";
 import { showAlert } from "./core/utils/alert";
 import { APP_EVENTS } from "./core/constants/events";
+import { sanitizeSvgMarkup } from "./core/utils/svg-sanitizer";
+import { emitAppEvent, onAppEvent } from "./core/events/app-events";
 
-// Dependency Injection Setup
-const providerRegistry = createDefaultProviderRegistry();
-const aiService = createAiService(db, providerRegistry);
+function sanitizeGeneratedSvgs(svgs: string[]): string[] {
+  return svgs.map((svg) => sanitizeSvgMarkup(svg)).filter((svg): svg is string => Boolean(svg));
+}
 
-/** --- ORCHESTRATION --- */
 document.addEventListener("DOMContentLoaded", () => {
-  window.addEventListener(APP_EVENTS.START_GENERATION, async (e: Event) => {
-    const customEvent = e as CustomEvent;
-    const { prompt, referenceSvgs, model, providerId, variations } = customEvent.detail;
+  onAppEvent(APP_EVENTS.START_GENERATION, async (detail) => {
+    const { prompt, referenceSvgs, model, providerId, variations } = detail;
 
     if (!model || !providerId) {
       showAlert({
@@ -26,21 +24,21 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Check if configuration exists
-    const settings = db.getSettings();
+    const settings = appComposition.settingsRepository.getSettings();
     const activeKeyId = settings.activeKeys[providerId];
-    const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
+    const activeKey = settings.apiKeys.find((key) => key.id === activeKeyId);
 
     if (!activeKey) {
       showAlert({
         type: "error",
-        message: `Please configure and select an API key for the chosen provider in the API Keys tab.`,
+        message:
+          "Please configure and select an API key for the chosen provider in the API Keys tab.",
       });
       window.location.href = "/settings/";
       return;
     }
 
-    const provider = providerRegistry.getProvider(providerId);
+    const provider = appComposition.providerRegistry.getProvider(providerId);
 
     if (!provider) {
       showAlert({
@@ -50,14 +48,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    window.dispatchEvent(new Event(APP_EVENTS.GENERATION_STARTED));
+    emitAppEvent(APP_EVENTS.GENERATION_STARTED);
 
     try {
       const requestedVariations = variations || settings.variations || 4;
       let results: string[];
 
       try {
-        results = await aiService.generateMultiple(
+        results = await appComposition.aiService.generateMultiple(
           {
             prompt,
             referenceSvgs,
@@ -82,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
           message: `Model ${model} does not support multiple candidates. Generated 1 variation instead.`,
         });
 
-        results = await aiService.generateMultiple(
+        results = await appComposition.aiService.generateMultiple(
           {
             prompt,
             referenceSvgs,
@@ -93,16 +91,23 @@ document.addEventListener("DOMContentLoaded", () => {
         );
       }
 
+      const safeResults = sanitizeGeneratedSvgs(results);
+      if (safeResults.length === 0) {
+        throw new Error("Generated SVG content failed validation and was blocked.");
+      }
+
+      if (safeResults.length < results.length) {
+        showAlert({
+          type: "warning",
+          message: "One or more SVG results were blocked because they failed security validation.",
+        });
+      }
+
       const generatedAt = Date.now();
 
-      window.dispatchEvent(
-        new CustomEvent(APP_EVENTS.SVGEN_RESULTS, {
-          detail: { svgs: results, prompt, model, generatedAt },
-        }),
-      );
+      emitAppEvent(APP_EVENTS.SVGEN_RESULTS, { svgs: safeResults, prompt, model, generatedAt });
       showAlert({ type: "success", message: "SVGs generated successfully" });
     } catch (error: unknown) {
-      // Use stricter error type than any
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate SVG. Please try again.";
       console.error("Generation failed:", error);
@@ -110,10 +115,9 @@ document.addEventListener("DOMContentLoaded", () => {
         type: "error",
         message: errorMessage,
       });
-      // clear the skeleton
-      window.dispatchEvent(new CustomEvent(APP_EVENTS.SVGEN_RESULTS, { detail: { svgs: [] } }));
+      emitAppEvent(APP_EVENTS.SVGEN_RESULTS, { svgs: [] });
     } finally {
-      window.dispatchEvent(new Event(APP_EVENTS.GENERATION_FINISHED));
+      emitAppEvent(APP_EVENTS.GENERATION_FINISHED);
     }
   });
 });

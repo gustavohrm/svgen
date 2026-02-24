@@ -2,6 +2,7 @@ import { OpenRouterProvider } from "./open-router";
 import { GoogleCloudProvider } from "./google-cloud";
 import { AiProvider, AiProviderId } from "../../../types/index";
 import { ProviderRegistry } from "../index";
+import { GoogleCloudClient, OpenRouterClient } from "./clients";
 
 export class AiProviderRegistry implements ProviderRegistry {
   private providersMap: Map<AiProviderId, AiProvider> = new Map();
@@ -24,8 +25,18 @@ export class AiProviderRegistry implements ProviderRegistry {
 /**
  * Factory function to create the default provider registry
  */
-export function createDefaultProviderRegistry(): AiProviderRegistry {
-  return new AiProviderRegistry([new OpenRouterProvider(), new GoogleCloudProvider()]);
+export interface DefaultProviderClients {
+  openRouterClient?: OpenRouterClient;
+  googleCloudClient?: GoogleCloudClient;
+}
+
+export function createDefaultProviderRegistry(
+  clients: DefaultProviderClients = {},
+): AiProviderRegistry {
+  return new AiProviderRegistry([
+    new OpenRouterProvider(clients.openRouterClient),
+    new GoogleCloudProvider(clients.googleCloudClient),
+  ]);
 }
 
 // Re-export specific classes if needed by consumers

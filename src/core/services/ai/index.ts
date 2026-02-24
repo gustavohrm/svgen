@@ -1,7 +1,7 @@
 import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 
-export interface Database {
+export interface SettingsRepository {
   getSettings(): AppSettings;
 }
 
@@ -26,7 +26,7 @@ const SYSTEM_PROMPT_GUARDRAILS = `Output contract:
 
 export class AiService {
   constructor(
-    private readonly db: Database,
+    private readonly settingsRepository: SettingsRepository,
     private readonly providerRegistry: ProviderRegistry,
   ) {}
 
@@ -53,7 +53,7 @@ export class AiService {
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
   ): Promise<string[]> {
-    const settings = this.db.getSettings();
+    const settings = this.settingsRepository.getSettings();
     const activeKeyId = settings.activeKeys[options.providerId];
     const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
 
@@ -90,6 +90,9 @@ export class AiService {
 /**
  * Factory function to create an instance of AiService
  */
-export function createAiService(db: Database, providerRegistry: ProviderRegistry): AiService {
-  return new AiService(db, providerRegistry);
+export function createAiService(
+  settingsRepository: SettingsRepository,
+  providerRegistry: ProviderRegistry,
+): AiService {
+  return new AiService(settingsRepository, providerRegistry);
 }

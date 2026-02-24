@@ -6,21 +6,29 @@ export interface GalleryItem {
   timestamp: number;
 }
 
+export interface GalleryRepository {
+  saveSvg(item: GalleryItem): Promise<void>;
+  getAllSvgs(): Promise<GalleryItem[]>;
+  deleteSvg(id: string): Promise<void>;
+  close(): void;
+  deleteDatabase(): Promise<void>;
+}
+
 const DB_NAME = "SVGenGalleryDB";
 const DB_VERSION = 1;
 const STORE_NAME = "svgs";
 
-class GalleryDatabase {
+export class IndexedDbGalleryRepository implements GalleryRepository {
   private dbPromise: Promise<IDBDatabase>;
   private dbInstance: IDBDatabase | null = null;
 
-  constructor() {
+  constructor(private readonly indexedDbFactory: IDBFactory = indexedDB) {
     this.dbPromise = this.initDb();
   }
 
   private initDb(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = this.indexedDbFactory.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
@@ -90,11 +98,9 @@ class GalleryDatabase {
   async deleteDatabase(): Promise<void> {
     this.close();
     return new Promise((resolve, reject) => {
-      const request = indexedDB.deleteDatabase(DB_NAME);
+      const request = this.indexedDbFactory.deleteDatabase(DB_NAME);
       request.onsuccess = () => resolve();
       request.onerror = (event) => reject((event.target as IDBRequest).error);
     });
   }
 }
-
-export const galleryDb = new GalleryDatabase();

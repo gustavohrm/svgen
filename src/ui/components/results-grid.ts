@@ -1,4 +1,4 @@
-import { galleryDb, GalleryItem } from "../../core/modules/gallery-db/index";
+import { GalleryItem } from "../../core/modules/gallery-db/index";
 import { showAlert } from "../../core/utils/alert";
 import {
   renderSvgCard,
@@ -6,7 +6,13 @@ import {
   attachSvgCardEvents,
 } from "../../core/utils/svg-card";
 import { APP_EVENTS } from "../../core/constants/events";
-import { db } from "../../core/modules/db/index";
+import { appComposition } from "../../core/app/composition-root";
+import { createId } from "../../core/utils/id";
+import { sanitizeSvgMarkup } from "../../core/utils/svg-sanitizer";
+import { onAppEvent, type SvgResultsDetail } from "../../core/events/app-events";
+
+const settingsRepository = appComposition.settingsRepository;
+const galleryRepository = appComposition.galleryRepository;
 
 export class ResultsGrid extends HTMLElement {
   private currentSvgs: string[] = [];
@@ -14,6 +20,7 @@ export class ResultsGrid extends HTMLElement {
   private currentModel: string = "";
   private currentGeneratedAt: number | null = null;
   private isGenerating: boolean = false;
+  private unsubscribeEvents: Array<() => void> = [];
 
   private handleGenerationStarted = () => {
     this.currentSvgs = [];
@@ -29,14 +36,12 @@ export class ResultsGrid extends HTMLElement {
     // Don't render here, rely on SVGEN_RESULTS to populate and render
   };
 
-  private handleSVGenResults = (e: Event) => {
-    const customEvent = e as CustomEvent;
-    if (customEvent.detail?.svgs) {
-      this.currentSvgs = customEvent.detail.svgs;
-      this.currentPrompt = customEvent.detail.prompt || "";
-      this.currentModel = customEvent.detail.model || "";
-      this.currentGeneratedAt =
-        typeof customEvent.detail.generatedAt === "number" ? customEvent.detail.generatedAt : null;
+  private handleSVGenResults = (detail: SvgResultsDetail) => {
+    if (detail.svgs) {
+      this.currentSvgs = detail.svgs;
+      this.currentPrompt = detail.prompt || "";
+      this.currentModel = detail.model || "";
+      this.currentGeneratedAt = typeof detail.generatedAt === "number" ? detail.generatedAt : null;
       this.isGenerating = false;
       this.render();
     }
@@ -52,9 +57,8 @@ export class ResultsGrid extends HTMLElement {
   }
 
   disconnectedCallback() {
-    window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
-    window.removeEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
+    this.unsubscribeEvents.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribeEvents = [];
   }
 
   private render() {
@@ -69,7 +73,7 @@ export class ResultsGrid extends HTMLElement {
     let contentHtml = "";
 
     if (this.isGenerating) {
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const count = settings.variations || 4;
       contentHtml = Array.from({ length: count })
         .map(() => renderSvgCardSkeleton())
@@ -106,9 +110,13 @@ export class ResultsGrid extends HTMLElement {
 
   private attachEvents() {
     // Listen to global app events
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
-    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted),
+    );
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished),
+    );
+    this.unsubscribeEvents.push(onAppEvent(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults));
   }
 
   private resolveSvgByCardId = (cardId: string): string | undefined => {
@@ -131,15 +139,23 @@ export class ResultsGrid extends HTMLElement {
             }
 
             const galleryItem: GalleryItem = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              svg: svgContent,
+              id: createId("gallery"),
+              svg: sanitizeSvgMarkup(svgContent) ?? "",
               prompt: this.currentPrompt,
               model: this.currentModel,
               timestamp: this.currentGeneratedAt ?? Date.now(),
             };
 
+            if (!galleryItem.svg) {
+              showAlert({
+                type: "error",
+                message: "SVG failed validation and could not be saved.",
+              });
+              return;
+            }
+
             try {
-              await galleryDb.saveSvg(galleryItem);
+              await galleryRepository.saveSvg(galleryItem);
               showAlert({ type: "success", message: "SVG saved to gallery!" });
             } catch (error: unknown) {
               console.error("Failed to save SVG to gallery:", error);

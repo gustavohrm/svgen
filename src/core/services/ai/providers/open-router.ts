@@ -5,12 +5,11 @@ import {
   AiProviderId,
 } from "../../../types/index";
 import { extractSvgFromResult } from "../../../utils/svg-parser";
-
-interface OpenRouterApiModel {
-  id: string;
-}
+import { FetchOpenRouterClient, OpenRouterClient } from "./clients";
 
 export class OpenRouterProvider implements AiProvider {
+  constructor(private readonly client: OpenRouterClient = new FetchOpenRouterClient()) {}
+
   id: AiProviderId = "open-router";
   name = "OpenRouter";
   icon = "/assets/open-router.svg";
@@ -26,23 +25,15 @@ export class OpenRouterProvider implements AiProvider {
 
   async fetchModels(apiKey: string): Promise<string[]> {
     try {
-      const res = await fetch("https://openrouter.ai/api/v1/models", {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-        },
-      });
-      if (!res.ok) throw new Error("Failed to fetch OpenRouter models");
-      const data = (await res.json()) as { data: OpenRouterApiModel[] };
+      const models = await this.client.fetchModels(apiKey);
       // Filter for models that likely support text/chat
       // OpenRouter models usually have 'id'. Some might be image models (like dall-e-3).
       // We can filter out known image models or check for specific properties.
-      return data.data
-        .filter((m) => {
-          const id = m.id.toLowerCase();
-          // Exclude known image-only models
-          return !id.includes("dall-e") && !id.includes("stable-diffusion") && !id.includes("flux");
-        })
-        .map((m) => m.id);
+      return models.filter((m) => {
+        const id = m.toLowerCase();
+        // Exclude known image-only models
+        return !id.includes("dall-e") && !id.includes("stable-diffusion") && !id.includes("flux");
+      });
     } catch (error: unknown) {
       console.error("Failed to fetch OpenRouter models:", error);
       return [];
@@ -56,32 +47,17 @@ export class OpenRouterProvider implements AiProvider {
       throw new Error("OpenRouter API key is required");
     }
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": window.location.origin,
-        "X-Title": "SVGen",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
-        ],
-        n: count,
-        temperature,
-      }),
+    const choices = await this.client.generate({
+      prompt,
+      systemPrompt,
+      model,
+      apiKey,
+      count,
+      temperature,
+      appOrigin: typeof window === "undefined" ? "http://localhost" : window.location.origin,
+      appName: "SVGen",
     });
 
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`OpenRouter API error: ${res.status} ${res.statusText} - ${errorText}`);
-    }
-
-    const data = await res.json();
-    const choices = data.choices || [];
-    return choices.map((choice: any) => extractSvgFromResult(choice.message?.content || ""));
+    return choices.map((choice) => extractSvgFromResult(choice));
   }
 }

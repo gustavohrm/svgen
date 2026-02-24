@@ -1,11 +1,13 @@
-import { db, ApiKeyItem } from "../../core/modules/db/index";
-import { createDefaultProviderRegistry } from "../../core/services/ai/providers/index";
+import { ApiKeyItem } from "../../core/modules/db/index";
 import { showAlert } from "../../core/utils/alert";
 import { AiProviderId } from "../../core/types/index";
-import { APP_EVENTS } from "../../core/constants/events";
+import { escapeHtml } from "../../core/utils/html-escape";
 import "./app-modal";
+import { appComposition } from "../../core/app/composition-root";
+import { createId } from "../../core/utils/id";
 
-const providerRegistry = createDefaultProviderRegistry();
+const providerRegistry = appComposition.providerRegistry;
+const settingsRepository = appComposition.settingsRepository;
 
 export class ApiKeysModal extends HTMLElement {
   constructor() {
@@ -135,11 +137,14 @@ export class ApiKeysModal extends HTMLElement {
     const body = this.querySelector("#keys-modal-body");
     if (!body) return;
 
-    const settings = db.getSettings();
+    const settings = settingsRepository.getSettings();
     const providers = providerRegistry.getAllProviders();
 
     body.innerHTML = providers
       .map((provider) => {
+        const safeProviderIcon = escapeHtml(provider.icon);
+        const safeProviderName = escapeHtml(provider.name);
+        const safeProviderId = escapeHtml(provider.id);
         const keys = settings.apiKeys.filter((k) => k.providerId === provider.id);
         const activeKeyId = settings.activeKeys[provider.id];
 
@@ -147,10 +152,10 @@ export class ApiKeysModal extends HTMLElement {
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2.5">
-                <img src="${provider.icon}" alt="${provider.name}" class="w-5 h-5 object-contain" />
-                <span class="text-sm font-semibold text-text">${provider.name}</span>
+                <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-5 h-5 object-contain" />
+                <span class="text-sm font-semibold text-text">${safeProviderName}</span>
               </div>
-              <button data-action="add-key" data-provider="${provider.id}" class="text-xs font-medium text-text-secondary hover:text-text transition-all cursor-pointer flex items-center gap-1.5">
+              <button data-action="add-key" data-provider="${safeProviderId}" class="text-xs font-medium text-text-secondary hover:text-text transition-all cursor-pointer flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
                 <span>Add Key</span>
               </button>
@@ -163,24 +168,29 @@ export class ApiKeysModal extends HTMLElement {
                    </div>`
                 : keys
                     .map((key) => {
+                      const safeKeyId = escapeHtml(key.id);
+                      const safeKeyName = escapeHtml(key.name);
+                      const safeKeyMaskedValue = escapeHtml(
+                        `${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}`,
+                      );
                       const isActive = key.id === activeKeyId;
                       return `
                       <div class="flex items-center gap-3 group">
                         <label class="flex-1 flex items-center gap-3 p-2 cursor-pointer rounded-lg transition-all hover:bg-surface">
-                          <input type="radio" name="active-key-${provider.id}" value="${key.id}" data-provider-id="${provider.id}" ${isActive ? "checked" : ""} class="w-4 h-4 accent-primary key-radio cursor-pointer" />
+                          <input type="radio" name="active-key-${safeProviderId}" value="${safeKeyId}" data-provider-id="${safeProviderId}" ${isActive ? "checked" : ""} class="w-4 h-4 accent-primary key-radio cursor-pointer" />
                           <div class="flex flex-col min-w-0">
-                            <span class="text-sm font-medium ${isActive ? "text-text" : "text-text-secondary"} truncate">${key.name}</span>
-                            <span class="text-xs text-text-muted font-mono mt-0.5">${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}</span>
+                            <span class="text-sm font-medium ${isActive ? "text-text" : "text-text-secondary"} truncate">${safeKeyName}</span>
+                            <span class="text-xs text-text-muted font-mono mt-0.5">${safeKeyMaskedValue}</span>
                           </div>
                         </label>
                         <div class="flex items-center gap-1">
-                          <button data-action="edit-key" data-key-id="${key.id}" data-key-name="${key.name}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all opacity-0 group-hover:opacity-100 cursor-pointer" title="Edit Name">
+                          <button data-action="edit-key" data-key-id="${safeKeyId}" data-key-name="${safeKeyName}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all opacity-0 group-hover:opacity-100 cursor-pointer" title="Edit Name">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
                           </button>
-                          <button data-action="delete-key" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer" title="Delete Key">
+                          <button data-action="delete-key" data-key-id="${safeKeyId}" class="p-2 rounded-lg text-text-secondary hover:text-error hover:bg-error/10 transition-all opacity-0 group-hover:opacity-100 cursor-pointer" title="Delete Key">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
                           </button>
-                          <button data-action="fetch-models" data-key-id="${key.id}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Sync Models">
+                          <button data-action="fetch-models" data-key-id="${safeKeyId}" class="p-2 rounded-lg text-text-secondary hover:text-text hover:bg-surface-hover transition-all cursor-pointer" title="Sync Models">
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
                           </button>
                         </div>
@@ -210,11 +220,10 @@ export class ApiKeysModal extends HTMLElement {
         const id = radio.value;
         const providerId = radio.dataset.providerId;
         if (providerId) {
-          const settings = db.getSettings();
+          const settings = settingsRepository.getSettings();
           settings.activeKeys[providerId] = id;
-          db.saveSettings(settings);
+          settingsRepository.saveSettings(settings);
           this.renderBody();
-          window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         }
         return;
       }
@@ -248,7 +257,7 @@ export class ApiKeysModal extends HTMLElement {
       if (action === "delete-key") {
         const id = (btn as HTMLElement).dataset.keyId;
         if (confirm("Delete this key?")) {
-          const settings = db.getSettings();
+          const settings = settingsRepository.getSettings();
           const keyToDelete = settings.apiKeys.find((k) => k.id === id);
           if (keyToDelete) {
             settings.apiKeys = settings.apiKeys.filter((k) => k.id !== id);
@@ -260,10 +269,9 @@ export class ApiKeysModal extends HTMLElement {
                 settings.activeKeys[keyToDelete.providerId] = remaining[0].id;
               else delete settings.activeKeys[keyToDelete.providerId];
             }
-            db.saveSettings(settings);
+            settingsRepository.saveSettings(settings);
           }
           this.renderBody();
-          window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         }
         return;
       }
@@ -271,7 +279,7 @@ export class ApiKeysModal extends HTMLElement {
       // Sync models
       if (action === "fetch-models") {
         const keyId = (btn as HTMLElement).dataset.keyId;
-        const settings = db.getSettings();
+        const settings = settingsRepository.getSettings();
         const key = settings.apiKeys.find((k) => k.id === keyId);
         if (!key) return;
 
@@ -286,10 +294,9 @@ export class ApiKeysModal extends HTMLElement {
           const models = await provider.fetchModels(key.value);
           key.availableModels = models;
           if (key.selectedModels.length === 0) key.selectedModels = [...models];
-          db.saveSettings(settings);
+          settingsRepository.saveSettings(settings);
           showAlert({ type: "success", message: "Models synced." });
           this.renderBody();
-          window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         } catch (err: unknown) {
           console.error("Failed to sync models:", err);
           const message = err instanceof Error ? err.message : "Unknown error";
@@ -321,7 +328,6 @@ export class ApiKeysModal extends HTMLElement {
     // Close modals natively (handled mostly by app-modal but adding specific explicit closes for these nested modals)
     this.querySelector("#close-keys-modal-btn")?.addEventListener("click", () => {
       this.closeModal("keys-modal");
-      window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
     });
 
     this.querySelector("#close-add-key-btn")?.addEventListener("click", () => {
@@ -347,9 +353,9 @@ export class ApiKeysModal extends HTMLElement {
         return;
       }
 
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const newKey: ApiKeyItem = {
-        id: Date.now().toString(),
+        id: createId("key"),
         providerId,
         name,
         value,
@@ -359,12 +365,11 @@ export class ApiKeysModal extends HTMLElement {
 
       settings.apiKeys.push(newKey);
       if (!settings.activeKeys[providerId]) settings.activeKeys[providerId] = newKey.id;
-      db.saveSettings(settings);
+      settingsRepository.saveSettings(settings);
 
       showAlert({ type: "success", message: "Key added." });
       this.closeModal("add-key-modal");
       this.renderBody();
-      window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
     });
 
     // Save edit key
@@ -380,15 +385,14 @@ export class ApiKeysModal extends HTMLElement {
         return;
       }
 
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const keyToEdit = settings.apiKeys.find((k) => k.id === id);
       if (keyToEdit) {
         keyToEdit.name = newName;
-        db.saveSettings(settings);
+        settingsRepository.saveSettings(settings);
         showAlert({ type: "success", message: "Key name updated." });
         this.closeModal("edit-key-modal");
         this.renderBody();
-        window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
       }
     });
   }

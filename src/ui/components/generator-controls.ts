@@ -1,7 +1,11 @@
 import { APP_EVENTS } from "../../core/constants/events";
+import { emitAppEvent } from "../../core/events/app-events";
+import type { AiProviderId } from "../../core/types";
 import { ModelDropdown } from "./model-dropdown";
-import { db } from "../../core/modules/db/index";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/services/ai/index";
+import { appComposition } from "../../core/app/composition-root";
+
+const settingsRepository = appComposition.settingsRepository;
 
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
@@ -129,7 +133,7 @@ export class GeneratorControls extends HTMLElement {
                       id="variation-input"
                       min="1"
                       max="4"
-                      value="${db.getSettings().variations}"
+                      value="${settingsRepository.getSettings().variations}"
                       class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
                     />
                   </div>
@@ -142,7 +146,7 @@ export class GeneratorControls extends HTMLElement {
                       min="0"
                       max="2"
                       step="0.1"
-                      value="${db.getSettings().temperature.toFixed(1)}"
+                      value="${settingsRepository.getSettings().temperature.toFixed(1)}"
                       class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
                     />
                   </div>
@@ -311,7 +315,7 @@ export class GeneratorControls extends HTMLElement {
       if (isNaN(val)) return;
       if (val < 1) val = 1;
       if (val > 4) val = 4;
-      db.saveSettings({ variations: val });
+      settingsRepository.saveSettings({ variations: val });
     });
 
     variationInput?.addEventListener("blur", (e) => {
@@ -319,7 +323,7 @@ export class GeneratorControls extends HTMLElement {
       if (isNaN(val) || val < 1) val = 1;
       if (val > 4) val = 4;
       (e.target as HTMLInputElement).value = val.toString();
-      db.saveSettings({ variations: val });
+      settingsRepository.saveSettings({ variations: val });
     });
 
     const clampTemperature = (value: number): number => {
@@ -331,7 +335,7 @@ export class GeneratorControls extends HTMLElement {
     temperatureInput?.addEventListener("input", (e) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
       if (isNaN(value)) return;
-      db.saveSettings({ temperature: clampTemperature(value) });
+      settingsRepository.saveSettings({ temperature: clampTemperature(value) });
     });
 
     temperatureInput?.addEventListener("blur", (e) => {
@@ -339,13 +343,13 @@ export class GeneratorControls extends HTMLElement {
       const value = parseFloat(target.value);
       const normalized = isNaN(value) ? 0.7 : clampTemperature(value);
       target.value = normalized.toFixed(1);
-      db.saveSettings({ temperature: normalized });
+      settingsRepository.saveSettings({ temperature: normalized });
     });
 
     editSystemPromptBtn?.addEventListener("click", () => {
       if (!systemPromptModal || !systemPromptModalInput) return;
 
-      const savedPrompt = db.getSettings().systemPrompt?.trim();
+      const savedPrompt = settingsRepository.getSettings().systemPrompt?.trim();
       systemPromptModalInput.value = savedPrompt || DEFAULT_SYSTEM_PROMPT;
 
       settingsMenu?.classList.add("hidden");
@@ -364,7 +368,7 @@ export class GeneratorControls extends HTMLElement {
 
       const value = systemPromptModalInput.value.trim();
       const normalizedDefault = DEFAULT_SYSTEM_PROMPT.trim();
-      db.saveSettings({ systemPrompt: value === normalizedDefault ? "" : value });
+      settingsRepository.saveSettings({ systemPrompt: value === normalizedDefault ? "" : value });
       closeSystemPromptModal();
     });
 
@@ -411,18 +415,20 @@ export class GeneratorControls extends HTMLElement {
       const prompt = promptInput.value.trim();
       const selector = this.querySelector("#model-selector") as ModelDropdown | null;
       const model = selector?.selectedModel;
-      const providerId = selector?.providerId;
+      const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
 
       if (!prompt) return;
 
       const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
-      const variations = db.getSettings().variations || 1;
+      const variations = settingsRepository.getSettings().variations || 1;
 
-      window.dispatchEvent(
-        new CustomEvent(APP_EVENTS.START_GENERATION, {
-          detail: { prompt, referenceSvgs: svgsAsText, model, providerId, variations },
-        }),
-      );
+      emitAppEvent(APP_EVENTS.START_GENERATION, {
+        prompt,
+        referenceSvgs: svgsAsText,
+        model,
+        providerId,
+        variations,
+      });
     });
 
     // Subscribing to global events generated by index.ts Orchestrator
