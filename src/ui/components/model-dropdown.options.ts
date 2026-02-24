@@ -58,7 +58,7 @@ export function buildModelOptions({
     }
 
     providerTabsHtml += `
-      <button data-tab-target="${safeProviderPaneId}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
+      <button data-tab-target="${safeProviderPaneId}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted"} hover:text-text hover:bg-surface-hover/50 transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
         <div class="flex items-center gap-2 max-w-full overflow-hidden">
           <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-4 h-4 shrink-0 object-contain" />
           <span class="truncate">${safeProviderName}</span>

@@ -16,6 +16,8 @@ export function activateProviderPane(root: HTMLElement, paneId: string): void {
     tab.classList.toggle("text-text", isTarget);
     tab.classList.toggle("bg-surface-hover/30", isTarget);
     tab.classList.toggle("text-text-muted", !isTarget);
+    tab.classList.toggle("hover:text-text", !isTarget);
+    tab.classList.toggle("hover:bg-surface-hover/50", !isTarget);
   });
 
   root.querySelectorAll(".provider-pane").forEach((pane) => {

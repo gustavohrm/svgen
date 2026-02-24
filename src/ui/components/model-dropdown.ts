@@ -94,7 +94,7 @@ export class ModelDropdown extends HTMLElement {
     }
 
     // Activate the correct provider tab/pane for the selected model
-    if (this.providerId && hasSavedModel) {
+    if (this.providerId) {
       activateProviderPane(this, `provider-pane-${this.providerId}`);
     }
   }

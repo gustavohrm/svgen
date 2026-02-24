@@ -31,7 +31,7 @@ export function renderApiKeysModalShell(): string {
             type="text"
             id="modal-key-name"
             placeholder="e.g. Primary Key"
-            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-hidden focus:border-border transition-all"
           />
         </div>
         <div class="space-y-2">
@@ -40,7 +40,7 @@ export function renderApiKeysModalShell(): string {
             type="password"
             id="modal-key-value"
             placeholder="sk-••••••••••••••••••••••••"
-            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-hidden focus:border-border transition-all"
           />
         </div>
       </div>
@@ -68,7 +68,7 @@ export function renderApiKeysModalShell(): string {
             type="text"
             id="edit-modal-key-name"
             placeholder="e.g. Primary Key"
-            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+            class="w-full bg-transparent border border-border/50 rounded-lg px-4 py-3 text-sm text-text placeholder:text-text-muted outline-hidden focus:border-border transition-all"
           />
         </div>
       </div>
@@ -114,7 +114,7 @@ export function renderApiKeysBody(settings: AppSettings, providers: ProviderOpti
                     const safeKeyId = escapeHtml(key.id);
                     const safeKeyName = escapeHtml(key.name);
                     const maskedValue =
-                      key.value.length < 8
+                      key.value.length <= 8
                         ? "••••••"
                         : `${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}`;
                     const safeKeyMaskedValue = escapeHtml(maskedValue);

@@ -13,6 +13,7 @@ import { createAttachmentPreviewNode } from "./generator-controls.attachments";
 import {
   clampTemperature,
   clampVariations,
+  DEFAULT_TEMPERATURE,
   hidePanel,
   showPanel,
   togglePanel,
@@ -35,7 +36,7 @@ export class GeneratorControls extends HTMLElement {
       !settingsBtn.contains(e.target as Node) &&
       !settingsMenu.contains(e.target as Node)
     ) {
-      settingsMenu.classList.add("hidden");
+      hidePanel(settingsMenu);
     }
   };
 
@@ -75,7 +76,11 @@ export class GeneratorControls extends HTMLElement {
     this.innerHTML = renderGeneratorControls(settingsRepository.getSettings());
 
     // Delay attach until element is painted
-    requestAnimationFrame(() => this.renderAttachments());
+    requestAnimationFrame(() => {
+      void this.renderAttachments().catch((error: unknown) => {
+        console.error("Failed to render attachments:", error);
+      });
+    });
   }
 
   private async renderAttachments() {
@@ -87,19 +92,32 @@ export class GeneratorControls extends HTMLElement {
 
     container.innerHTML = "";
 
-    for (let i = 0; i < filesSnapshot.length; i++) {
-      const file = filesSnapshot[i];
-      const div = await createAttachmentPreviewNode(file, i);
+    try {
+      for (let i = 0; i < filesSnapshot.length; i++) {
+        const file = filesSnapshot[i];
+        const div = await createAttachmentPreviewNode(file, i);
 
+        if (renderToken !== this.attachmentsRenderToken) {
+          return;
+        }
+
+        if (this.referenceFiles[i] !== file) {
+          continue;
+        }
+
+        container.appendChild(div);
+      }
+    } catch (error: unknown) {
       if (renderToken !== this.attachmentsRenderToken) {
         return;
       }
 
-      if (this.referenceFiles[i] !== file) {
-        continue;
-      }
-
-      container.appendChild(div);
+      container.innerHTML = "";
+      const fallback = document.createElement("div");
+      fallback.className = "text-xs text-text-muted px-2 py-1";
+      fallback.textContent = "Unable to render attachments.";
+      container.appendChild(fallback);
+      console.error("Failed to render attachment previews:", error);
     }
   }
 
@@ -158,7 +176,7 @@ export class GeneratorControls extends HTMLElement {
     temperatureInput?.addEventListener("blur", (e) => {
       const target = e.target as HTMLInputElement;
       const value = parseFloat(target.value);
-      const normalized = isNaN(value) ? 0.7 : clampTemperature(value);
+      const normalized = Number.isNaN(value) ? DEFAULT_TEMPERATURE : clampTemperature(value);
       target.value = normalized.toFixed(1);
       settingsRepository.setTemperature(normalized);
     });
@@ -204,7 +222,9 @@ export class GeneratorControls extends HTMLElement {
         (f) => f.type === "image/svg+xml" || f.name.endsWith(".svg") || f.name.endsWith(".SVG"),
       );
       this.referenceFiles = [...this.referenceFiles, ...newFiles];
-      this.renderAttachments();
+      void this.renderAttachments().catch((error: unknown) => {
+        console.error("Failed to render attachments:", error);
+      });
     });
 
     // Remove file (Event delegation for attachments)
@@ -214,7 +234,9 @@ export class GeneratorControls extends HTMLElement {
 
       const idx = parseInt(btn.getAttribute("data-index")!);
       this.referenceFiles.splice(idx, 1);
-      this.renderAttachments();
+      void this.renderAttachments().catch((error: unknown) => {
+        console.error("Failed to render attachments:", error);
+      });
 
       if (this.referenceFiles.length === 0 && referenceInput) {
         referenceInput.value = "";
