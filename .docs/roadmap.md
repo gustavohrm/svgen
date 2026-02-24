@@ -33,11 +33,17 @@ Deliverable: deterministic settings state transitions.
 
 ## Phase 4 - UI Module Decomposition
 
-- [ ] Split large components (`generator-controls`, `model-dropdown`, `api-keys-modal`) into render/controller/state modules.
-- [ ] Reduce full rerender patterns where local updates are enough.
-- [ ] Keep custom element APIs unchanged.
+- [x] Split large components (`generator-controls`, `model-dropdown`, `api-keys-modal`) into render/controller/state modules.
+- [x] Reduce full rerender patterns where local updates are enough.
+- [x] Keep custom element APIs unchanged.
 
 Deliverable: smaller modules with single-purpose responsibilities.
+
+### Phase 4 Implementation Report (2026-02-24)
+
+- Extracted generator, model-dropdown, and API keys modal rendering/DOM-state logic into focused helper modules while preserving the existing custom element tags and public properties.
+- Centralized repeated UI behavior (dropdown/modal open-close states, attachment preview rendering, setting clamp/toggle helpers) to reduce component-level branching and make event handlers orchestration-only.
+- Replaced one full rerender path in API key activation with targeted DOM updates so active-key selection updates in place without rebuilding the entire modal body.
 
 ## Phase 5 - Test Coverage Expansion
 
