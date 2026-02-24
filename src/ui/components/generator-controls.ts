@@ -156,13 +156,13 @@ export class GeneratorControls extends HTMLElement {
     });
 
     variationInput?.addEventListener("input", (e) => {
-      const val = parseInt((e.target as HTMLInputElement).value, 10);
+      const val = parseFloat((e.target as HTMLInputElement).value);
       if (Number.isNaN(val)) return;
       settingsRepository.setVariations(clampVariations(val));
     });
 
     variationInput?.addEventListener("blur", (e) => {
-      const val = clampVariations(parseInt((e.target as HTMLInputElement).value, 10));
+      const val = clampVariations(parseFloat((e.target as HTMLInputElement).value));
       (e.target as HTMLInputElement).value = val.toString();
       settingsRepository.setVariations(val);
     });
