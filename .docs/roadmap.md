@@ -47,13 +47,19 @@ Deliverable: smaller modules with single-purpose responsibilities.
 
 ## Phase 5 - Test Coverage Expansion
 
-- [ ] Add integration tests for:
+- [x] Add integration tests for:
   - generation event pipeline,
   - save to gallery,
   - settings update workflows.
-- [ ] Add repository tests for edge/error paths (including migration scenarios).
+- [x] Add repository tests for edge/error paths (including migration scenarios).
 
 Deliverable: regression safety net for architecture changes.
+
+### Phase 5 Implementation Report (2026-02-24)
+
+- Added end-to-end style integration tests for: app event orchestration in `src/index.ts`, save-to-gallery behavior in `results-grid`, and settings model-selection workflows in `settings/index.ts`.
+- Expanded `BrowserSettingsRepository` tests with error/fallback coverage for invalid persisted payloads and migration-path checks for legacy `apiKeys` records and `activeKeyId` mapping.
+- Verified the expanded suite with `npm test` (45 passing tests) to keep the phase incremental and regression-focused.
 
 ## Execution Strategy
 
