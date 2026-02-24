@@ -1,3 +1,10 @@
+/**
+ * Set visibility of a dropdown menu and rotate an optional icon to reflect the open state.
+ *
+ * @param menu - The dropdown element whose visibility classes ("hidden"/"flex") will be toggled
+ * @param icon - Optional icon element to rotate to 180° when open or 0° when closed
+ * @param isOpen - Whether the dropdown should be open
+ */
 export function setDropdownOpenState(
   menu: HTMLElement,
   icon: HTMLElement | null,
@@ -10,6 +17,14 @@ export function setDropdownOpenState(
   }
 }
 
+/**
+ * Activate the provider pane identified by `paneId` and update tab styles to reflect the active tab.
+ *
+ * Updates elements with class `provider-tab` by marking the tab whose `data-tab-target` equals `paneId` as active and marking others as inactive. Shows the `.provider-pane` whose `id` equals `paneId` and hides the other panes.
+ *
+ * @param root - Root element containing `.provider-tab` and `.provider-pane` elements
+ * @param paneId - The `id` of the pane to activate; tabs match this via their `data-tab-target` attribute
+ */
 export function activateProviderPane(root: HTMLElement, paneId: string): void {
   root.querySelectorAll(".provider-tab").forEach((tab) => {
     const isTarget = (tab as HTMLElement).dataset.tabTarget === paneId;

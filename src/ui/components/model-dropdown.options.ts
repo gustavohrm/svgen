@@ -18,6 +18,18 @@ export interface ModelDropdownBuildResult {
   firstProviderId: string | null;
 }
 
+/**
+ * Build the HTML for a provider-grouped model selection dropdown based on configured API keys.
+ *
+ * Builds a search-enabled two-column model picker: a left column of provider tabs and a right column of provider panes containing model option buttons. If no API keys are configured or no models are enabled, returns a simple message HTML instead.
+ *
+ * @param settings - Application settings containing configured API keys and their selected models
+ * @param providers - Available providers to include in the dropdown; each provider must include `id`, `name`, and `icon`
+ * @returns An object containing:
+ *  - `modelOptionsHtml`: the constructed HTML string for the dropdown or a message HTML when no models/keys are available,
+ *  - `firstModel`: the first available model string or `null` if none,
+ *  - `firstProviderId`: the provider id corresponding to `firstModel` or `null` if none
+ */
 export function buildModelOptions({
   settings,
   providers,

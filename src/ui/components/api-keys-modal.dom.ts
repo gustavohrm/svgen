@@ -1,3 +1,12 @@
+/**
+ * Produce a CSS selector-safe string from an input value.
+ *
+ * Uses the platform `CSS.escape` when available; otherwise converts `value` to a string
+ * and returns an escaped representation suitable for use in CSS selectors.
+ *
+ * @param value - The value to escape (will be converted to a string)
+ * @returns A string safe for use in CSS selectors representing the input value
+ */
 function escapeCssSelectorValue(value: string): string {
   if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
     return CSS.escape(value);
@@ -50,6 +59,11 @@ function escapeCssSelectorValue(value: string): string {
   return result;
 }
 
+/**
+ * Shows the modal element with the given DOM id. If no element matches the id, does nothing.
+ *
+ * @param id - The id attribute of the modal element to show
+ */
 export function showModalById(id: string): void {
   const modal = document.getElementById(id);
   if (!modal) return;
@@ -57,6 +71,11 @@ export function showModalById(id: string): void {
   modal.classList.add("flex");
 }
 
+/**
+ * Hides the modal element with the given DOM id by updating its visibility classes.
+ *
+ * @param id - The DOM id of the modal element to hide
+ */
 export function hideModalById(id: string): void {
   const modal = document.getElementById(id);
   if (!modal) return;
@@ -64,6 +83,16 @@ export function hideModalById(id: string): void {
   modal.classList.remove("flex");
 }
 
+/**
+ * Update radio inputs and their label text within `root` to mark the active key for a provider.
+ *
+ * Finds radio inputs with class `key-radio` associated with `providerId`, sets the radio whose value
+ * equals `keyId` as checked, and toggles the label's text color classes to indicate active versus inactive state.
+ *
+ * @param root - Root element that contains the provider key radio inputs.
+ * @param providerId - Provider identifier used to select the matching radio inputs.
+ * @param keyId - The id of the key to mark as active (the radio with matching value will be checked).
+ */
 export function applyActiveKeySelectionUI(
   root: HTMLElement,
   providerId: string,

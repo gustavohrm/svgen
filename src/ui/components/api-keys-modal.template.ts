@@ -2,6 +2,11 @@ import type { AppSettings } from "../../core/modules/db";
 import { escapeHtml } from "../../core/utils/html-escape";
 import type { ProviderOption } from "./model-dropdown.options";
 
+/**
+ * Renders the HTML shell for API keys management modals.
+ *
+ * @returns A string containing three modal templates: the "API Keys" list modal (`keys-modal`), the "Add API Key" modal (`add-key-modal`), and the "Edit API Key Name" modal (`edit-key-modal`); includes the key-related input and button element IDs used by UI logic (e.g., `keys-modal-body`, `modal-provider-id`, `modal-key-name`, `modal-key-value`, `save-new-key`, `edit-modal-key-id`, `edit-modal-key-name`, `save-edit-key`).
+ */
 export function renderApiKeysModalShell(): string {
   return `
     <app-modal
@@ -84,6 +89,13 @@ export function renderApiKeysModalShell(): string {
   `;
 }
 
+/**
+ * Render HTML for the API keys list grouped by provider.
+ *
+ * @param settings - Application settings containing `apiKeys` and `activeKeys` mappings used to render keys and the active selection per provider
+ * @param providers - Array of provider options to render sections for; each section lists the provider's keys and controls
+ * @returns A concatenated HTML string with a section per provider showing provider header, an "Add Key" action, and either a "No keys configured" notice or a list of keys with activation, masked value, and action buttons
+ */
 export function renderApiKeysBody(settings: AppSettings, providers: ProviderOption[]): string {
   return providers
     .map((provider) => {
