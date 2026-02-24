@@ -101,6 +101,9 @@ export interface SettingsRepository {
   saveSettings(settings: Partial<AppSettings>): AppSettings;
   setActiveKey(providerId: AiProviderId, keyId: string): AppSettings;
   toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings;
+  toggleModelSelections(
+    updates: Array<{ keyId: string; model: string; shouldSelect?: boolean }>,
+  ): AppSettings;
   setVariations(value: number): AppSettings;
   setTemperature(value: number): AppSettings;
   setSystemPrompt(value: string): AppSettings;
@@ -232,24 +235,56 @@ export class BrowserSettingsRepository implements SettingsRepository {
   }
 
   toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings {
+    return this.toggleModelSelections([{ keyId, model, shouldSelect }]);
+  }
+
+  toggleModelSelections(
+    updates: Array<{ keyId: string; model: string; shouldSelect?: boolean }>,
+  ): AppSettings {
+    if (updates.length === 0) {
+      return this.getSettings();
+    }
+
     const current = this.getSettings();
+    const groupedUpdates = new Map<string, Array<{ model: string; shouldSelect?: boolean }>>();
+
+    for (const update of updates) {
+      const modelUpdates = groupedUpdates.get(update.keyId) || [];
+      modelUpdates.push({ model: update.model, shouldSelect: update.shouldSelect });
+      groupedUpdates.set(update.keyId, modelUpdates);
+    }
+
     const apiKeys = current.apiKeys.map((key) => {
-      if (key.id !== keyId) {
+      const keyUpdates = groupedUpdates.get(key.id);
+      if (!keyUpdates) {
         return key;
       }
 
-      const hasModel = key.selectedModels.includes(model);
-      const nextShouldSelect = shouldSelect ?? !hasModel;
+      const selected = new Set(key.selectedModels);
+      let changed = false;
 
-      if (nextShouldSelect === hasModel) {
+      for (const update of keyUpdates) {
+        const hasModel = selected.has(update.model);
+        const nextShouldSelect = update.shouldSelect ?? !hasModel;
+
+        if (nextShouldSelect && !hasModel) {
+          selected.add(update.model);
+          changed = true;
+        }
+
+        if (!nextShouldSelect && hasModel) {
+          selected.delete(update.model);
+          changed = true;
+        }
+      }
+
+      if (!changed) {
         return key;
       }
 
       return {
         ...key,
-        selectedModels: nextShouldSelect
-          ? [...key.selectedModels, model]
-          : key.selectedModels.filter((entry) => entry !== model),
+        selectedModels: [...selected],
       };
     });
 

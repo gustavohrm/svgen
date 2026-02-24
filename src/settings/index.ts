@@ -312,9 +312,13 @@ function attachDynamicEvents() {
       const allModels = getAllModels();
       const filtered = getFilteredModels(allModels, state);
 
-      for (const entry of filtered) {
-        settingsRepository.toggleModelSelection(entry.keyId, entry.model, isChecked);
-      }
+      settingsRepository.toggleModelSelections(
+        filtered.map((entry) => ({
+          keyId: entry.keyId,
+          model: entry.model,
+          shouldSelect: isChecked,
+        })),
+      );
       render(store.get());
       return;
     }
