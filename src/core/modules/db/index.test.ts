@@ -152,4 +152,68 @@ describe("BrowserSettingsRepository", () => {
 
     expect(setItemSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("falls back to defaults when persisted settings are invalid JSON", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    localStorage.setItem("svgen_settings", "{not-json");
+
+    const settings = repository.getSettings();
+
+    expect(settings).toMatchObject({
+      apiKeys: [],
+      activeKeys: {},
+      variations: 4,
+      temperature: 0.7,
+      systemPrompt: "",
+    });
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it("migrates legacy provider-key record payloads", () => {
+    localStorage.setItem(
+      "svgen_settings",
+      JSON.stringify({
+        apiKeys: {
+          openrouter: "or-secret",
+          gcp: "gcp-secret",
+        },
+        selectedProvider: "openrouter",
+      }),
+    );
+
+    const settings = repository.getSettings();
+    const openRouterKey = settings.apiKeys.find((key) => key.providerId === "open-router");
+    const gcpKey = settings.apiKeys.find((key) => key.providerId === "gcp");
+
+    expect(settings.apiKeys).toHaveLength(2);
+    expect(openRouterKey?.value).toBe("or-secret");
+    expect(gcpKey?.value).toBe("gcp-secret");
+    expect(settings.activeKeys["open-router"]).toBe(openRouterKey?.id);
+    expect(settings.activeKeys.gcp).toBe(gcpKey?.id);
+  });
+
+  it("maps legacy activeKeyId into provider-scoped activeKeys", () => {
+    localStorage.setItem(
+      "svgen_settings",
+      JSON.stringify({
+        apiKeys: [
+          {
+            id: "legacy-gcp",
+            providerId: "gcp",
+            name: "Legacy gcp key",
+            value: "gcp-secret",
+            createdAt: Date.now(),
+            selectedModels: [],
+          },
+        ],
+        activeKeyId: "legacy-gcp",
+      }),
+    );
+
+    const settings = repository.getSettings();
+
+    expect(settings.activeKeys.gcp).toBe("legacy-gcp");
+  });
 });
