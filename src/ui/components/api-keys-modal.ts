@@ -220,9 +220,7 @@ export class ApiKeysModal extends HTMLElement {
         const id = radio.value;
         const providerId = radio.dataset.providerId;
         if (providerId) {
-          const settings = settingsRepository.getSettings();
-          settings.activeKeys[providerId] = id;
-          settingsRepository.saveSettings(settings);
+          settingsRepository.setActiveKey(providerId as AiProviderId, id);
           this.renderBody();
         }
         return;
@@ -260,16 +258,19 @@ export class ApiKeysModal extends HTMLElement {
           const settings = settingsRepository.getSettings();
           const keyToDelete = settings.apiKeys.find((k) => k.id === id);
           if (keyToDelete) {
-            settings.apiKeys = settings.apiKeys.filter((k) => k.id !== id);
-            if (settings.activeKeys[keyToDelete.providerId] === id) {
-              const remaining = settings.apiKeys.filter(
-                (k) => k.providerId === keyToDelete.providerId,
-              );
-              if (remaining.length > 0)
-                settings.activeKeys[keyToDelete.providerId] = remaining[0].id;
-              else delete settings.activeKeys[keyToDelete.providerId];
+            const apiKeys = settings.apiKeys.filter((k) => k.id !== id);
+            const activeKeys = { ...settings.activeKeys };
+
+            if (activeKeys[keyToDelete.providerId] === id) {
+              const remaining = apiKeys.filter((k) => k.providerId === keyToDelete.providerId);
+              if (remaining.length > 0) {
+                activeKeys[keyToDelete.providerId] = remaining[0].id;
+              } else {
+                delete activeKeys[keyToDelete.providerId];
+              }
             }
-            settingsRepository.saveSettings(settings);
+
+            settingsRepository.saveSettings({ apiKeys, activeKeys });
           }
           this.renderBody();
         }
@@ -292,9 +293,24 @@ export class ApiKeysModal extends HTMLElement {
 
         try {
           const models = await provider.fetchModels(key.value);
-          key.availableModels = models;
-          if (key.selectedModels.length === 0) key.selectedModels = [...models];
-          settingsRepository.saveSettings(settings);
+          const latestSettings = settingsRepository.getSettings();
+          const apiKeys = latestSettings.apiKeys.map((entry) => {
+            if (entry.id !== key.id) {
+              return entry;
+            }
+
+            return {
+              ...entry,
+              availableModels: [...models],
+              selectedModels:
+                entry.selectedModels.length === 0 ? [...models] : [...entry.selectedModels],
+            };
+          });
+
+          settingsRepository.saveSettings({
+            ...latestSettings,
+            apiKeys,
+          });
           showAlert({ type: "success", message: "Models synced." });
           this.renderBody();
         } catch (err: unknown) {
@@ -363,9 +379,12 @@ export class ApiKeysModal extends HTMLElement {
         selectedModels: [],
       };
 
-      settings.apiKeys.push(newKey);
-      if (!settings.activeKeys[providerId]) settings.activeKeys[providerId] = newKey.id;
-      settingsRepository.saveSettings(settings);
+      settingsRepository.saveSettings({
+        apiKeys: [...settings.apiKeys, newKey],
+        activeKeys: settings.activeKeys[providerId]
+          ? { ...settings.activeKeys }
+          : { ...settings.activeKeys, [providerId]: newKey.id },
+      });
 
       showAlert({ type: "success", message: "Key added." });
       this.closeModal("add-key-modal");
@@ -386,10 +405,20 @@ export class ApiKeysModal extends HTMLElement {
       }
 
       const settings = settingsRepository.getSettings();
-      const keyToEdit = settings.apiKeys.find((k) => k.id === id);
-      if (keyToEdit) {
-        keyToEdit.name = newName;
-        settingsRepository.saveSettings(settings);
+      const keyExists = settings.apiKeys.some((k) => k.id === id);
+      if (keyExists) {
+        const apiKeys = settings.apiKeys.map((key) => {
+          if (key.id !== id) {
+            return key;
+          }
+
+          return {
+            ...key,
+            name: newName,
+          };
+        });
+
+        settingsRepository.saveSettings({ apiKeys });
         showAlert({ type: "success", message: "Key name updated." });
         this.closeModal("edit-key-modal");
         this.renderBody();

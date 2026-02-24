@@ -77,4 +77,79 @@ describe("BrowserSettingsRepository", () => {
     const settings = repository.getSettings();
     expect(settings.activeKeys["open-router"]).toBe("123");
   });
+
+  it("returns immutable copies from getSettings", () => {
+    const first = repository.getSettings();
+    first.apiKeys.push({
+      id: "temp",
+      providerId: "open-router",
+      name: "Temp",
+      value: "secret",
+      createdAt: Date.now(),
+      selectedModels: ["x"],
+    });
+    first.activeKeys["open-router"] = "temp";
+
+    const second = repository.getSettings();
+    expect(second.apiKeys).toEqual([]);
+    expect(second.activeKeys).toEqual({});
+  });
+
+  it("updates settings via command methods", () => {
+    repository.saveSettings({
+      apiKeys: [
+        {
+          id: "k1",
+          providerId: "open-router",
+          name: "Main",
+          value: "abc",
+          createdAt: Date.now(),
+          selectedModels: [],
+        },
+      ],
+      activeKeys: { "open-router": "k1" },
+    });
+
+    repository.setVariations(10);
+    repository.setTemperature(-1);
+    repository.setSystemPrompt("custom");
+    repository.toggleModelSelection("k1", "m1", true);
+    repository.toggleModelSelection("k1", "m1", false);
+    repository.toggleModelSelections([
+      { keyId: "k1", model: "m2", shouldSelect: true },
+      { keyId: "k1", model: "m3", shouldSelect: true },
+    ]);
+    repository.setActiveKey("open-router", "k1");
+
+    const settings = repository.getSettings();
+    expect(settings.variations).toBe(4);
+    expect(settings.temperature).toBe(0);
+    expect(settings.systemPrompt).toBe("custom");
+    expect(settings.apiKeys[0].selectedModels).toEqual(["m2", "m3"]);
+    expect(settings.activeKeys["open-router"]).toBe("k1");
+  });
+
+  it("applies batch model updates with a single storage write", () => {
+    repository.saveSettings({
+      apiKeys: [
+        {
+          id: "k1",
+          providerId: "open-router",
+          name: "Main",
+          value: "abc",
+          createdAt: Date.now(),
+          selectedModels: [],
+        },
+      ],
+    });
+
+    const setItemSpy = vi.spyOn(localStorage, "setItem");
+    repository.toggleModelSelections([
+      { keyId: "k1", model: "m1", shouldSelect: true },
+      { keyId: "k1", model: "m2", shouldSelect: true },
+      { keyId: "k1", model: "m3", shouldSelect: true },
+    ]);
+
+    expect(setItemSpy).toHaveBeenCalledTimes(1);
+  });
 });

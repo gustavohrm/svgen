@@ -49,9 +49,62 @@ function toLegacyProviderId(rawProviderId: string): AiProviderId {
   return (rawProviderId === "openrouter" ? "open-router" : rawProviderId) as AiProviderId;
 }
 
+function cloneApiKeyItem(key: ApiKeyItem): ApiKeyItem {
+  return {
+    ...key,
+    selectedModels: [...(key.selectedModels || [])],
+    availableModels: key.availableModels ? [...key.availableModels] : undefined,
+  };
+}
+
+function cloneSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    apiKeys: settings.apiKeys.map((key) => cloneApiKeyItem(key)),
+    activeKeys: { ...settings.activeKeys },
+  };
+}
+
+function normalizeSettings(input: Partial<AppSettings>): AppSettings {
+  return {
+    apiKeys: Array.isArray(input.apiKeys) ? input.apiKeys.map((key) => cloneApiKeyItem(key)) : [],
+    activeKeys: isRecord(input.activeKeys)
+      ? Object.fromEntries(
+          Object.entries(input.activeKeys).filter(([, keyId]) => typeof keyId === "string"),
+        )
+      : {},
+    variations:
+      typeof input.variations === "number" && Number.isFinite(input.variations)
+        ? Math.max(1, Math.min(4, Math.round(input.variations)))
+        : defaultSettings.variations,
+    temperature:
+      typeof input.temperature === "number" && Number.isFinite(input.temperature)
+        ? Math.max(0, Math.min(2, Math.round(input.temperature * 10) / 10))
+        : defaultSettings.temperature,
+    systemPrompt:
+      typeof input.systemPrompt === "string" ? input.systemPrompt : defaultSettings.systemPrompt,
+    lastSelectedModel:
+      typeof input.lastSelectedModel === "string"
+        ? input.lastSelectedModel
+        : defaultSettings.lastSelectedModel,
+    lastSelectedProviderId:
+      typeof input.lastSelectedProviderId === "string"
+        ? input.lastSelectedProviderId
+        : defaultSettings.lastSelectedProviderId,
+  };
+}
+
 export interface SettingsRepository {
   getSettings(): AppSettings;
-  saveSettings(settings: Partial<AppSettings>): AppSettings;
+  saveSettings(settings: Partial<AppSettings>, current?: AppSettings): AppSettings;
+  setActiveKey(providerId: AiProviderId, keyId: string): AppSettings;
+  toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings;
+  toggleModelSelections(
+    updates: Array<{ keyId: string; model: string; shouldSelect?: boolean }>,
+  ): AppSettings;
+  setVariations(value: number): AppSettings;
+  setTemperature(value: number): AppSettings;
+  setSystemPrompt(value: string): AppSettings;
 }
 
 export class BrowserSettingsRepository implements SettingsRepository {
@@ -63,7 +116,7 @@ export class BrowserSettingsRepository implements SettingsRepository {
   getSettings(): AppSettings {
     const saved = this.storage.getItem(this.storageKey);
     if (!saved) {
-      return defaultSettings;
+      return cloneSettings(defaultSettings);
     }
 
     try {
@@ -130,7 +183,7 @@ export class BrowserSettingsRepository implements SettingsRepository {
       delete parsed.selectedProvider;
       delete parsed.selectedModel;
 
-      const merged = { ...defaultSettings, ...parsed } as AppSettings;
+      const merged = normalizeSettings({ ...defaultSettings, ...(parsed as Partial<AppSettings>) });
 
       if (!merged.activeKeys) {
         merged.activeKeys = {};
@@ -150,17 +203,104 @@ export class BrowserSettingsRepository implements SettingsRepository {
         }
       }
 
-      return merged;
+      return cloneSettings(merged);
     } catch (error: unknown) {
       console.warn("Failed to parse settings, falling back to defaults", error);
-      return defaultSettings;
+      return cloneSettings(defaultSettings);
     }
   }
 
-  saveSettings(settings: Partial<AppSettings>): AppSettings {
-    const current = this.getSettings();
-    const updated = { ...current, ...settings };
+  saveSettings(settings: Partial<AppSettings>, current?: AppSettings): AppSettings {
+    const base = current || this.getSettings();
+    const updated = normalizeSettings({ ...base, ...settings });
     this.storage.setItem(this.storageKey, JSON.stringify(updated));
-    return updated;
+    return cloneSettings(updated);
+  }
+
+  setActiveKey(providerId: AiProviderId, keyId: string): AppSettings {
+    const current = this.getSettings();
+    const key = current.apiKeys.find((item) => item.id === keyId && item.providerId === providerId);
+    if (!key) {
+      return current;
+    }
+
+    return this.saveSettings(
+      {
+        activeKeys: {
+          ...current.activeKeys,
+          [providerId]: keyId,
+        },
+      },
+      current,
+    );
+  }
+
+  toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings {
+    return this.toggleModelSelections([{ keyId, model, shouldSelect }]);
+  }
+
+  toggleModelSelections(
+    updates: Array<{ keyId: string; model: string; shouldSelect?: boolean }>,
+  ): AppSettings {
+    if (updates.length === 0) {
+      return this.getSettings();
+    }
+
+    const current = this.getSettings();
+    const groupedUpdates = new Map<string, Array<{ model: string; shouldSelect?: boolean }>>();
+
+    for (const update of updates) {
+      const modelUpdates = groupedUpdates.get(update.keyId) || [];
+      modelUpdates.push({ model: update.model, shouldSelect: update.shouldSelect });
+      groupedUpdates.set(update.keyId, modelUpdates);
+    }
+
+    const apiKeys = current.apiKeys.map((key) => {
+      const keyUpdates = groupedUpdates.get(key.id);
+      if (!keyUpdates) {
+        return key;
+      }
+
+      const selected = new Set(key.selectedModels);
+      let changed = false;
+
+      for (const update of keyUpdates) {
+        const hasModel = selected.has(update.model);
+        const nextShouldSelect = update.shouldSelect ?? !hasModel;
+
+        if (nextShouldSelect && !hasModel) {
+          selected.add(update.model);
+          changed = true;
+        }
+
+        if (!nextShouldSelect && hasModel) {
+          selected.delete(update.model);
+          changed = true;
+        }
+      }
+
+      if (!changed) {
+        return key;
+      }
+
+      return {
+        ...key,
+        selectedModels: [...selected],
+      };
+    });
+
+    return this.saveSettings({ apiKeys }, current);
+  }
+
+  setVariations(value: number): AppSettings {
+    return this.saveSettings({ variations: value });
+  }
+
+  setTemperature(value: number): AppSettings {
+    return this.saveSettings({ temperature: value });
+  }
+
+  setSystemPrompt(value: string): AppSettings {
+    return this.saveSettings({ systemPrompt: value });
   }
 }

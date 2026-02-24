@@ -312,22 +312,13 @@ function attachDynamicEvents() {
       const allModels = getAllModels();
       const filtered = getFilteredModels(allModels, state);
 
-      const settings = settingsRepository.getSettings();
-
-      for (const entry of filtered) {
-        const key = settings.apiKeys.find((k) => k.id === entry.keyId);
-        if (key) {
-          if (isChecked) {
-            if (!key.selectedModels.includes(entry.model)) {
-              key.selectedModels.push(entry.model);
-            }
-          } else {
-            key.selectedModels = key.selectedModels.filter((m) => m !== entry.model);
-          }
-        }
-      }
-
-      settingsRepository.saveSettings(settings);
+      settingsRepository.toggleModelSelections(
+        filtered.map((entry) => ({
+          keyId: entry.keyId,
+          model: entry.model,
+          shouldSelect: isChecked,
+        })),
+      );
       render(store.get());
       return;
     }
@@ -336,15 +327,8 @@ function attachDynamicEvents() {
     if (target.matches(".model-checkbox")) {
       const keyId = target.dataset.keyId;
       const model = target.value;
-      const settings = settingsRepository.getSettings();
-      const key = settings.apiKeys.find((k) => k.id === keyId);
-      if (key) {
-        if (target.checked) {
-          if (!key.selectedModels.includes(model)) key.selectedModels.push(model);
-        } else {
-          key.selectedModels = key.selectedModels.filter((m) => m !== model);
-        }
-        settingsRepository.saveSettings(settings);
+      if (keyId) {
+        settingsRepository.toggleModelSelection(keyId, model, target.checked);
         render(store.get()); // Re-render to update the Select All checkbox state
       }
     }

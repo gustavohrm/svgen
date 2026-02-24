@@ -19,11 +19,17 @@ Deliverable: clear separation between app logic and UI shell.
 
 ## Phase 3 - Settings Mutation Hardening
 
-- [ ] Add repository command methods: `setActiveKey`, `toggleModelSelection`, `setVariations`, `setTemperature`, `setSystemPrompt`.
-- [ ] Stop direct mutation of settings objects in UI modules.
-- [ ] Ensure repository returns immutable copies and does not leak default object references.
+- [x] Add repository command methods: `setActiveKey`, `toggleModelSelection`, `setVariations`, `setTemperature`, `setSystemPrompt`.
+- [x] Stop direct mutation of settings objects in UI modules.
+- [x] Ensure repository returns immutable copies and does not leak default object references.
 
 Deliverable: deterministic settings state transitions.
+
+### Phase 3 Implementation Report (2026-02-24)
+
+- Added command-oriented mutation methods to `BrowserSettingsRepository` and the `SettingsRepository` contract.
+- Hardened settings normalization/cloning so `getSettings()` and `saveSettings()` do not leak mutable internal/default references.
+- Updated settings-related UI flows (`generator-controls`, `settings` page model selection, and `api-keys-modal`) to avoid in-place mutation of repository-returned objects.
 
 ## Phase 4 - UI Module Decomposition
 
