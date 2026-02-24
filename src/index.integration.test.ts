@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_EVENTS } from "./core/constants/events";
 import { emitAppEvent } from "./core/events/app-events";
 
@@ -23,10 +23,42 @@ vi.mock("./core/use-cases/generate-svg", () => ({
 }));
 
 describe("index generation event pipeline", () => {
+  let cleanupEventsController: AbortController;
+  let originalWindowAddEventListener: Window["addEventListener"];
+  let originalWindowRemoveEventListener: Window["removeEventListener"];
+  let trackedWindowListeners: Array<{
+    type: string;
+    listener: EventListenerOrEventListenerObject;
+    options?: boolean | AddEventListenerOptions;
+  }>;
+
   beforeEach(() => {
     vi.resetModules();
     executeMock.mockReset();
     document.body.innerHTML = "";
+    cleanupEventsController = new AbortController();
+
+    originalWindowAddEventListener = window.addEventListener.bind(window);
+    originalWindowRemoveEventListener = window.removeEventListener.bind(window);
+    trackedWindowListeners = [];
+
+    window.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
+      trackedWindowListeners.push({ type, listener, options });
+      return originalWindowAddEventListener(type, listener, options);
+    }) as Window["addEventListener"];
+  });
+
+  afterEach(() => {
+    cleanupEventsController.abort();
+    for (const { type, listener, options } of trackedWindowListeners) {
+      originalWindowRemoveEventListener(type, listener, options);
+    }
+    window.addEventListener = originalWindowAddEventListener;
+    window.removeEventListener = originalWindowRemoveEventListener;
   });
 
   it("emits started, results and finished events in order", async () => {
@@ -40,9 +72,19 @@ describe("index generation event pipeline", () => {
     await import("./index");
 
     const sequence: string[] = [];
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, () => sequence.push("started"));
-    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, () => sequence.push("results"));
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, () => sequence.push("finished"));
+    const onStarted = () => sequence.push("started");
+    const onResults = () => sequence.push("results");
+    const onFinished = () => sequence.push("finished");
+
+    window.addEventListener(APP_EVENTS.GENERATION_STARTED, onStarted, {
+      signal: cleanupEventsController.signal,
+    });
+    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, onResults, {
+      signal: cleanupEventsController.signal,
+    });
+    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, onFinished, {
+      signal: cleanupEventsController.signal,
+    });
 
     document.dispatchEvent(new Event("DOMContentLoaded"));
     emitAppEvent(APP_EVENTS.START_GENERATION, {

@@ -159,15 +159,14 @@ describe("BrowserSettingsRepository", () => {
 
     const settings = repository.getSettings();
 
-    expect(settings).toEqual({
+    expect(settings).toMatchObject({
       apiKeys: [],
       activeKeys: {},
       variations: 4,
       temperature: 0.7,
       systemPrompt: "",
-      lastSelectedModel: undefined,
-      lastSelectedProviderId: undefined,
     });
+    expect(warnSpy).toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

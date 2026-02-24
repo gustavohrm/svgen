@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_EVENTS } from "../../core/constants/events";
 import { emitAppEvent } from "../../core/events/app-events";
 
@@ -30,6 +30,11 @@ describe("results-grid save to gallery workflow", () => {
     saveSvgMock.mockReset();
     showAlertMock.mockReset();
     document.body.innerHTML = "";
+  });
+
+  afterEach(() => {
+    const grid = document.querySelector("results-grid");
+    grid?.remove();
   });
 
   it("saves selected generated SVG with result metadata", async () => {

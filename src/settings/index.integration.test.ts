@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const toggleModelSelectionMock = vi.fn();
 const toggleModelSelectionsMock = vi.fn();
@@ -31,6 +31,8 @@ vi.mock("../core/app/composition-root", () => ({
 }));
 
 describe("settings page model selection workflows", () => {
+  let domContentLoadedHandler: EventListenerOrEventListenerObject | null = null;
+
   beforeEach(() => {
     vi.resetModules();
     toggleModelSelectionMock.mockReset();
@@ -72,8 +74,37 @@ describe("settings page model selection workflows", () => {
     `;
   });
 
+  afterEach(() => {
+    if (domContentLoadedHandler) {
+      document.removeEventListener("DOMContentLoaded", domContentLoadedHandler);
+      domContentLoadedHandler = null;
+    }
+  });
+
+  async function importSettingsPageModule() {
+    const originalAddEventListener = document.addEventListener.bind(document);
+
+    document.addEventListener = ((
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | AddEventListenerOptions,
+    ) => {
+      if (type === "DOMContentLoaded") {
+        domContentLoadedHandler = listener;
+      }
+
+      return originalAddEventListener(type, listener, options);
+    }) as Document["addEventListener"];
+
+    try {
+      await import("./index");
+    } finally {
+      document.addEventListener = originalAddEventListener;
+    }
+  }
+
   it("updates a single model checkbox through repository command", async () => {
-    await import("./index");
+    await importSettingsPageModule();
     document.dispatchEvent(new Event("DOMContentLoaded"));
 
     const checkbox = document.querySelector<HTMLInputElement>(".model-checkbox");
@@ -86,7 +117,7 @@ describe("settings page model selection workflows", () => {
   });
 
   it("applies select-all updates with batched repository command", async () => {
-    await import("./index");
+    await importSettingsPageModule();
     document.dispatchEvent(new Event("DOMContentLoaded"));
 
     const selectAll = document.getElementById("select-all-models") as HTMLInputElement;
