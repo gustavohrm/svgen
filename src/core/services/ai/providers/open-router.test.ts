@@ -53,9 +53,14 @@ describe("OpenRouterProvider", () => {
       systemPrompt: "test system prompt",
       model: "test-model",
       apiKey: "test-key",
+      temperature: 1.1,
     });
 
     expect(result).toEqual(["<svg>test</svg>"]);
+
+    const fetchCall = (global.fetch as any).mock.calls[0];
+    const payload = JSON.parse(fetchCall[1].body);
+    expect(payload.temperature).toBe(1.1);
   });
 
   it("should throw error when generation fails", async () => {

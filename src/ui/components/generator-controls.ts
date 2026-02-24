@@ -105,22 +105,22 @@ export class GeneratorControls extends HTMLElement {
                   title="Settings"
                 >
                   <svg
-                    xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    class="w-4 h-4"
+                    class="size-4"
                   >
-                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-                    <circle cx="12" cy="12" r="3" />
+                    <path d="M14 17H5"/><path d="M19 7h-9"/>
+                    <circle cx="17" cy="17" r="3"/>
+                    <circle cx="7" cy="7" r="3"/>
                   </svg>
                 </button>
                 <div
                   id="settings-menu"
-                  class="absolute left-1/2 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-3 p-3 shadow-2xl z-50 min-w-3xs duration-200"
+                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-3 p-3 shadow-2xl z-50 min-w-3xs duration-200"
                 >
                   <div class="flex items-center justify-between gap-3">
                     <label class="text-sm font-medium text-text-secondary whitespace-nowrap" for="variation-input">Variations</label>
@@ -130,6 +130,19 @@ export class GeneratorControls extends HTMLElement {
                       min="1"
                       max="4"
                       value="${db.getSettings().variations}"
+                      class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
+                    />
+                  </div>
+
+                  <div class="flex items-center justify-between gap-3">
+                    <label class="text-sm font-medium text-text-secondary whitespace-nowrap" for="temperature-input">Temperature</label>
+                    <input
+                      type="number"
+                      id="temperature-input"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value="${db.getSettings().temperature.toFixed(1)}"
                       class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
                     />
                   </div>
@@ -262,6 +275,7 @@ export class GeneratorControls extends HTMLElement {
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement;
     const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement;
     const variationInput = this.querySelector("#variation-input") as HTMLInputElement;
+    const temperatureInput = this.querySelector("#temperature-input") as HTMLInputElement;
     const editSystemPromptBtn = this.querySelector("#edit-system-prompt-btn") as HTMLButtonElement;
     const systemPromptModal = this.querySelector("#system-prompt-modal") as HTMLDivElement;
     const systemPromptModalInput = this.querySelector(
@@ -306,6 +320,26 @@ export class GeneratorControls extends HTMLElement {
       if (val > 4) val = 4;
       (e.target as HTMLInputElement).value = val.toString();
       db.saveSettings({ variations: val });
+    });
+
+    const clampTemperature = (value: number): number => {
+      if (value < 0) return 0;
+      if (value > 2) return 2;
+      return Math.round(value * 10) / 10;
+    };
+
+    temperatureInput?.addEventListener("input", (e) => {
+      const value = parseFloat((e.target as HTMLInputElement).value);
+      if (isNaN(value)) return;
+      db.saveSettings({ temperature: clampTemperature(value) });
+    });
+
+    temperatureInput?.addEventListener("blur", (e) => {
+      const target = e.target as HTMLInputElement;
+      const value = parseFloat(target.value);
+      const normalized = isNaN(value) ? 0.7 : clampTemperature(value);
+      target.value = normalized.toFixed(1);
+      db.saveSettings({ temperature: normalized });
     });
 
     editSystemPromptBtn?.addEventListener("click", () => {

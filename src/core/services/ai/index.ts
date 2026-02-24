@@ -75,6 +75,7 @@ export class AiService {
       model: options.model,
       apiKey: activeKey.value,
       count,
+      temperature: settings.temperature,
     });
   }
 

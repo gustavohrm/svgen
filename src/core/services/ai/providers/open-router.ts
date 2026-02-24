@@ -50,7 +50,7 @@ export class OpenRouterProvider implements AiProvider {
   }
 
   async generate(options: ProviderGenerateOptions): Promise<string[]> {
-    const { prompt, systemPrompt, model, apiKey, count = 1 } = options;
+    const { prompt, systemPrompt, model, apiKey, count = 1, temperature } = options;
 
     if (!apiKey) {
       throw new Error("OpenRouter API key is required");
@@ -71,6 +71,7 @@ export class OpenRouterProvider implements AiProvider {
           { role: "user", content: prompt },
         ],
         n: count,
+        temperature,
       }),
     });
 

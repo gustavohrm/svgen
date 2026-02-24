@@ -6,6 +6,7 @@ export interface ProviderGenerateOptions {
   model: string;
   apiKey: string;
   count?: number;
+  temperature?: number;
 }
 
 export interface ProviderConfigField {

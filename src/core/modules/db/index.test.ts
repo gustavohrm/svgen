@@ -12,6 +12,7 @@ describe("db module", () => {
     expect(settings.apiKeys).toEqual([]);
     expect(settings.activeKeys).toEqual({});
     expect(settings.variations).toBe(4);
+    expect(settings.temperature).toBe(0.7);
     expect(settings.systemPrompt).toBe("");
   });
 
@@ -43,6 +44,10 @@ describe("db module", () => {
     let settings = db.getSettings();
     expect(settings.variations).toBe(3);
 
+    db.saveSettings({ temperature: 1.2 });
+    settings = db.getSettings();
+    expect(settings.temperature).toBe(1.2);
+
     db.saveSettings({ systemPrompt: "Custom prompt" });
     settings = db.getSettings();
     expect(settings.systemPrompt).toBe("Custom prompt");
@@ -50,6 +55,7 @@ describe("db module", () => {
     db.saveSettings({ activeKeys: { gcp: "some-id" } });
     settings = db.getSettings();
     expect(settings.variations).toBe(3);
+    expect(settings.temperature).toBe(1.2);
     expect(settings.systemPrompt).toBe("Custom prompt");
     expect(settings.activeKeys["gcp"]).toBe("some-id");
   });

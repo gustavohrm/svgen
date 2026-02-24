@@ -22,6 +22,7 @@ describe("AiService", () => {
         apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
         activeKeys: { gcp: "key1" },
         variations: 1,
+        temperature: 0.7,
         systemPrompt: "",
       }),
     };
@@ -67,6 +68,7 @@ describe("AiService", () => {
       expect.objectContaining({
         prompt: "draw a circle",
         apiKey: "test-key",
+        temperature: 0.7,
       }),
     );
   });

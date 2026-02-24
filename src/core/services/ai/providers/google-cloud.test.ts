@@ -60,9 +60,14 @@ describe("GoogleCloudProvider", () => {
       systemPrompt: "test",
       model: "test-model",
       apiKey: "test-key",
+      temperature: 0.3,
     });
 
     expect(result).toEqual(["<svg>gcp-test</svg>"]);
+
+    const fetchCall = (global.fetch as any).mock.calls[0];
+    const payload = JSON.parse(fetchCall[1].body);
+    expect(payload.generationConfig.temperature).toBe(0.3);
   });
 
   it("should throw error if no API key is provided", async () => {
