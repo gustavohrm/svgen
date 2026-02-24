@@ -1,14 +1,13 @@
 import "../ui/components/app-header";
-import "../ui/components/app-modal";
-import { db } from "../core/modules/db/index";
-import { createDefaultProviderRegistry } from "../core/services/ai/providers/index";
 import { AiProviderId } from "../core/types/index";
 import { APP_EVENTS } from "../core/constants/events";
 import { createStore } from "../core/utils/store";
 import "../ui/components/api-keys-modal";
 import { ApiKeysModal } from "../ui/components/api-keys-modal";
+import { appComposition } from "../core/app/composition-root";
 
-const providerRegistry = createDefaultProviderRegistry();
+const providerRegistry = appComposition.providerRegistry;
+const settingsRepository = appComposition.settingsRepository;
 const container = document.getElementById("settings-container");
 
 interface ModelEntry {
@@ -35,7 +34,7 @@ const store = createStore<SettingsState>({
 
 /* ── Helpers ── */
 function getAllModels(): ModelEntry[] {
-  const settings = db.getSettings();
+  const settings = settingsRepository.getSettings();
   const providers = providerRegistry.getAllProviders();
   const entries: ModelEntry[] = [];
 
@@ -304,7 +303,7 @@ function attachDynamicEvents() {
       const allModels = getAllModels();
       const filtered = getFilteredModels(allModels, state);
 
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
 
       for (const entry of filtered) {
         const key = settings.apiKeys.find((k) => k.id === entry.keyId);
@@ -319,7 +318,7 @@ function attachDynamicEvents() {
         }
       }
 
-      db.saveSettings(settings);
+      settingsRepository.saveSettings(settings);
       window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
       render(store.get());
       return;
@@ -329,7 +328,7 @@ function attachDynamicEvents() {
     if (target.matches(".model-checkbox")) {
       const keyId = target.dataset.keyId;
       const model = target.value;
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const key = settings.apiKeys.find((k) => k.id === keyId);
       if (key) {
         if (target.checked) {
@@ -337,7 +336,7 @@ function attachDynamicEvents() {
         } else {
           key.selectedModels = key.selectedModels.filter((m) => m !== model);
         }
-        db.saveSettings(settings);
+        settingsRepository.saveSettings(settings);
         window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         render(store.get()); // Re-render to update the Select All checkbox state
       }

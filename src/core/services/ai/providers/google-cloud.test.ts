@@ -5,9 +5,9 @@ describe("GoogleCloudProvider", () => {
   let provider: GoogleCloudProvider;
 
   beforeEach(() => {
-    provider = new GoogleCloudProvider();
     vi.clearAllMocks();
     global.fetch = vi.fn();
+    provider = new GoogleCloudProvider();
   });
 
   it("should fetch and filter models by supportedGenerationMethods", async () => {

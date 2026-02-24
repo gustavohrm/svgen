@@ -5,9 +5,9 @@ describe("OpenRouterProvider", () => {
   let provider: OpenRouterProvider;
 
   beforeEach(() => {
-    provider = new OpenRouterProvider();
     vi.clearAllMocks();
     global.fetch = vi.fn();
+    provider = new OpenRouterProvider();
   });
 
   it("should fetch and filter models", async () => {

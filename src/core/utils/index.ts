@@ -7,3 +7,5 @@ export {
   downloadSvg,
   attachSvgCardEvents,
 } from "./svg-card";
+export { sanitizeSvgMarkup } from "./svg-sanitizer";
+export { createId } from "./id";

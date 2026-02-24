@@ -1,7 +1,7 @@
-import { db } from "../../core/modules/db/index";
-import { createDefaultProviderRegistry } from "../../core/services/ai/providers/index";
+import { appComposition } from "../../core/app/composition-root";
 
-const providerRegistry = createDefaultProviderRegistry();
+const providerRegistry = appComposition.providerRegistry;
+const settingsRepository = appComposition.settingsRepository;
 
 export class ModelDropdown extends HTMLElement {
   public selectedModel = "";
@@ -38,7 +38,7 @@ export class ModelDropdown extends HTMLElement {
   }
 
   render() {
-    const settings = db.getSettings();
+    const settings = settingsRepository.getSettings();
 
     // Create custom dropdown options for models, organized by provider
     let modelOptionsHtml = "";
@@ -269,7 +269,7 @@ export class ModelDropdown extends HTMLElement {
           modelDropdownText.textContent = model;
 
           // Persist selection across sessions
-          db.saveSettings({
+          settingsRepository.saveSettings({
             lastSelectedModel: model,
             lastSelectedProviderId: providerId,
           });

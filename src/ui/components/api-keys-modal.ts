@@ -1,11 +1,13 @@
-import { db, ApiKeyItem } from "../../core/modules/db/index";
-import { createDefaultProviderRegistry } from "../../core/services/ai/providers/index";
+import { ApiKeyItem } from "../../core/modules/db/index";
 import { showAlert } from "../../core/utils/alert";
 import { AiProviderId } from "../../core/types/index";
 import { APP_EVENTS } from "../../core/constants/events";
 import "./app-modal";
+import { appComposition } from "../../core/app/composition-root";
+import { createId } from "../../core/utils/id";
 
-const providerRegistry = createDefaultProviderRegistry();
+const providerRegistry = appComposition.providerRegistry;
+const settingsRepository = appComposition.settingsRepository;
 
 export class ApiKeysModal extends HTMLElement {
   constructor() {
@@ -135,7 +137,7 @@ export class ApiKeysModal extends HTMLElement {
     const body = this.querySelector("#keys-modal-body");
     if (!body) return;
 
-    const settings = db.getSettings();
+    const settings = settingsRepository.getSettings();
     const providers = providerRegistry.getAllProviders();
 
     body.innerHTML = providers
@@ -210,9 +212,9 @@ export class ApiKeysModal extends HTMLElement {
         const id = radio.value;
         const providerId = radio.dataset.providerId;
         if (providerId) {
-          const settings = db.getSettings();
+          const settings = settingsRepository.getSettings();
           settings.activeKeys[providerId] = id;
-          db.saveSettings(settings);
+          settingsRepository.saveSettings(settings);
           this.renderBody();
           window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         }
@@ -248,7 +250,7 @@ export class ApiKeysModal extends HTMLElement {
       if (action === "delete-key") {
         const id = (btn as HTMLElement).dataset.keyId;
         if (confirm("Delete this key?")) {
-          const settings = db.getSettings();
+          const settings = settingsRepository.getSettings();
           const keyToDelete = settings.apiKeys.find((k) => k.id === id);
           if (keyToDelete) {
             settings.apiKeys = settings.apiKeys.filter((k) => k.id !== id);
@@ -260,7 +262,7 @@ export class ApiKeysModal extends HTMLElement {
                 settings.activeKeys[keyToDelete.providerId] = remaining[0].id;
               else delete settings.activeKeys[keyToDelete.providerId];
             }
-            db.saveSettings(settings);
+            settingsRepository.saveSettings(settings);
           }
           this.renderBody();
           window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
@@ -271,7 +273,7 @@ export class ApiKeysModal extends HTMLElement {
       // Sync models
       if (action === "fetch-models") {
         const keyId = (btn as HTMLElement).dataset.keyId;
-        const settings = db.getSettings();
+        const settings = settingsRepository.getSettings();
         const key = settings.apiKeys.find((k) => k.id === keyId);
         if (!key) return;
 
@@ -286,7 +288,7 @@ export class ApiKeysModal extends HTMLElement {
           const models = await provider.fetchModels(key.value);
           key.availableModels = models;
           if (key.selectedModels.length === 0) key.selectedModels = [...models];
-          db.saveSettings(settings);
+          settingsRepository.saveSettings(settings);
           showAlert({ type: "success", message: "Models synced." });
           this.renderBody();
           window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
@@ -347,9 +349,9 @@ export class ApiKeysModal extends HTMLElement {
         return;
       }
 
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const newKey: ApiKeyItem = {
-        id: Date.now().toString(),
+        id: createId("key"),
         providerId,
         name,
         value,
@@ -359,7 +361,7 @@ export class ApiKeysModal extends HTMLElement {
 
       settings.apiKeys.push(newKey);
       if (!settings.activeKeys[providerId]) settings.activeKeys[providerId] = newKey.id;
-      db.saveSettings(settings);
+      settingsRepository.saveSettings(settings);
 
       showAlert({ type: "success", message: "Key added." });
       this.closeModal("add-key-modal");
@@ -380,11 +382,11 @@ export class ApiKeysModal extends HTMLElement {
         return;
       }
 
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const keyToEdit = settings.apiKeys.find((k) => k.id === id);
       if (keyToEdit) {
         keyToEdit.name = newName;
-        db.saveSettings(settings);
+        settingsRepository.saveSettings(settings);
         showAlert({ type: "success", message: "Key name updated." });
         this.closeModal("edit-key-modal");
         this.renderBody();

@@ -1,4 +1,5 @@
 import { showAlert } from "./alert";
+import { sanitizeSvgMarkup } from "./svg-sanitizer";
 
 // --- Lucide icon SVG strings (inlined to avoid external deps) ---
 const ICONS = {
@@ -48,10 +49,17 @@ interface SvgCardActionHandler {
  * properly inside the card preview area.
  */
 export function sanitizeSvgForDisplay(rawSvg: string): string {
-  return rawSvg.replace(
-    /<svg\b([^>]*)>/i,
-    '<svg class="w-full h-full max-h-56 drop-shadow-xl" $1>',
-  );
+  const safeSvg = sanitizeSvgMarkup(rawSvg);
+  if (!safeSvg) {
+    return `<svg viewBox="0 0 48 48" class="w-full h-full max-h-56 drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="40" height="40" rx="8" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"/><path d="M16 16L32 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/><path d="M32 16L16 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+  }
+
+  const documentNode = new DOMParser().parseFromString(safeSvg, "image/svg+xml");
+  const root = documentNode.documentElement;
+  const currentClass = root.getAttribute("class") ?? "";
+  const displayClasses = "w-full h-full max-h-56 drop-shadow-xl";
+  root.setAttribute("class", `${displayClasses} ${currentClass}`.trim());
+  return root.outerHTML;
 }
 
 function buildActionButton(action: CardAction, cardId: string): string {

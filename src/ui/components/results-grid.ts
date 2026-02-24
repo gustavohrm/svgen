@@ -1,4 +1,4 @@
-import { galleryDb, GalleryItem } from "../../core/modules/gallery-db/index";
+import { GalleryItem } from "../../core/modules/gallery-db/index";
 import { showAlert } from "../../core/utils/alert";
 import {
   renderSvgCard,
@@ -6,7 +6,12 @@ import {
   attachSvgCardEvents,
 } from "../../core/utils/svg-card";
 import { APP_EVENTS } from "../../core/constants/events";
-import { db } from "../../core/modules/db/index";
+import { appComposition } from "../../core/app/composition-root";
+import { createId } from "../../core/utils/id";
+import { sanitizeSvgMarkup } from "../../core/utils/svg-sanitizer";
+
+const settingsRepository = appComposition.settingsRepository;
+const galleryRepository = appComposition.galleryRepository;
 
 export class ResultsGrid extends HTMLElement {
   private currentSvgs: string[] = [];
@@ -69,7 +74,7 @@ export class ResultsGrid extends HTMLElement {
     let contentHtml = "";
 
     if (this.isGenerating) {
-      const settings = db.getSettings();
+      const settings = settingsRepository.getSettings();
       const count = settings.variations || 4;
       contentHtml = Array.from({ length: count })
         .map(() => renderSvgCardSkeleton())
@@ -131,15 +136,23 @@ export class ResultsGrid extends HTMLElement {
             }
 
             const galleryItem: GalleryItem = {
-              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-              svg: svgContent,
+              id: createId("gallery"),
+              svg: sanitizeSvgMarkup(svgContent) ?? "",
               prompt: this.currentPrompt,
               model: this.currentModel,
               timestamp: this.currentGeneratedAt ?? Date.now(),
             };
 
+            if (!galleryItem.svg) {
+              showAlert({
+                type: "error",
+                message: "SVG failed validation and could not be saved.",
+              });
+              return;
+            }
+
             try {
-              await galleryDb.saveSvg(galleryItem);
+              await galleryRepository.saveSvg(galleryItem);
               showAlert({ type: "success", message: "SVG saved to gallery!" });
             } catch (error: unknown) {
               console.error("Failed to save SVG to gallery:", error);

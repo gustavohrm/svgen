@@ -5,13 +5,11 @@ import {
   AiProviderId,
 } from "../../../types/index";
 import { extractSvgFromResult } from "../../../utils/svg-parser";
-
-interface GCPApiModel {
-  name: string;
-  supportedGenerationMethods: string[];
-}
+import { FetchGoogleCloudClient, GoogleCloudClient } from "./clients";
 
 export class GoogleCloudProvider implements AiProvider {
+  constructor(private readonly client: GoogleCloudClient = new FetchGoogleCloudClient()) {}
+
   id: AiProviderId = "gcp";
   name = "Google Cloud (Gemini)";
   icon = "/assets/google.svg";
@@ -28,15 +26,7 @@ export class GoogleCloudProvider implements AiProvider {
   async fetchModels(apiKey: string): Promise<string[]> {
     if (!apiKey) return [];
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-      );
-      if (!res.ok) throw new Error("Failed to fetch GCP models");
-      const data = (await res.json()) as { models: GCPApiModel[] };
-      // Only include models that support generateContent (text/chat models)
-      return data.models
-        .filter((m) => m.supportedGenerationMethods.includes("generateContent"))
-        .map((m) => m.name.replace("models/", ""));
+      return this.client.fetchModels(apiKey);
     } catch (error: unknown) {
       console.error("Failed to fetch GCP models:", error);
       return [];
@@ -50,42 +40,15 @@ export class GoogleCloudProvider implements AiProvider {
       throw new Error("GCP (Gemini) API key is required");
     }
 
-    const payload = {
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
-      generationConfig: {
-        candidateCount: count,
-        temperature,
-      },
-    };
+    const candidates = await this.client.generate({
+      prompt,
+      systemPrompt,
+      model,
+      apiKey,
+      count,
+      temperature,
+    });
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      },
-    );
-
-    if (!res.ok) {
-      const errorText = await res.text();
-      throw new Error(`GCP API error: ${res.status} ${res.statusText} - ${errorText}`);
-    }
-
-    const data = await res.json();
-    const candidates = data?.candidates || [];
-    return candidates.map((candidate: any) =>
-      extractSvgFromResult(candidate.content?.parts?.[0]?.text || ""),
-    );
+    return candidates.map((candidate) => extractSvgFromResult(candidate));
   }
 }

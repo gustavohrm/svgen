@@ -1,7 +1,11 @@
 import "../ui/components/app-header";
-import { galleryDb, GalleryItem } from "../core/modules/gallery-db/index";
+import { GalleryItem } from "../core/modules/gallery-db/index";
 import { showAlert } from "../core/utils/alert";
 import { renderSvgCard, attachSvgCardEvents } from "../core/utils/svg-card";
+import { appComposition } from "../core/app/composition-root";
+import { sanitizeSvgMarkup } from "../core/utils/svg-sanitizer";
+
+const galleryRepository = appComposition.galleryRepository;
 
 let currentSvgs: GalleryItem[] = [];
 
@@ -25,7 +29,20 @@ function formatGeneratedAt(timestamp: number): string {
 }
 
 async function loadGallery() {
-  currentSvgs = await galleryDb.getAllSvgs();
+  const allItems = await galleryRepository.getAllSvgs();
+  currentSvgs = allItems
+    .map((item) => {
+      const svg = sanitizeSvgMarkup(item.svg);
+      if (!svg) {
+        return null;
+      }
+
+      return {
+        ...item,
+        svg,
+      };
+    })
+    .filter((item): item is GalleryItem => Boolean(item));
   renderGallery(currentSvgs);
 }
 
@@ -87,7 +104,7 @@ function initEvents() {
         actionId: "delete-svg",
         handler: async (cardId: string) => {
           if (confirm("Are you sure you want to delete this SVG?")) {
-            await galleryDb.deleteSvg(cardId);
+            await galleryRepository.deleteSvg(cardId);
             showAlert({
               type: "success",
               message: "SVG deleted from gallery.",

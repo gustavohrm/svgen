@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AiService, createAiService, Database, ProviderRegistry } from "./index";
+import { AiService, createAiService, ProviderRegistry, SettingsRepository } from "./index";
 import { AiProvider, GenerateOptions } from "../../types/index";
 
 describe("AiService", () => {
-  let mockDb: Database;
+  let mockSettingsRepository: SettingsRepository;
   let mockProviderRegistry: ProviderRegistry;
   let mockProvider: AiProvider;
   let service: AiService;
@@ -17,7 +17,7 @@ describe("AiService", () => {
       fetchModels: vi.fn().mockResolvedValue(["model1"]),
     } as any;
 
-    mockDb = {
+    mockSettingsRepository = {
       getSettings: vi.fn().mockReturnValue({
         apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
         activeKeys: { gcp: "key1" },
@@ -31,7 +31,7 @@ describe("AiService", () => {
       getProvider: vi.fn().mockReturnValue(mockProvider),
     };
 
-    service = createAiService(mockDb, mockProviderRegistry);
+    service = createAiService(mockSettingsRepository, mockProviderRegistry);
   });
 
   it("should build correct system prompt", () => {
@@ -95,7 +95,7 @@ describe("AiService", () => {
   });
 
   it("should throw error if no active key", async () => {
-    (mockDb.getSettings as any).mockReturnValue({
+    (mockSettingsRepository.getSettings as any).mockReturnValue({
       apiKeys: [],
       activeKeys: {},
     });
