@@ -401,8 +401,8 @@ export class ApiKeysModal extends HTMLElement {
       }
 
       const settings = settingsRepository.getSettings();
-      const keyToEdit = settings.apiKeys.some((k) => k.id === id);
-      if (keyToEdit) {
+      const keyExists = settings.apiKeys.some((k) => k.id === id);
+      if (keyExists) {
         const apiKeys = settings.apiKeys.map((key) => {
           if (key.id !== id) {
             return key;

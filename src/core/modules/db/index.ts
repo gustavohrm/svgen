@@ -70,9 +70,7 @@ function normalizeSettings(input: Partial<AppSettings>): AppSettings {
     apiKeys: Array.isArray(input.apiKeys) ? input.apiKeys.map((key) => cloneApiKeyItem(key)) : [],
     activeKeys: isRecord(input.activeKeys)
       ? Object.fromEntries(
-          Object.entries(input.activeKeys).filter(
-            ([providerId, keyId]) => typeof providerId === "string" && typeof keyId === "string",
-          ),
+          Object.entries(input.activeKeys).filter(([, keyId]) => typeof keyId === "string"),
         )
       : {},
     variations:
@@ -98,7 +96,7 @@ function normalizeSettings(input: Partial<AppSettings>): AppSettings {
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
-  saveSettings(settings: Partial<AppSettings>): AppSettings;
+  saveSettings(settings: Partial<AppSettings>, current?: AppSettings): AppSettings;
   setActiveKey(providerId: AiProviderId, keyId: string): AppSettings;
   toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings;
   toggleModelSelections(
@@ -212,9 +210,9 @@ export class BrowserSettingsRepository implements SettingsRepository {
     }
   }
 
-  saveSettings(settings: Partial<AppSettings>): AppSettings {
-    const current = this.getSettings();
-    const updated = normalizeSettings({ ...current, ...settings });
+  saveSettings(settings: Partial<AppSettings>, current?: AppSettings): AppSettings {
+    const base = current || this.getSettings();
+    const updated = normalizeSettings({ ...base, ...settings });
     this.storage.setItem(this.storageKey, JSON.stringify(updated));
     return cloneSettings(updated);
   }
@@ -226,12 +224,15 @@ export class BrowserSettingsRepository implements SettingsRepository {
       return current;
     }
 
-    return this.saveSettings({
-      activeKeys: {
-        ...current.activeKeys,
-        [providerId]: keyId,
+    return this.saveSettings(
+      {
+        activeKeys: {
+          ...current.activeKeys,
+          [providerId]: keyId,
+        },
       },
-    });
+      current,
+    );
   }
 
   toggleModelSelection(keyId: string, model: string, shouldSelect?: boolean): AppSettings {
@@ -288,7 +289,7 @@ export class BrowserSettingsRepository implements SettingsRepository {
       };
     });
 
-    return this.saveSettings({ apiKeys });
+    return this.saveSettings({ apiKeys }, current);
   }
 
   setVariations(value: number): AppSettings {
