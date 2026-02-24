@@ -315,7 +315,7 @@ export class GeneratorControls extends HTMLElement {
       if (isNaN(val)) return;
       if (val < 1) val = 1;
       if (val > 4) val = 4;
-      settingsRepository.saveSettings({ variations: val });
+      settingsRepository.setVariations(val);
     });
 
     variationInput?.addEventListener("blur", (e) => {
@@ -323,7 +323,7 @@ export class GeneratorControls extends HTMLElement {
       if (isNaN(val) || val < 1) val = 1;
       if (val > 4) val = 4;
       (e.target as HTMLInputElement).value = val.toString();
-      settingsRepository.saveSettings({ variations: val });
+      settingsRepository.setVariations(val);
     });
 
     const clampTemperature = (value: number): number => {
@@ -335,7 +335,7 @@ export class GeneratorControls extends HTMLElement {
     temperatureInput?.addEventListener("input", (e) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
       if (isNaN(value)) return;
-      settingsRepository.saveSettings({ temperature: clampTemperature(value) });
+      settingsRepository.setTemperature(clampTemperature(value));
     });
 
     temperatureInput?.addEventListener("blur", (e) => {
@@ -343,7 +343,7 @@ export class GeneratorControls extends HTMLElement {
       const value = parseFloat(target.value);
       const normalized = isNaN(value) ? 0.7 : clampTemperature(value);
       target.value = normalized.toFixed(1);
-      settingsRepository.saveSettings({ temperature: normalized });
+      settingsRepository.setTemperature(normalized);
     });
 
     editSystemPromptBtn?.addEventListener("click", () => {
@@ -368,7 +368,7 @@ export class GeneratorControls extends HTMLElement {
 
       const value = systemPromptModalInput.value.trim();
       const normalizedDefault = DEFAULT_SYSTEM_PROMPT.trim();
-      settingsRepository.saveSettings({ systemPrompt: value === normalizedDefault ? "" : value });
+      settingsRepository.setSystemPrompt(value === normalizedDefault ? "" : value);
       closeSystemPromptModal();
     });
 
