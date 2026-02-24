@@ -23,6 +23,7 @@ const settingsRepository = appComposition.settingsRepository;
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
   private isGenerating: boolean = false;
+  private attachmentsRenderToken = 0;
 
   private handleDocumentClick = (e: Event) => {
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement | null;
@@ -81,10 +82,23 @@ export class GeneratorControls extends HTMLElement {
     const container = this.querySelector("#attachments-container") as HTMLDivElement;
     if (!container) return;
 
+    const renderToken = ++this.attachmentsRenderToken;
+    const filesSnapshot = [...this.referenceFiles];
+
     container.innerHTML = "";
 
-    for (let i = 0; i < this.referenceFiles.length; i++) {
-      const div = await createAttachmentPreviewNode(this.referenceFiles[i], i);
+    for (let i = 0; i < filesSnapshot.length; i++) {
+      const file = filesSnapshot[i];
+      const div = await createAttachmentPreviewNode(file, i);
+
+      if (renderToken !== this.attachmentsRenderToken) {
+        return;
+      }
+
+      if (this.referenceFiles[i] !== file) {
+        continue;
+      }
+
       container.appendChild(div);
     }
   }
@@ -126,7 +140,7 @@ export class GeneratorControls extends HTMLElement {
     variationInput?.addEventListener("input", (e) => {
       const val = parseInt((e.target as HTMLInputElement).value, 10);
       if (isNaN(val)) return;
-      settingsRepository.setVariations(val);
+      settingsRepository.setVariations(clampVariations(val));
     });
 
     variationInput?.addEventListener("blur", (e) => {

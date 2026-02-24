@@ -17,8 +17,13 @@ export function applyActiveKeySelectionUI(
   providerId: string,
   keyId: string,
 ): void {
+  const escapedProviderId =
+    typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(providerId)
+      : providerId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
   const radios = root.querySelectorAll(
-    `input.key-radio[data-provider-id="${providerId}"]`,
+    `input.key-radio[data-provider-id="${escapedProviderId}"]`,
   ) as NodeListOf<HTMLInputElement>;
 
   radios.forEach((radio) => {

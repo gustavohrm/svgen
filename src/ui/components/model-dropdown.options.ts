@@ -1,4 +1,5 @@
 import type { AppSettings } from "../../core/modules/db";
+import { escapeHtml } from "../../core/utils/html-escape";
 
 export interface ProviderOption {
   id: string;
@@ -40,6 +41,10 @@ export function buildModelOptions({
   for (const provider of providers) {
     const keys = settings.apiKeys.filter((k) => k.providerId === provider.id);
     const providerModels = new Set<string>();
+    const safeProviderId = escapeHtml(provider.id);
+    const safeProviderName = escapeHtml(provider.name);
+    const safeProviderIcon = escapeHtml(provider.icon);
+    const safeProviderPaneId = `provider-pane-${safeProviderId}`;
 
     for (const key of keys) {
       if (!key.selectedModels) continue;
@@ -53,17 +58,17 @@ export function buildModelOptions({
     }
 
     providerTabsHtml += `
-      <button data-tab-target="provider-pane-${provider.id}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
+      <button data-tab-target="${safeProviderPaneId}" class="provider-tab w-full text-left px-4 py-3 text-xs font-semibold ${isFirstProvider ? "text-text bg-surface-hover/30" : "text-text-muted hover:text-text hover:bg-surface-hover/50"} transition-all flex items-center justify-between border-b border-border/10 last:border-b-0">
         <div class="flex items-center gap-2 max-w-full overflow-hidden">
-          <img src="${provider.icon}" alt="${provider.name}" class="w-4 h-4 shrink-0 object-contain" />
-          <span class="truncate">${provider.name}</span>
+          <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-4 h-4 shrink-0 object-contain" />
+          <span class="truncate">${safeProviderName}</span>
         </div>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 opacity-50 shrink-0"><path d="m9 18 6-6-6-6"/></svg>
       </button>
     `;
 
     providerPanesHtml += `
-      <div id="provider-pane-${provider.id}" class="provider-pane flex-col gap-1 ${isFirstProvider ? "flex" : "hidden"}">
+      <div id="${safeProviderPaneId}" class="provider-pane flex-col gap-1 ${isFirstProvider ? "flex" : "hidden"}">
     `;
 
     for (const model of providerModels) {
@@ -72,10 +77,12 @@ export function buildModelOptions({
         firstProviderId = provider.id;
       }
 
+      const safeModel = escapeHtml(model);
+
       providerPanesHtml += `
-        <button data-model="${model}" data-provider-id="${provider.id}" class="model-option w-full text-left px-3 py-2.5 text-xs font-medium text-text-secondary hover:text-text hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2">
-          <img src="${provider.icon}" alt="${provider.name}" class="w-4 h-4 shrink-0 object-contain opacity-60" />
-          <span class="truncate">${model}</span>
+        <button data-model="${safeModel}" data-provider-id="${safeProviderId}" class="model-option w-full text-left px-3 py-2.5 text-xs font-medium text-text-secondary hover:text-text hover:bg-surface-hover rounded-lg transition-colors flex items-center gap-2">
+          <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-4 h-4 shrink-0 object-contain opacity-60" />
+          <span class="truncate">${safeModel}</span>
         </button>
       `;
     }

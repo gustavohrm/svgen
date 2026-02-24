@@ -1,5 +1,14 @@
 function svgTextToDataUrl(svgText: string): string {
-  const base64 = btoa(unescape(encodeURIComponent(svgText)));
+  const bytes = new TextEncoder().encode(svgText);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const chunk = bytes.subarray(offset, offset + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  const base64 = btoa(binary);
   return `data:image/svg+xml;base64,${base64}`;
 }
 

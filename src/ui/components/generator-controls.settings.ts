@@ -6,6 +6,7 @@ export function clampVariations(value: number): number {
 }
 
 export function clampTemperature(value: number): number {
+  if (Number.isNaN(value)) return 1;
   if (value < 0) return 0;
   if (value > 2) return 2;
   return Math.round(value * 10) / 10;

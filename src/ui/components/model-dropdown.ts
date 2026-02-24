@@ -20,9 +20,7 @@ export class ModelDropdown extends HTMLElement {
       !modelDropdownBtn.contains(e.target as Node) &&
       !modelDropdownMenu.contains(e.target as Node)
     ) {
-      modelDropdownMenu.classList.add("hidden");
-      modelDropdownMenu.classList.remove("flex");
-      if (modelDropdownIcon) modelDropdownIcon.style.transform = "rotate(0deg)";
+      setDropdownOpenState(modelDropdownMenu, modelDropdownIcon, false);
     }
   };
 
@@ -65,9 +63,7 @@ export class ModelDropdown extends HTMLElement {
           <span
             class="text-xs font-semibold text-text max-w-37.5 truncate"
             id="model-dropdown-text"
-          >
-            ${this.selectedModel ? this.selectedModel : "Select an AI model..."}
-          </span>
+          ></span>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -91,6 +87,11 @@ export class ModelDropdown extends HTMLElement {
         </div>
       </div>
     `;
+
+    const modelDropdownText = this.querySelector("#model-dropdown-text") as HTMLSpanElement | null;
+    if (modelDropdownText) {
+      modelDropdownText.textContent = this.selectedModel || "Select an AI model...";
+    }
 
     // Activate the correct provider tab/pane for the selected model
     if (this.providerId && hasSavedModel) {

@@ -1,11 +1,6 @@
 import type { AppSettings } from "../../core/modules/db";
 import { escapeHtml } from "../../core/utils/html-escape";
-
-interface ProviderOption {
-  id: string;
-  name: string;
-  icon: string;
-}
+import type { ProviderOption } from "./model-dropdown.options";
 
 export function renderApiKeysModalShell(): string {
   return `
@@ -118,9 +113,11 @@ export function renderApiKeysBody(settings: AppSettings, providers: ProviderOpti
                   .map((key) => {
                     const safeKeyId = escapeHtml(key.id);
                     const safeKeyName = escapeHtml(key.name);
-                    const safeKeyMaskedValue = escapeHtml(
-                      `${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}`,
-                    );
+                    const maskedValue =
+                      key.value.length < 8
+                        ? "••••••"
+                        : `${key.value.substring(0, 4)}••••${key.value.substring(key.value.length - 4)}`;
+                    const safeKeyMaskedValue = escapeHtml(maskedValue);
                     const isActive = key.id === activeKeyId;
                     return `
                       <div class="flex items-center gap-3 group">
