@@ -157,7 +157,7 @@ export class GeneratorControls extends HTMLElement {
 
     variationInput?.addEventListener("input", (e) => {
       const val = parseInt((e.target as HTMLInputElement).value, 10);
-      if (isNaN(val)) return;
+      if (Number.isNaN(val)) return;
       settingsRepository.setVariations(clampVariations(val));
     });
 
@@ -169,7 +169,7 @@ export class GeneratorControls extends HTMLElement {
 
     temperatureInput?.addEventListener("input", (e) => {
       const value = parseFloat((e.target as HTMLInputElement).value);
-      if (isNaN(value)) return;
+      if (Number.isNaN(value)) return;
       settingsRepository.setTemperature(clampTemperature(value));
     });
 
@@ -232,7 +232,7 @@ export class GeneratorControls extends HTMLElement {
       const btn = (e.target as HTMLElement).closest("button[data-index]");
       if (!btn) return;
 
-      const idx = parseInt(btn.getAttribute("data-index")!);
+      const idx = parseInt(btn.getAttribute("data-index")!, 10);
       this.referenceFiles.splice(idx, 1);
       void this.renderAttachments().catch((error: unknown) => {
         console.error("Failed to render attachments:", error);
