@@ -293,7 +293,8 @@ export class ApiKeysModal extends HTMLElement {
 
         try {
           const models = await provider.fetchModels(key.value);
-          const apiKeys = settings.apiKeys.map((entry) => {
+          const latestSettings = settingsRepository.getSettings();
+          const apiKeys = latestSettings.apiKeys.map((entry) => {
             if (entry.id !== key.id) {
               return entry;
             }
@@ -306,7 +307,10 @@ export class ApiKeysModal extends HTMLElement {
             };
           });
 
-          settingsRepository.saveSettings({ apiKeys });
+          settingsRepository.saveSettings({
+            ...latestSettings,
+            apiKeys,
+          });
           showAlert({ type: "success", message: "Models synced." });
           this.renderBody();
         } catch (err: unknown) {
