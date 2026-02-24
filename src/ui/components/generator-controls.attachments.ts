@@ -1,3 +1,9 @@
+/**
+ * Convert raw SVG markup into a base64-encoded data URL suitable for use as an image source.
+ *
+ * @param svgText - The SVG markup string to encode.
+ * @returns A `data:image/svg+xml;base64,<...>` string containing the encoded SVG.
+ */
 function svgTextToDataUrl(svgText: string): string {
   const bytes = new TextEncoder().encode(svgText);
   const chunkSize = 0x8000;
@@ -12,6 +18,13 @@ function svgTextToDataUrl(svgText: string): string {
   return `data:image/svg+xml;base64,${base64}`;
 }
 
+/**
+ * Create a preview DOM node for an SVG attachment file.
+ *
+ * @param file - The File whose SVG text will be rendered into the preview image.
+ * @param index - The attachment's zero-based index, set on the dismiss button's `data-index` attribute.
+ * @returns The constructed HTMLDivElement containing the preview image and a positioned dismiss button.
+ */
 export async function createAttachmentPreviewNode(
   file: File,
   index: number,
