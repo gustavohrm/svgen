@@ -64,16 +64,16 @@ export class GeneratorControls extends HTMLElement {
     this.innerHTML = `
       <div id="generator-controls-container" class="max-w-5xl mx-auto w-full py-0">
         <div
-          class="bg-transparent border border-border hover:bg-surface-hover/10 rounded-xl p-2 transition-all duration-300 focus-within:border-border-bright relative z-20"
+          class="bg-surface border border-transparent rounded-xl p-4 transition-all duration-400 focus-within:border-border relative z-20"
         >
           <textarea
             id="prompt-input"
             rows="3"
-            class="w-full bg-transparent px-3 py-4 text-text placeholder-text-muted outline-none resize-none leading-relaxed"
+            class="w-full bg-transparent text-text placeholder-text-muted outline-none resize-none leading-relaxed"
             placeholder="Describe the SVG you want to generate (e.g., a glowing isometric cube)..."
           ></textarea>
 
-          <div class="flex items-center justify-between px-2 pb-2 pt-1">
+          <div class="flex items-center justify-between">
             <div class="flex items-center gap-4 pt-2">
               <model-dropdown id="model-selector"></model-dropdown>
 
