@@ -1,7 +1,7 @@
 import "../ui/components/app-header";
 import { AiProviderId } from "../core/types/index";
-import { APP_EVENTS } from "../core/constants/events";
 import { createStore } from "../core/utils/store";
+import { escapeHtml } from "../core/utils/html-escape";
 import "../ui/components/api-keys-modal";
 import { ApiKeysModal } from "../ui/components/api-keys-modal";
 import { appComposition } from "../core/app/composition-root";
@@ -154,28 +154,33 @@ function renderModels(state: SettingsState) {
   emptyState.classList.remove("flex");
 
   table.innerHTML = filtered
-    .map(
-      (entry) => `
+    .map((entry) => {
+      const safeKeyId = escapeHtml(entry.keyId);
+      const safeModel = escapeHtml(entry.model);
+      const safeProviderIcon = escapeHtml(entry.providerIcon);
+      const safeProviderName = escapeHtml(entry.providerName);
+
+      return `
       <label class="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-hover/5 transition-all cursor-pointer group">
         <input
           type="checkbox"
-          data-key-id="${entry.keyId}"
-          value="${entry.model}"
+          data-key-id="${safeKeyId}"
+          value="${safeModel}"
           ${entry.isSelected ? "checked" : ""}
           class="model-checkbox w-4 h-4 accent-primary rounded border-border shrink-0"
         />
         <div class="w-24 shrink-0 flex items-center gap-2">
           <img
-            src="${entry.providerIcon}"
-            alt="${entry.providerName}"
+            src="${safeProviderIcon}"
+            alt="${safeProviderName}"
             class="w-4 h-4 shrink-0 object-contain opacity-60 group-hover:opacity-100 transition-opacity"
           />
-          <span class="text-xs text-text opacity-60 group-hover:opacity-100 transition-colors">${entry.providerName}</span>
+          <span class="text-xs text-text opacity-60 group-hover:opacity-100 transition-colors">${safeProviderName}</span>
         </div>
-        <span class="text-sm text-text opacity-60 group-hover:opacity-100 transition-colors flex-1">${entry.model}</span>
+        <span class="text-sm text-text opacity-60 group-hover:opacity-100 transition-colors flex-1">${safeModel}</span>
       </label>
-    `,
-    )
+    `;
+    })
     .join("");
 }
 
@@ -199,16 +204,20 @@ function renderFilterDropdown(state: SettingsState) {
       All Providers
     </button>
     ${providers
-      .map(
-        (p) => `
-      <button data-filter="${p.id}" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
+      .map((p) => {
+        const safeProviderId = escapeHtml(p.id);
+        const safeProviderIcon = escapeHtml(p.icon);
+        const safeProviderName = escapeHtml(p.name);
+
+        return `
+      <button data-filter="${safeProviderId}" class="filter-option w-full text-left px-4 py-2.5 text-sm ${
         state.filterProvider === p.id ? "text-text" : "text-text-secondary"
       } hover:text-text hover:bg-surface-hover transition-all flex items-center gap-2.5">
-        <img src="${p.icon}" alt="${p.name}" class="w-5 h-5 object-contain shrink-0" />
-        ${p.name}
+        <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-5 h-5 object-contain shrink-0" />
+        ${safeProviderName}
       </button>
-    `,
-      )
+    `;
+      })
       .join("")}
   `;
 }
@@ -319,7 +328,6 @@ function attachDynamicEvents() {
       }
 
       settingsRepository.saveSettings(settings);
-      window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
       render(store.get());
       return;
     }
@@ -337,7 +345,6 @@ function attachDynamicEvents() {
           key.selectedModels = key.selectedModels.filter((m) => m !== model);
         }
         settingsRepository.saveSettings(settings);
-        window.dispatchEvent(new Event(APP_EVENTS.SETTINGS_UPDATED));
         render(store.get()); // Re-render to update the Select All checkbox state
       }
     }

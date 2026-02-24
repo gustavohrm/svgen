@@ -9,6 +9,7 @@ import { APP_EVENTS } from "../../core/constants/events";
 import { appComposition } from "../../core/app/composition-root";
 import { createId } from "../../core/utils/id";
 import { sanitizeSvgMarkup } from "../../core/utils/svg-sanitizer";
+import { onAppEvent, type SvgResultsDetail } from "../../core/events/app-events";
 
 const settingsRepository = appComposition.settingsRepository;
 const galleryRepository = appComposition.galleryRepository;
@@ -19,6 +20,7 @@ export class ResultsGrid extends HTMLElement {
   private currentModel: string = "";
   private currentGeneratedAt: number | null = null;
   private isGenerating: boolean = false;
+  private unsubscribeEvents: Array<() => void> = [];
 
   private handleGenerationStarted = () => {
     this.currentSvgs = [];
@@ -34,14 +36,12 @@ export class ResultsGrid extends HTMLElement {
     // Don't render here, rely on SVGEN_RESULTS to populate and render
   };
 
-  private handleSVGenResults = (e: Event) => {
-    const customEvent = e as CustomEvent;
-    if (customEvent.detail?.svgs) {
-      this.currentSvgs = customEvent.detail.svgs;
-      this.currentPrompt = customEvent.detail.prompt || "";
-      this.currentModel = customEvent.detail.model || "";
-      this.currentGeneratedAt =
-        typeof customEvent.detail.generatedAt === "number" ? customEvent.detail.generatedAt : null;
+  private handleSVGenResults = (detail: SvgResultsDetail) => {
+    if (detail.svgs) {
+      this.currentSvgs = detail.svgs;
+      this.currentPrompt = detail.prompt || "";
+      this.currentModel = detail.model || "";
+      this.currentGeneratedAt = typeof detail.generatedAt === "number" ? detail.generatedAt : null;
       this.isGenerating = false;
       this.render();
     }
@@ -57,9 +57,8 @@ export class ResultsGrid extends HTMLElement {
   }
 
   disconnectedCallback() {
-    window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
-    window.removeEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
+    this.unsubscribeEvents.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribeEvents = [];
   }
 
   private render() {
@@ -111,9 +110,13 @@ export class ResultsGrid extends HTMLElement {
 
   private attachEvents() {
     // Listen to global app events
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
-    window.addEventListener(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults);
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted),
+    );
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished),
+    );
+    this.unsubscribeEvents.push(onAppEvent(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults));
   }
 
   private resolveSvgByCardId = (cardId: string): string | undefined => {

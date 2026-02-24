@@ -1,4 +1,5 @@
 import { showAlert } from "./alert";
+import { escapeHtml } from "./html-escape";
 import { sanitizeSvgMarkup } from "./svg-sanitizer";
 
 // --- Lucide icon SVG strings (inlined to avoid external deps) ---
@@ -64,13 +65,16 @@ export function sanitizeSvgForDisplay(rawSvg: string): string {
 
 function buildActionButton(action: CardAction, cardId: string): string {
   const hoverClass = action.hoverClass ?? "hover:text-text hover:bg-surface-hover";
+  const safeActionId = escapeHtml(action.id);
+  const safeCardId = escapeHtml(cardId);
+  const safeTitle = escapeHtml(action.title);
 
   return `
     <button
-      data-action="${action.id}"
-      data-card-id="${cardId}"
+      data-action="${safeActionId}"
+      data-card-id="${safeCardId}"
       class="p-2 rounded-lg text-text-secondary ${hoverClass} transition-all cursor-pointer"
-      title="${action.title}"
+      title="${safeTitle}"
     >
       ${ICONS[action.icon]}
     </button>
@@ -79,16 +83,19 @@ function buildActionButton(action: CardAction, cardId: string): string {
 
 function buildMenuActionButton(action: CardAction, cardId: string): string {
   const hoverClass = action.hoverClass ?? "hover:text-text hover:bg-surface-hover";
+  const safeActionId = escapeHtml(action.id);
+  const safeCardId = escapeHtml(cardId);
+  const safeTitle = escapeHtml(action.title);
 
   return `
     <button
-      data-action="${action.id}"
-      data-card-id="${cardId}"
+      data-action="${safeActionId}"
+      data-card-id="${safeCardId}"
       class="w-full px-3 py-2 rounded-md text-sm text-text-secondary ${hoverClass} transition-all flex items-center gap-2"
-      title="${action.title}"
+      title="${safeTitle}"
     >
       ${ICONS[action.icon]}
-      <span>${action.title}</span>
+      <span>${safeTitle}</span>
     </button>
   `;
 }
@@ -142,7 +149,11 @@ export function renderSvgCard(options: SvgCardOptions): string {
     `
       : "";
 
-  const sublabelHtml = sublabel ? `<span class="text-xs text-text-muted">${sublabel}</span>` : "";
+  const safeLabel = escapeHtml(label);
+  const safeSublabel = sublabel ? escapeHtml(sublabel) : "";
+  const sublabelHtml = safeSublabel
+    ? `<span class="text-xs text-text-muted">${safeSublabel}</span>`
+    : "";
 
   return `
     <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border flex flex-col">
@@ -151,7 +162,7 @@ export function renderSvgCard(options: SvgCardOptions): string {
       </div>
       <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
         <div class="flex flex-col gap-0.5 min-w-0 flex-1">
-          <span class="text-sm font-medium text-text truncate" title="${label}">${label}</span>
+          <span class="text-sm font-medium text-text truncate" title="${safeLabel}">${safeLabel}</span>
           ${sublabelHtml}
         </div>
         <div class="flex gap-1 shrink-0 items-center">

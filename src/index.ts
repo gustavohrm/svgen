@@ -6,15 +6,15 @@ import { appComposition } from "./core/app/composition-root";
 import { showAlert } from "./core/utils/alert";
 import { APP_EVENTS } from "./core/constants/events";
 import { sanitizeSvgMarkup } from "./core/utils/svg-sanitizer";
+import { emitAppEvent, onAppEvent } from "./core/events/app-events";
 
 function sanitizeGeneratedSvgs(svgs: string[]): string[] {
   return svgs.map((svg) => sanitizeSvgMarkup(svg)).filter((svg): svg is string => Boolean(svg));
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  window.addEventListener(APP_EVENTS.START_GENERATION, async (e: Event) => {
-    const customEvent = e as CustomEvent;
-    const { prompt, referenceSvgs, model, providerId, variations } = customEvent.detail;
+  onAppEvent(APP_EVENTS.START_GENERATION, async (detail) => {
+    const { prompt, referenceSvgs, model, providerId, variations } = detail;
 
     if (!model || !providerId) {
       showAlert({
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    window.dispatchEvent(new Event(APP_EVENTS.GENERATION_STARTED));
+    emitAppEvent(APP_EVENTS.GENERATION_STARTED);
 
     try {
       const requestedVariations = variations || settings.variations || 4;
@@ -105,11 +105,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const generatedAt = Date.now();
 
-      window.dispatchEvent(
-        new CustomEvent(APP_EVENTS.SVGEN_RESULTS, {
-          detail: { svgs: safeResults, prompt, model, generatedAt },
-        }),
-      );
+      emitAppEvent(APP_EVENTS.SVGEN_RESULTS, { svgs: safeResults, prompt, model, generatedAt });
       showAlert({ type: "success", message: "SVGs generated successfully" });
     } catch (error: unknown) {
       const errorMessage =
@@ -119,9 +115,9 @@ document.addEventListener("DOMContentLoaded", () => {
         type: "error",
         message: errorMessage,
       });
-      window.dispatchEvent(new CustomEvent(APP_EVENTS.SVGEN_RESULTS, { detail: { svgs: [] } }));
+      emitAppEvent(APP_EVENTS.SVGEN_RESULTS, { svgs: [] });
     } finally {
-      window.dispatchEvent(new Event(APP_EVENTS.GENERATION_FINISHED));
+      emitAppEvent(APP_EVENTS.GENERATION_FINISHED);
     }
   });
 });
