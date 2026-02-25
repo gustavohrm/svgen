@@ -96,12 +96,25 @@ function renderTableHeader(state: SettingsState, filteredModels: ModelEntry[]) {
 
   header.innerHTML = `
     <div class="flex items-center gap-4 w-full">
-      <input
-        type="checkbox"
-        id="select-all-models"
-        ${allSelected ? "checked" : ""}
-        class="w-4 h-4 accent-primary rounded border-border shrink-0 cursor-pointer"
-      />
+      <label class="relative w-4 h-4 shrink-0 rounded-[5px] focus-within:ring-2 focus-within:ring-border/60 focus-within:ring-offset-1 focus-within:ring-offset-background">
+        <input
+          type="checkbox"
+          id="select-all-models"
+          ${allSelected ? "checked" : ""}
+          class="absolute inset-0 opacity-0 cursor-pointer"
+        />
+        <span
+          class="w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${allSelected || someSelected ? "bg-text border-text" : "bg-transparent border-border/70"}"
+        >
+          ${
+            allSelected
+              ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5 text-background"><path d="M20 6 9 17l-5-5" /></svg>`
+              : someSelected
+                ? `<svg viewBox="0 0 24 24" fill="currentColor" class="w-2.5 h-2.5 text-background"><rect x="5" y="11" width="14" height="2.5" rx="1.25" /></svg>`
+                : ""
+          }
+        </span>
+      </label>
       <span class="text-sm font-bold text-text tracking-wider w-24 shrink-0">Provider</span>
       <span class="text-sm font-bold text-text tracking-wider flex-1">Model</span>
       <button
@@ -163,16 +176,27 @@ function renderModels(state: SettingsState) {
       const safeModel = escapeHtml(entry.model);
       const safeProviderIcon = escapeHtml(entry.providerIcon);
       const safeProviderName = escapeHtml(entry.providerName);
+      const checkboxStateClasses = entry.isSelected
+        ? "bg-text border-text"
+        : "bg-transparent border-border/70";
+      const checkboxIcon = entry.isSelected
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5 text-background"><path d="M20 6 9 17l-5-5" /></svg>`
+        : "";
 
       return `
       <label class="flex items-center gap-4 px-5 py-3.5 hover:bg-surface-hover/5 transition-all cursor-pointer group">
-        <input
-          type="checkbox"
-          data-key-id="${safeKeyId}"
-          value="${safeModel}"
-          ${entry.isSelected ? "checked" : ""}
-          class="model-checkbox w-4 h-4 accent-primary rounded border-border shrink-0"
-        />
+        <div class="relative w-4 h-4 shrink-0 rounded-[5px] focus-within:ring-2 focus-within:ring-border/60 focus-within:ring-offset-1 focus-within:ring-offset-background">
+          <input
+            type="checkbox"
+            data-key-id="${safeKeyId}"
+            value="${safeModel}"
+            ${entry.isSelected ? "checked" : ""}
+            class="model-checkbox absolute inset-0 opacity-0 cursor-pointer"
+          />
+          <span class="pointer-events-none w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${checkboxStateClasses}">
+            ${checkboxIcon}
+          </span>
+        </div>
         <div class="w-24 shrink-0 flex items-center gap-2">
           <img
             src="${safeProviderIcon}"
