@@ -67,6 +67,41 @@ describe("OpenRouterProvider", () => {
     expect(payload.response_format.type).toBe("json_schema");
   });
 
+  it("should accumulate parsed variations across multiple responses", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  svgs: ["<svg>from-choice-1</svg>"],
+                }),
+              },
+            },
+            {
+              message: {
+                content: JSON.stringify({
+                  svgs: ["<svg>from-choice-2</svg>"],
+                }),
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = await provider.generate({
+      prompt: "test prompt",
+      systemPrompt: "test system prompt",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 2,
+    });
+
+    expect(result).toEqual(["<svg>from-choice-1</svg>", "<svg>from-choice-2</svg>"]);
+  });
+
   it("should fall back to plain prompt when structured output is unsupported", async () => {
     (global.fetch as any)
       .mockResolvedValueOnce({

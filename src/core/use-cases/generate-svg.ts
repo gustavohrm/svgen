@@ -101,21 +101,27 @@ export class GenerateSvgUseCase {
         throw new Error("Generated SVG content failed validation and was blocked.");
       }
 
+      let hasWarnings = false;
+
       if (safeResults.length < generatedSvgs.length) {
+        hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
           message: "One or more SVG results were blocked because they failed security validation.",
         });
       }
 
-      if (safeResults.length < requestedVariations) {
+      if (generatedSvgs.length < requestedVariations) {
+        hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Model returned ${safeResults.length} of ${requestedVariations} requested variations.`,
+          message: `Model returned ${generatedSvgs.length} of ${requestedVariations} requested variations before sanitization.`,
         });
       }
 
-      this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
+      if (!hasWarnings && safeResults.length === requestedVariations) {
+        this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
+      }
       return {
         svgs: safeResults,
         prompt,

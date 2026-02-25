@@ -116,12 +116,21 @@ export function parseSvgVariationsFromResponses(
   requestedCount: number,
 ): string[] {
   const normalizedCount = normalizeRequestedCount(requestedCount);
+  const parsedSvgs = new Set<string>();
 
   for (const response of responses) {
     const parsed = parseSvgVariationsFromText(response, normalizedCount);
-    if (parsed.length > 0) {
-      return parsed;
+    for (const svg of parsed) {
+      parsedSvgs.add(svg);
+      if (parsedSvgs.size >= normalizedCount) {
+        return [...parsedSvgs].slice(0, normalizedCount);
+      }
     }
+  }
+
+  const parsedResults = [...parsedSvgs].slice(0, normalizedCount);
+  if (parsedResults.length > 0) {
+    return parsedResults;
   }
 
   const fallbackSvgs = new Set<string>();

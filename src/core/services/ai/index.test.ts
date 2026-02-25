@@ -63,6 +63,16 @@ describe("AiService", () => {
     expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
   });
 
+  it("should keep XML well-formed when user prompt contains CDATA terminator", () => {
+    const prompt = service.buildUserPrompt("test ]]> end", 2);
+
+    expect(prompt).toContain("<generation_request>");
+    expect(prompt).toContain("<user_prompt><![CDATA[");
+    expect(prompt).toContain("]]]]><![CDATA[>");
+    expect(prompt).toContain("end]]></user_prompt>");
+    expect(prompt).not.toContain("test ]]></user_prompt>");
+  });
+
   it("should generate SVG using injected provider", async () => {
     const options: Omit<GenerateOptions, "apiKey"> = {
       prompt: "draw a circle",

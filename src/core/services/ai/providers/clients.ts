@@ -106,9 +106,18 @@ function isStructuredOutputUnsupportedError(status: number, errorText: string): 
   const indicatesUnsupported =
     normalized.includes("not support") ||
     normalized.includes("unsupported") ||
-    normalized.includes("not available");
+    normalized.includes("not available") ||
+    normalized.includes("not recognized") ||
+    normalized.includes("unrecognized") ||
+    normalized.includes("unknown") ||
+    normalized.includes("unknown field") ||
+    normalized.includes("invalid");
 
-  return indicatesStructuredOutputIssue && indicatesUnsupported;
+  if (!indicatesStructuredOutputIssue) {
+    return false;
+  }
+
+  return indicatesUnsupported || (status >= 400 && status < 500);
 }
 
 function parseGoogleCandidateText(candidate: {
@@ -238,6 +247,8 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     apiKey: string;
     temperature?: number;
   }): Promise<string[]> {
+    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`;
+
     const baseGenerationConfig = {
       temperature: options.temperature,
     };
@@ -265,16 +276,13 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
       generationConfig: baseGenerationConfig,
     };
 
-    let response = await this.fetchImpl(
-      `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(structuredPayload),
+    let response = await this.fetchImpl(generateUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      body: JSON.stringify(structuredPayload),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -283,16 +291,13 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
         throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      response = await this.fetchImpl(
-        `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(fallbackPayload),
+      response = await this.fetchImpl(generateUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(fallbackPayload),
+      });
 
       if (!response.ok) {
         const fallbackErrorText = await response.text();

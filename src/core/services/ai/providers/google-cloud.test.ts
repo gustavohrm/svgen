@@ -78,6 +78,49 @@ describe("GoogleCloudProvider", () => {
     expect(payload.generationConfig.responseMimeType).toBe("application/json");
   });
 
+  it("should accumulate parsed variations across multiple candidates", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      svgs: ["<svg>candidate-1</svg>"],
+                    }),
+                  },
+                ],
+              },
+            },
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      svgs: ["<svg>candidate-2</svg>"],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = await provider.generate({
+      prompt: "test",
+      systemPrompt: "test",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 2,
+    });
+
+    expect(result).toEqual(["<svg>candidate-1</svg>", "<svg>candidate-2</svg>"]);
+  });
+
   it("should retry without structured output when model does not support schema", async () => {
     (global.fetch as any)
       .mockResolvedValueOnce({

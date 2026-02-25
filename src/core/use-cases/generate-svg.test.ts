@@ -5,6 +5,7 @@ import { GenerateSvgUseCase, GenerationUiAdapter } from "./generate-svg";
 
 describe("GenerateSvgUseCase", () => {
   const validSvg = "<svg viewBox='0 0 10 10'><circle cx='5' cy='5' r='4'/></svg>";
+  const validSvgAlt = "<svg viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8'/></svg>";
 
   let settingsRepository: {
     getSettings: () => AppSettings;
@@ -89,6 +90,8 @@ describe("GenerateSvgUseCase", () => {
   });
 
   it("returns shaped successful payload and emits success notification", async () => {
+    generateMultipleMock.mockResolvedValue([validSvg, validSvgAlt]);
+
     const result = await useCase.execute({
       prompt: "draw a badge",
       referenceSvgs: [],
@@ -105,8 +108,9 @@ describe("GenerateSvgUseCase", () => {
       }),
       2,
     );
-    expect(result.svgs).toHaveLength(1);
+    expect(result.svgs).toHaveLength(2);
     expect(result.svgs[0]).toContain("<svg");
+    expect(result.svgs[1]).toContain("<svg");
     expect(result.prompt).toBe("draw a badge");
     expect(result.model).toBe("gemini-2.5-flash");
     expect(result.generatedAt).toBeTypeOf("number");
@@ -162,7 +166,11 @@ describe("GenerateSvgUseCase", () => {
     expect(result.svgs[0]).toContain("<svg");
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",
-      message: "Model returned 1 of 3 requested variations.",
+      message: "Model returned 1 of 3 requested variations before sanitization.",
+    });
+    expect(uiAdapter.notify).not.toHaveBeenCalledWith({
+      type: "success",
+      message: "SVGs generated successfully",
     });
   });
 });

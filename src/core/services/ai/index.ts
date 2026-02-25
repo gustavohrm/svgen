@@ -53,6 +53,7 @@ export class AiService {
     return systemPrompt;
   }
 
+  /** @internal */
   buildUserPrompt(userPrompt: string, variationCount: number): string {
     const normalizedVariationCount = normalizeVariationCount(variationCount);
 
