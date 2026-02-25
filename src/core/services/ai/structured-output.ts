@@ -26,7 +26,6 @@ export const SVG_VARIATIONS_JSON_SCHEMA = {
 
 export const GCP_SVG_VARIATIONS_SCHEMA = {
   type: "OBJECT",
-  additionalProperties: false,
   required: ["svgs"],
   properties: {
     svgs: {
@@ -169,6 +168,9 @@ export function parseSvgVariationsFromResponses(
     const normalized = normalizeSvgMarkup(response);
     if (normalized) {
       fallbackSvgs.add(normalized);
+      if (fallbackSvgs.size >= normalizedCount) {
+        break;
+      }
     }
   }
 

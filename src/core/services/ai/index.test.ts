@@ -125,6 +125,7 @@ describe("AiService", () => {
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({
         count: 2,
+        prompt: expect.stringContaining("<variation_count>2</variation_count>"),
       }),
     );
   });
