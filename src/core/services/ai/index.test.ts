@@ -37,6 +37,15 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const prompt = service.buildSystemPrompt();
     expect(prompt).toContain("expert SVG designer");
+    expect(prompt).toContain("Prefer named SVG primitives");
+    expect(prompt).toContain("avoid SMIL tags");
+    expect(prompt).toContain("<css_animation_profile>");
+    expect(prompt).toContain("<profile>permissive</profile>");
+    expect(prompt).toContain("<allowed_css_properties>");
+    expect(prompt).toContain("animation-duration");
+    expect(prompt).toContain("<safety_rules>");
+    expect(prompt).toContain("Use &lt;style&gt; blocks");
+    expect(prompt).not.toContain('Use <style> blocks (optional type="text/css").');
     expect(prompt).toContain("<system_instructions>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
