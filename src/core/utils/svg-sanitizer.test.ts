@@ -82,6 +82,14 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toBeNull();
   });
 
+  it("rejects unsafe CSS when style closing tag has trailing whitespace", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@import "https://evil.example/style.css";</style ><rect x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("keeps safe inline style attributes", () => {
     const result = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="fill:#f00;opacity:.7"/></svg>',
