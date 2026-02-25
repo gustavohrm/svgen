@@ -142,10 +142,8 @@ describe("GenerateSvgUseCase", () => {
     });
   });
 
-  it("falls back to single generation when gcp model rejects multiple candidates", async () => {
-    generateMultipleMock
-      .mockRejectedValueOnce(new Error("Multiple candidates is not enabled for this model"))
-      .mockResolvedValueOnce([validSvg]);
+  it("warns when provider returns fewer variations than requested", async () => {
+    generateMultipleMock.mockResolvedValue([validSvg]);
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -155,22 +153,16 @@ describe("GenerateSvgUseCase", () => {
       variations: 3,
     });
 
-    expect(aiService.generateMultiple).toHaveBeenNthCalledWith(
-      1,
+    expect(aiService.generateMultiple).toHaveBeenCalledTimes(1);
+    expect(aiService.generateMultiple).toHaveBeenCalledWith(
       expect.objectContaining({ providerId: "gcp" }),
       3,
-    );
-    expect(aiService.generateMultiple).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ providerId: "gcp" }),
-      1,
     );
     expect(result.svgs).toHaveLength(1);
     expect(result.svgs[0]).toContain("<svg");
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",
-      message:
-        "Model gemini-2.5-flash does not support multiple candidates. Generated 1 variation instead.",
+      message: "Model returned 1 of 3 requested variations.",
     });
   });
 });

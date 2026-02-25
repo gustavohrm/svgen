@@ -37,20 +37,30 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const prompt = service.buildSystemPrompt();
     expect(prompt).toContain("expert SVG designer");
-    expect(prompt).toContain("Output contract");
-    expect(prompt).toContain("Return exactly one complete <svg>...</svg>");
+    expect(prompt).toContain("<system_instructions>");
+    expect(prompt).toContain("<response_contract>");
+    expect(prompt).toContain('"svgs"');
   });
 
   it("should build system prompt with references", () => {
     const prompt = service.buildSystemPrompt(["<svg>ref</svg>"]);
-    expect(prompt).toContain("Reference SVGs");
+    expect(prompt).toContain("<reference_svgs>");
+    expect(prompt).toContain('<reference index="1">');
     expect(prompt).toContain("<svg>ref</svg>");
   });
 
   it("should use custom system prompt when provided", () => {
     const prompt = service.buildSystemPrompt([], "Always prefer monochrome icon style.");
     expect(prompt).toContain("Always prefer monochrome icon style.");
-    expect(prompt).toContain("Output contract");
+    expect(prompt).toContain("<response_contract>");
+  });
+
+  it("should build XML-scoped user prompt for generation", () => {
+    const prompt = service.buildUserPrompt("draw an orbit icon", 3);
+
+    expect(prompt).toContain("<generation_request>");
+    expect(prompt).toContain("<variation_count>3</variation_count>");
+    expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
   });
 
   it("should generate SVG using injected provider", async () => {
@@ -66,11 +76,14 @@ describe("AiService", () => {
     expect(mockProviderRegistry.getProvider).toHaveBeenCalledWith("gcp");
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: "draw a circle",
         apiKey: "test-key",
         temperature: 0.7,
       }),
     );
+
+    const providerCall = (mockProvider.generate as any).mock.calls[0][0];
+    expect(providerCall.prompt).toContain("<generation_request>");
+    expect(providerCall.prompt).toContain("<user_prompt><![CDATA[draw a circle]]></user_prompt>");
   });
 
   it("should generate multiple SVGs in a single request", async () => {

@@ -1,5 +1,6 @@
 import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
+import { SVG_VARIATIONS_JSON_SCHEMA } from "./structured-output";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -17,12 +18,19 @@ Design goals:
 - Use cohesive color palettes with sufficient contrast between key shapes.
 - Prefer reusable structure (grouping, transforms, shared styles) when it keeps output clear and compact.`;
 
-const SYSTEM_PROMPT_GUARDRAILS = `Output contract:
-1. Return exactly one complete <svg>...</svg> document and nothing else.
-2. Do not use markdown, code fences, explanations, or comments outside SVG.
-3. Ensure the SVG is valid and self-contained (no external assets, fonts, CSS, or scripts).
-4. Prefer a viewBox and responsive coordinates over fixed pixel width/height.
-5. Keep markup concise and deterministic while preserving visual quality.`;
+const SYSTEM_PROMPT_GUARDRAILS = `
+<generation_rules>
+  <rule>Generate the requested number of distinct SVG variations.</rule>
+  <rule>Each variation must be a complete, valid &lt;svg&gt;...&lt;/svg&gt; document.</rule>
+  <rule>Do not use markdown, code fences, or explanatory text.</rule>
+  <rule>Keep SVGs self-contained (no external assets, fonts, CSS, or scripts).</rule>
+  <rule>Prefer viewBox-based responsive coordinates.</rule>
+</generation_rules>
+<response_contract>
+  <type>json_object</type>
+  <schema>${JSON.stringify(SVG_VARIATIONS_JSON_SCHEMA)}</schema>
+  <notes>The response must be valid JSON matching the schema exactly.</notes>
+</response_contract>`;
 
 export class AiService {
   constructor(
@@ -32,16 +40,32 @@ export class AiService {
 
   buildSystemPrompt(referenceSvgs?: string[], customSystemPrompt?: string): string {
     const basePrompt = customSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
-    let systemPrompt = `${basePrompt}\n\n${SYSTEM_PROMPT_GUARDRAILS}`;
+    let systemPrompt = `<system_instructions><![CDATA[${toCdata(basePrompt)}]]></system_instructions>\n${SYSTEM_PROMPT_GUARDRAILS}`;
 
     if (referenceSvgs && referenceSvgs.length > 0) {
-      systemPrompt += `\n\nReference SVGs are provided below to guide the style or structure:\n`;
+      systemPrompt += `\n<reference_svgs>`;
       referenceSvgs.forEach((svg, index) => {
-        systemPrompt += `\n--- Reference ${index + 1} ---\n${svg}\n--------------------\n`;
+        systemPrompt += `\n  <reference index="${index + 1}"><![CDATA[${toCdata(svg)}]]></reference>`;
       });
+      systemPrompt += `\n</reference_svgs>`;
     }
 
     return systemPrompt;
+  }
+
+  buildUserPrompt(userPrompt: string, variationCount: number): string {
+    const normalizedVariationCount = normalizeVariationCount(variationCount);
+
+    return `<generation_request>
+  <variation_count>${normalizedVariationCount}</variation_count>
+  <user_prompt><![CDATA[${toCdata(userPrompt)}]]></user_prompt>
+  <output_requirements>
+    <requirement>Return JSON only.</requirement>
+    <requirement>Use exactly one top-level key named "svgs".</requirement>
+    <requirement>Provide ${normalizedVariationCount} SVG strings when possible.</requirement>
+    <requirement>Each item must be a full &lt;svg&gt;...&lt;/svg&gt; document.</requirement>
+  </output_requirements>
+</generation_request>`;
   }
 
   async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
@@ -68,9 +92,10 @@ export class AiService {
     }
 
     const systemPrompt = this.buildSystemPrompt(options.referenceSvgs, settings.systemPrompt);
+    const userPrompt = this.buildUserPrompt(options.prompt, count);
 
     return provider.generate({
-      prompt: options.prompt,
+      prompt: userPrompt,
       systemPrompt,
       model: options.model,
       apiKey: activeKey.value,
@@ -95,4 +120,16 @@ export function createAiService(
   providerRegistry: ProviderRegistry,
 ): AiService {
   return new AiService(settingsRepository, providerRegistry);
+}
+
+function normalizeVariationCount(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 1;
+  }
+
+  return Math.max(1, Math.floor(value));
+}
+
+function toCdata(value: string): string {
+  return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }

@@ -86,7 +86,7 @@ export class GenerateSvgUseCase {
 
     try {
       const requestedVariations = variations || settings.variations || 4;
-      const generatedSvgs = await this.generateWithFallback(
+      const generatedSvgs = await this.aiService.generateMultiple(
         {
           prompt,
           referenceSvgs,
@@ -108,6 +108,13 @@ export class GenerateSvgUseCase {
         });
       }
 
+      if (safeResults.length < requestedVariations) {
+        this.uiAdapter.notify({
+          type: "warning",
+          message: `Model returned ${safeResults.length} of ${requestedVariations} requested variations.`,
+        });
+      }
+
       this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
       return {
         svgs: safeResults,
@@ -124,37 +131,6 @@ export class GenerateSvgUseCase {
         message: errorMessage,
       });
       return { svgs: [] };
-    }
-  }
-
-  private async generateWithFallback(
-    options: {
-      prompt: string;
-      referenceSvgs: string[];
-      model: string;
-      providerId: AiProviderId;
-    },
-    requestedVariations: number,
-  ): Promise<string[]> {
-    try {
-      return await this.aiService.generateMultiple(options, requestedVariations);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "";
-      const shouldFallbackToSingle =
-        options.providerId === "gcp" &&
-        requestedVariations > 1 &&
-        /Multiple candidates is not enabled for this model/i.test(errorMessage);
-
-      if (!shouldFallbackToSingle) {
-        throw error;
-      }
-
-      this.uiAdapter.notify({
-        type: "warning",
-        message: `Model ${options.model} does not support multiple candidates. Generated 1 variation instead.`,
-      });
-
-      return this.aiService.generateMultiple(options, 1);
     }
   }
 }

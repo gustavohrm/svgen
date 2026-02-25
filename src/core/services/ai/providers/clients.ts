@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GCP_SVG_VARIATIONS_SCHEMA, SVG_VARIATIONS_JSON_SCHEMA } from "../structured-output";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -71,7 +72,6 @@ export interface OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
     appOrigin: string;
     appName: string;
@@ -85,9 +85,42 @@ export interface GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
   }): Promise<string[]>;
+}
+
+function isStructuredOutputUnsupportedError(status: number, errorText: string): boolean {
+  if (status < 400 || status >= 500) {
+    return false;
+  }
+
+  const normalized = errorText.toLowerCase();
+  const indicatesStructuredOutputIssue =
+    normalized.includes("response_format") ||
+    normalized.includes("json_schema") ||
+    normalized.includes("response schema") ||
+    normalized.includes("responseschema") ||
+    normalized.includes("responsemime") ||
+    normalized.includes("responsemimetype") ||
+    normalized.includes("structured output");
+  const indicatesUnsupported =
+    normalized.includes("not support") ||
+    normalized.includes("unsupported") ||
+    normalized.includes("not available");
+
+  return indicatesStructuredOutputIssue && indicatesUnsupported;
+}
+
+function parseGoogleCandidateText(candidate: {
+  content?: {
+    parts?: Array<{ text?: string }>;
+  };
+}): string {
+  const parts = candidate.content?.parts ?? [];
+  return parts
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
+    .filter((text) => text.length > 0)
+    .join("\n");
 }
 
 export class FetchOpenRouterClient implements OpenRouterClient {
@@ -113,35 +146,66 @@ export class FetchOpenRouterClient implements OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
     appOrigin: string;
     appName: string;
   }): Promise<string[]> {
-    const response = await this.fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${options.apiKey}`,
-        "HTTP-Referer": options.appOrigin,
-        "X-Title": options.appName,
+    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${options.apiKey}`,
+      "HTTP-Referer": options.appOrigin,
+      "X-Title": options.appName,
+    };
+
+    const baseBody = {
+      model: options.model,
+      messages: [
+        { role: "system", content: options.systemPrompt },
+        { role: "user", content: options.prompt },
+      ],
+      temperature: options.temperature,
+    };
+
+    const structuredBody = {
+      ...baseBody,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "svg_variations",
+          strict: true,
+          schema: SVG_VARIATIONS_JSON_SCHEMA,
+        },
       },
-      body: JSON.stringify({
-        model: options.model,
-        messages: [
-          { role: "system", content: options.systemPrompt },
-          { role: "user", content: options.prompt },
-        ],
-        n: options.count,
-        temperature: options.temperature,
-      }),
+    };
+
+    let response = await this.fetchImpl(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(structuredBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`,
-      );
+
+      if (!isStructuredOutputUnsupportedError(response.status, errorText)) {
+        throw new Error(
+          `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`,
+        );
+      }
+
+      response = await this.fetchImpl(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(baseBody),
+      });
+
+      if (!response.ok) {
+        const fallbackErrorText = await response.text();
+        throw new Error(
+          `OpenRouter API error: ${response.status} ${response.statusText} - ${fallbackErrorText}`,
+        );
+      }
     }
 
     const payload = openRouterGenerateResponseSchema.parse(await response.json());
@@ -172,10 +236,13 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
   }): Promise<string[]> {
-    const payload = {
+    const baseGenerationConfig = {
+      temperature: options.temperature,
+    };
+
+    const structuredPayload = {
       system_instruction: {
         parts: [{ text: options.systemPrompt }],
       },
@@ -186,28 +253,56 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
         },
       ],
       generationConfig: {
-        candidateCount: options.count,
-        temperature: options.temperature,
+        ...baseGenerationConfig,
+        responseMimeType: "application/json",
+        responseSchema: GCP_SVG_VARIATIONS_SCHEMA,
       },
     };
 
-    const response = await this.fetchImpl(
+    const fallbackPayload = {
+      system_instruction: structuredPayload.system_instruction,
+      contents: structuredPayload.contents,
+      generationConfig: baseGenerationConfig,
+    };
+
+    let response = await this.fetchImpl(
       `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(structuredPayload),
       },
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
+
+      if (!isStructuredOutputUnsupportedError(response.status, errorText)) {
+        throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      response = await this.fetchImpl(
+        `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(fallbackPayload),
+        },
+      );
+
+      if (!response.ok) {
+        const fallbackErrorText = await response.text();
+        throw new Error(
+          `GCP API error: ${response.status} ${response.statusText} - ${fallbackErrorText}`,
+        );
+      }
     }
 
     const parsed = gcpGenerateResponseSchema.parse(await response.json());
-    return parsed.candidates.map((candidate) => candidate.content?.parts?.[0]?.text ?? "");
+    return parsed.candidates.map((candidate) => parseGoogleCandidateText(candidate));
   }
 }
