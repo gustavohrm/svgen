@@ -153,8 +153,18 @@ const ALLOWED_SVG_ATTRS = [
   "scale",
 ] as const;
 
-const BLOCKED_TAG_PATTERN =
-  /<\s*\/?\s*(script|foreignObject|animate|animateMotion|animateTransform|set)\b/i;
+const BLOCKED_TAG_NAMES = new Set<string>([
+  "script",
+  "foreignobject",
+  "animate",
+  "animatemotion",
+  "animatetransform",
+  "set",
+]);
+const BLOCKED_TAG_PATTERN = new RegExp(
+  `<\\s*\\/?\\s*(?:${Array.from(BLOCKED_TAG_NAMES).map(escapeRegExp).join("|")})\\b`,
+  "i",
+);
 const INLINE_EVENT_PATTERN = /\son[a-z][\w:-]*\s*=/i;
 const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const STYLE_PLACEHOLDER_PREFIX = "__svgen_style_placeholder__";
@@ -168,15 +178,6 @@ const STYLE_TAG_ALLOWED_ATTRS_PATTERN =
 
 const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
 const ALLOWED_CSS_AT_RULES = new Set<string>(SVG_CSS_ALLOWED_AT_RULES.map((rule) => rule.slice(1)));
-
-const BLOCKED_TAG_NAMES = new Set([
-  "script",
-  "foreignobject",
-  "animate",
-  "animatemotion",
-  "animatetransform",
-  "set",
-]);
 
 interface ExtractedStyleBlock {
   placeholderId: string;
@@ -207,7 +208,7 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
     USE_PROFILES: { svg: true, svgFilters: true },
     ALLOWED_TAGS: [...ALLOWED_SVG_TAGS],
     ALLOWED_ATTR: [...ALLOWED_SVG_ATTRS],
-    FORBID_TAGS: ["script", "foreignObject", "animate", "animateMotion", "animateTransform", "set"],
+    FORBID_TAGS: Array.from(BLOCKED_TAG_NAMES),
   });
 
   if (typeof sanitized !== "string" || !sanitized.trim()) {
@@ -258,6 +259,10 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
 function containsBlockedElements(root: Element): boolean {
   const allElements = [root, ...Array.from(root.querySelectorAll("*"))];
   return allElements.some((element) => BLOCKED_TAG_NAMES.has(element.tagName.toLowerCase()));
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | null {
