@@ -129,6 +129,7 @@ export class GeneratorControls extends HTMLElement {
     const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement;
     const variationInput = this.querySelector("#variation-input") as HTMLInputElement;
     const temperatureInput = this.querySelector("#temperature-input") as HTMLInputElement;
+    const stepButtons = this.querySelectorAll<HTMLButtonElement>("button[data-step-target]");
     const editSystemPromptBtn = this.querySelector("#edit-system-prompt-btn") as HTMLButtonElement;
     const systemPromptModal = this.querySelector("#system-prompt-modal") as HTMLDivElement;
     const systemPromptModalInput = this.querySelector(
@@ -179,6 +180,37 @@ export class GeneratorControls extends HTMLElement {
       const normalized = Number.isNaN(value) ? DEFAULT_TEMPERATURE : clampTemperature(value);
       target.value = normalized.toFixed(1);
       settingsRepository.setTemperature(normalized);
+    });
+
+    stepButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const targetId = button.dataset.stepTarget;
+        const delta = Number(button.dataset.stepDelta);
+        if (!targetId || !Number.isFinite(delta)) return;
+
+        if (targetId === "variation-input" && variationInput) {
+          const current = parseFloat(variationInput.value);
+          const base = Number.isNaN(current)
+            ? (settingsRepository.getSettings().variations ?? 1)
+            : current;
+          const next = clampVariations(base + delta);
+
+          variationInput.value = next.toString();
+          settingsRepository.setVariations(next);
+          variationInput.focus();
+          return;
+        }
+
+        if (targetId === "temperature-input" && temperatureInput) {
+          const current = parseFloat(temperatureInput.value);
+          const base = Number.isNaN(current) ? DEFAULT_TEMPERATURE : current;
+          const next = clampTemperature(Math.round((base + delta) * 10) / 10);
+
+          temperatureInput.value = next.toFixed(1);
+          settingsRepository.setTemperature(next);
+          temperatureInput.focus();
+        }
+      });
     });
 
     editSystemPromptBtn?.addEventListener("click", () => {
