@@ -2,11 +2,9 @@ import { z } from "zod";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
-const svgVariationsPayloadSchema = z
-  .object({
-    svgs: z.array(z.string().min(1)).min(1),
-  })
-  .strict();
+const svgVariationsPayloadSchema = z.strictObject({
+  svgs: z.array(z.string().min(1)).min(1),
+});
 
 const CODE_FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
@@ -28,6 +26,7 @@ export const SVG_VARIATIONS_JSON_SCHEMA = {
 
 export const GCP_SVG_VARIATIONS_SCHEMA = {
   type: "OBJECT",
+  additionalProperties: false,
   required: ["svgs"],
   properties: {
     svgs: {
@@ -103,7 +102,7 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
     }
   }
 
-  return [...uniqueSvgs].slice(0, normalizePositiveInt(requestedCount));
+  return [...uniqueSvgs].slice(0, requestedCount);
 }
 
 export function parseSvgVariationsFromResponses(

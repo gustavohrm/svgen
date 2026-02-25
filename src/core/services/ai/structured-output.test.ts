@@ -3,6 +3,8 @@ import { parseSvgVariationsFromResponses } from "./structured-output";
 
 describe("parseSvgVariationsFromResponses", () => {
   const validSvg = "<svg viewBox='0 0 10 10'><circle cx='5' cy='5' r='4'/></svg>";
+  const secondSvg = "<svg viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8'/></svg>";
+  const thirdSvg = "<svg viewBox='0 0 10 10'><path d='M1 1 L9 9'/></svg>";
 
   it("parses valid structured payloads", () => {
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 1);
@@ -17,5 +19,26 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(() => parseSvgVariationsFromResponses([payloadWithUnknownField], 1)).toThrow(
       "Model returned an invalid variations payload",
     );
+  });
+
+  it("throws when no responses are returned", () => {
+    expect(() => parseSvgVariationsFromResponses([], 1)).toThrow(
+      "Model returned an invalid variations payload",
+    );
+  });
+
+  it("falls back to raw svg responses", () => {
+    const result = parseSvgVariationsFromResponses([validSvg], 1);
+
+    expect(result).toEqual([validSvg]);
+  });
+
+  it("caps parsed svg results to requestedCount", () => {
+    const result = parseSvgVariationsFromResponses(
+      [JSON.stringify({ svgs: [validSvg, secondSvg, thirdSvg] })],
+      1,
+    );
+
+    expect(result).toEqual([validSvg]);
   });
 });

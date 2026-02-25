@@ -4,6 +4,7 @@ import { MAX_POSITIVE_INT, normalizePositiveInt } from "./number";
 describe("normalizePositiveInt", () => {
   it("returns 1 for non-finite numbers", () => {
     expect(normalizePositiveInt(Number.NaN)).toBe(1);
+    expect(normalizePositiveInt(Number.NEGATIVE_INFINITY)).toBe(1);
     expect(normalizePositiveInt(Number.POSITIVE_INFINITY)).toBe(1);
   });
 
