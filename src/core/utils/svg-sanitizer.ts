@@ -274,7 +274,7 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
       }
 
       if (URL_REFERENCE_ATTR_NAMES.has(attrName)) {
-        if (!isSafeLocalFragmentReference(attribute.value)) {
+        if (!isSafeUrlReferenceAttributeValue(attrName, attribute.value)) {
           return null;
         }
       }
@@ -322,7 +322,7 @@ function containsUnsafeUrlReferenceAttributes(svgMarkup: string): boolean {
         continue;
       }
 
-      if (!isSafeLocalFragmentReference(attribute.value)) {
+      if (!isSafeUrlReferenceAttributeValue(attrName, attribute.value)) {
         return true;
       }
     }
@@ -894,6 +894,19 @@ function isSafeLocalFragmentReference(rawValue: string): boolean {
   }
 
   return containsOnlyLocalFragmentUrls(value);
+}
+
+function isSafeUrlReferenceAttributeValue(attrName: string, rawValue: string): boolean {
+  if (attrName === "href" || attrName === "xlink:href") {
+    return isSafeLocalFragmentReference(rawValue);
+  }
+
+  const normalizedValue = rawValue.trim().toLowerCase();
+  if (normalizedValue === "none") {
+    return true;
+  }
+
+  return isSafeLocalFragmentReference(rawValue);
 }
 
 function findMatchingBrace(input: string, openBraceIndex: number): number {

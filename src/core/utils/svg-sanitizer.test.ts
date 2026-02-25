@@ -356,13 +356,15 @@ describe("sanitizeSvgMarkup", () => {
 
   it("keeps local fragment references in URL-bearing attributes", () => {
     const result = sanitizeSvgMarkup(
-      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><defs><path id="shape" d="M1 1h8v8H1z"/><clipPath id="clip"><rect x="1" y="1" width="8" height="8"/></clipPath></defs><use href="#shape"/><use xlink:href="#shape"/><rect x="1" y="1" width="8" height="8" clip-path="url(#clip)"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><defs><path id="shape" d="M1 1h8v8H1z"/><clipPath id="clip"><rect x="1" y="1" width="8" height="8"/></clipPath></defs><use href="#shape"/><use xlink:href="#shape"/><rect x="1" y="1" width="8" height="8" clip-path="url(#clip)" filter="none" marker-start="none"/></svg>',
     );
 
     expect(result).not.toBeNull();
     expect(result).toContain('href="#shape"');
     expect(result).toContain('xlink:href="#shape"');
     expect(result).toContain('clip-path="url(#clip)"');
+    expect(result).toContain('filter="none"');
+    expect(result).toContain('marker-start="none"');
   });
 
   it("rejects SVG with more than MAX_STYLE_BLOCKS style tags", () => {
