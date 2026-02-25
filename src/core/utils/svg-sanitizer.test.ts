@@ -322,6 +322,49 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toBeNull();
   });
 
+  it("rejects external URLs in href attributes", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><image href="https://evil.example/img.png" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects external URLs in xlink:href attributes", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><use xlink:href="https://evil.example/#shape"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects mixed-case external URL wrappers in URL-bearing attributes", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><defs><clipPath id="clip"><rect x="1" y="1" width="8" height="8"/></clipPath></defs><rect x="1" y="1" width="8" height="8" clip-path="Url(https://evil.example/clip)"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects relative URLs in URL-bearing attributes", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><use href="/icons.svg#shape"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("keeps local fragment references in URL-bearing attributes", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 10 10"><defs><path id="shape" d="M1 1h8v8H1z"/><clipPath id="clip"><rect x="1" y="1" width="8" height="8"/></clipPath></defs><use href="#shape"/><use xlink:href="#shape"/><rect x="1" y="1" width="8" height="8" clip-path="url(#clip)"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain('href="#shape"');
+    expect(result).toContain('xlink:href="#shape"');
+    expect(result).toContain('clip-path="url(#clip)"');
+  });
+
   it("rejects SVG with more than MAX_STYLE_BLOCKS style tags", () => {
     const styleTags = Array.from(
       { length: MAX_STYLE_BLOCKS + 1 },

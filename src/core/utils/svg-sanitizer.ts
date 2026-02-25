@@ -177,6 +177,18 @@ const DISALLOWED_CSS_PATTERN =
   /(?:@import\b|javascript\s*:|expression\s*\(|behavior\s*:|-moz-binding\b|<\/style\b)/i;
 const STYLE_TAG_ALLOWED_ATTRS_PATTERN =
   /^\s*(?:type\s*=\s*(?:"text\/css"|'text\/css'|text\/css))?\s*$/i;
+const URL_REFERENCE_ATTR_NAMES = new Set<string>([
+  "href",
+  "xlink:href",
+  "filter",
+  "clip-path",
+  "mask",
+  "marker-start",
+  "marker-mid",
+  "marker-end",
+]);
+const LOCAL_FRAGMENT_REFERENCE_PATTERN = /^#[-\w:.]+$/;
+const LOCAL_FRAGMENT_URL_REFERENCE_PATTERN = /^url\s*\(\s*(['"]?)#[-\w:.]+\1\s*\)$/i;
 
 const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
 const ALLOWED_CSS_AT_RULES = new Set<string>(
@@ -224,6 +236,10 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
     return null;
   }
 
+  if (containsUnsafeUrlReferenceAttributes(styleExtraction.svgWithoutStyles)) {
+    return null;
+  }
+
   const sanitized = DOMPurify.sanitize(styleExtraction.svgWithoutStyles, {
     USE_PROFILES: { svg: true, svgFilters: true },
     ALLOWED_TAGS: [...ALLOWED_SVG_TAGS],
@@ -257,6 +273,12 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
         return null;
       }
 
+      if (URL_REFERENCE_ATTR_NAMES.has(attrName)) {
+        if (!isSafeLocalFragmentReference(attribute.value)) {
+          return null;
+        }
+      }
+
       if (attrName === "style") {
         const sanitizedStyle = sanitizeStyleAttribute(attribute.value);
         if (sanitizedStyle === null) {
@@ -283,6 +305,30 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
 function containsBlockedElements(root: Element): boolean {
   const allElements = [root, ...Array.from(root.querySelectorAll("*"))];
   return allElements.some((element) => BLOCKED_TAG_NAMES.has(element.tagName.toLowerCase()));
+}
+
+function containsUnsafeUrlReferenceAttributes(svgMarkup: string): boolean {
+  const parsedNode = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+  const root = parsedNode.documentElement;
+  if (!root || root.nodeName.toLowerCase() !== "svg" || parsedNode.querySelector("parsererror")) {
+    return false;
+  }
+
+  const allElements = [root, ...Array.from(root.querySelectorAll("*"))];
+  for (const element of allElements) {
+    for (const attribute of Array.from(element.attributes)) {
+      const attrName = attribute.name.toLowerCase();
+      if (!URL_REFERENCE_ATTR_NAMES.has(attrName)) {
+        continue;
+      }
+
+      if (!isSafeLocalFragmentReference(attribute.value)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 function escapeRegExp(input: string): string {
@@ -831,6 +877,23 @@ function containsOnlyLocalFragmentUrls(value: string): boolean {
   }
 
   return true;
+}
+
+function isSafeLocalFragmentReference(rawValue: string): boolean {
+  const value = rawValue.trim();
+  if (!value) {
+    return false;
+  }
+
+  if (LOCAL_FRAGMENT_REFERENCE_PATTERN.test(value)) {
+    return true;
+  }
+
+  if (!LOCAL_FRAGMENT_URL_REFERENCE_PATTERN.test(value)) {
+    return false;
+  }
+
+  return containsOnlyLocalFragmentUrls(value);
 }
 
 function findMatchingBrace(input: string, openBraceIndex: number): number {
