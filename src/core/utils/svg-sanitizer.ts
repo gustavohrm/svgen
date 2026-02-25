@@ -611,7 +611,7 @@ function isSafeCssSelector(selector: string): boolean {
     return false;
   }
 
-  if (selector.includes("@") || selector.includes("\\") || /[{}<>`]/.test(selector)) {
+  if (selector.includes("@") || selector.includes("\\") || /[{}<`]/.test(selector)) {
     return false;
   }
 

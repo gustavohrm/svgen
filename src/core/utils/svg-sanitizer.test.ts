@@ -67,6 +67,16 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("animation:pulse 1s linear infinite");
   });
 
+  it("keeps safe CSS selectors using child combinators", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>svg > g{opacity:.6}</style><g><rect x="1" y="1" width="8" height="8"/></g></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("<style>");
+    expect(result).toContain("svg > g{opacity:.6}");
+  });
+
   it("strips empty style blocks without rejecting the SVG", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>   \n\t  </style><rect x="1" y="1" width="8" height="8"/></svg>',
