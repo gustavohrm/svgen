@@ -124,6 +124,12 @@ export function createAiService(
   return new AiService(settingsRepository, providerRegistry);
 }
 
+/**
+ * Escape a string so it can be safely placed inside an XML CDATA section.
+ *
+ * @param value - The string to embed inside CDATA
+ * @returns The input string with every occurrence of `]]>` replaced by `]]]]><![CDATA[>` to prevent CDATA termination
+ */
 function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }

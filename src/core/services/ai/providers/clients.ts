@@ -89,6 +89,13 @@ export interface GoogleCloudClient {
   }): Promise<string[]>;
 }
 
+/**
+ * Detects whether a 4xx HTTP error indicates the API does not support structured output.
+ *
+ * @param status - The HTTP response status code
+ * @param errorText - The response body or error message text
+ * @returns `true` if the status is between 400 and 499 and the error text suggests structured-output fields (e.g., `response_format`, `json_schema`, `responseMimeType`) are unsupported or invalid, `false` otherwise.
+ */
 function isStructuredOutputUnsupportedError(status: number, errorText: string): boolean {
   if (status < 400 || status >= 500) {
     return false;
@@ -116,6 +123,14 @@ function isStructuredOutputUnsupportedError(status: number, errorText: string): 
   return indicatesStructuredOutputIssue && indicatesUnsupported;
 }
 
+/**
+ * Extracts and concatenates text parts from a Google Cloud generate candidate's content.
+ *
+ * Iterates candidate.content.parts, keeps only string `text` values, and joins them with newline characters. Returns an empty string if no text parts are present.
+ *
+ * @param candidate - The candidate object returned by Google Cloud Generate which may include `content.parts` with optional `text` fields.
+ * @returns The concatenated text parts separated by `\n`, or an empty string if none.
+ */
 function parseGoogleCandidateText(candidate: {
   content?: {
     parts?: Array<{ text?: string }>;

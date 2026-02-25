@@ -39,6 +39,12 @@ export const GCP_SVG_VARIATIONS_SCHEMA = {
   },
 } as const;
 
+/**
+ * Extracts and validates SVG markup from an input string.
+ *
+ * @param svg - Input text that may contain an SVG document or surrounding content
+ * @returns The trimmed SVG markup if it begins with `<svg` and ends with `</svg>`, `null` otherwise
+ */
 function normalizeSvgMarkup(svg: string): string | null {
   const extracted = extractSvgFromResult(svg).trim();
   if (!SVG_MARKUP_REGEX.test(extracted)) {
@@ -48,6 +54,16 @@ function normalizeSvgMarkup(svg: string): string | null {
   return extracted;
 }
 
+/**
+ * Extracts and parses a JSON value from a text blob.
+ *
+ * Attempts several extraction strategies (full text, fenced code block content, and an embedded object literal)
+ * and returns the first successfully parsed JSON value. If the parsed value is a JSON-encoded string, that string
+ * is parsed again and the resulting value is returned.
+ *
+ * @param text - The input text to search for a JSON payload
+ * @returns The parsed JSON value if parsing succeeds, or `undefined` if no valid JSON is found
+ */
 function parseJsonCandidate(text: string): unknown | undefined {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
@@ -83,6 +99,13 @@ function parseJsonCandidate(text: string): unknown | undefined {
   return undefined;
 }
 
+/**
+ * Extracts and returns up to the requested number of unique, normalized SVG markup strings found in a text payload containing a JSON `svgs` array.
+ *
+ * @param text - Text that may contain a JSON payload with an `svgs` array (plain JSON, code-fenced JSON, or embedded JSON).
+ * @param requestedCount - Maximum number of SVG strings to return.
+ * @returns An array of unique, normalized SVG markup strings, limited to `requestedCount`; an empty array if no valid SVGs are found.
+ */
 function parseSvgVariationsFromText(text: string, requestedCount: number): string[] {
   const parsedJson = parseJsonCandidate(text);
   if (!parsedJson) {
@@ -105,6 +128,16 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
   return [...uniqueSvgs].slice(0, requestedCount);
 }
 
+/**
+ * Aggregate and return up to `requestedCount` unique, normalized SVG markups found across multiple model responses.
+ *
+ * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, validating and normalizing each SVG and collecting unique results across responses until the requested count is reached. If that yields no valid SVGs, falls back to extracting and normalizing raw SVG markup directly from each response. The `requestedCount` is coerced to a positive integer.
+ *
+ * @param responses - Array of textual model responses to search for SVG variations
+ * @param requestedCount - Maximum number of unique SVGs to return; coerced to a positive integer
+ * @returns An array of up to `requestedCount` unique, normalized SVG markup strings
+ * @throws Error if no valid SVG variations can be extracted from any response
+ */
 export function parseSvgVariationsFromResponses(
   responses: string[],
   requestedCount: number,

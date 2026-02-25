@@ -144,6 +144,12 @@ export class GenerateSvgUseCase {
   }
 }
 
+/**
+ * Sanitize an array of SVG markup strings and remove any entries that fail validation.
+ *
+ * @param svgs - Array of raw SVG markup strings to sanitize
+ * @returns An array of sanitized SVG markup strings with any invalid or empty results removed
+ */
 function sanitizeGeneratedSvgs(svgs: string[]): string[] {
   return svgs.map((svg) => sanitizeSvgMarkup(svg)).filter((svg): svg is string => Boolean(svg));
 }
