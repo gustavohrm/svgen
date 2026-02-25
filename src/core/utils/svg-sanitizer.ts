@@ -169,6 +169,7 @@ const BLOCKED_TAG_PATTERN = new RegExp(
 const INLINE_EVENT_PATTERN = /\son[a-z][\w:-]*\s*=/i;
 const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const STYLE_PLACEHOLDER_PREFIX = "__svgen_style_placeholder__";
+const STYLE_PLACEHOLDER_FALLBACK_PREFIX = "fallback";
 export const MAX_STYLE_BLOCKS = 4;
 export const MAX_STYLE_CHARS = 5_000;
 const MAX_STYLE_ATTR_CHARS = 1_500;
@@ -205,6 +206,8 @@ interface StyleExtractionResult {
   svgWithoutStyles: string;
   styleBlocks: ExtractedStyleBlock[];
 }
+
+let stylePlaceholderFallbackCounter = 0;
 
 export function sanitizeSvgMarkup(rawSvg: string): string | null {
   const source = rawSvg.trim();
@@ -319,11 +322,6 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
       }
 
       const placeholderId = generateUniqueStylePlaceholderId(existingDescIds);
-      if (placeholderId === null) {
-        hasInvalidStyle = true;
-        return "";
-      }
-
       styleBlocks.push({ placeholderId, cssText: sanitizedCss });
       return `<desc id="${placeholderId}"></desc>`;
     },
@@ -354,15 +352,11 @@ function collectDescIds(source: string): Set<string> {
   return ids;
 }
 
-function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string | null {
+function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string {
   let placeholderId = "";
 
   do {
     const suffix = createRandomSuffix();
-    if (suffix === null) {
-      return null;
-    }
-
     placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${suffix}`;
   } while (existingDescIds.has(placeholderId));
 
@@ -370,13 +364,13 @@ function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string 
   return placeholderId;
 }
 
-function createRandomSuffix(): string | null {
+function createRandomSuffix(): string {
   const randomBytes = getSecureRandomBytes(8);
-  if (!randomBytes) {
-    return null;
+  if (randomBytes) {
+    return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   }
 
-  return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${STYLE_PLACEHOLDER_FALLBACK_PREFIX}${(stylePlaceholderFallbackCounter += 1).toString(36)}`;
 }
 
 function normalizeCssAtRule(rule: string): string {
@@ -390,16 +384,28 @@ function normalizeCssAtRule(rule: string): string {
 
 function getSecureRandomBytes(size: number): Uint8Array | null {
   if (typeof globalThis.crypto?.getRandomValues === "function") {
-    return globalThis.crypto.getRandomValues(new Uint8Array(size));
+    try {
+      return globalThis.crypto.getRandomValues(new Uint8Array(size));
+    } catch {
+      // Fall through to alternate crypto sources.
+    }
   }
 
   const nodeCrypto = getNodeCryptoModule();
   if (typeof nodeCrypto?.webcrypto?.getRandomValues === "function") {
-    return nodeCrypto.webcrypto.getRandomValues(new Uint8Array(size));
+    try {
+      return nodeCrypto.webcrypto.getRandomValues(new Uint8Array(size));
+    } catch {
+      // Fall through to node randomBytes.
+    }
   }
 
   if (typeof nodeCrypto?.randomBytes === "function") {
-    return Uint8Array.from(nodeCrypto.randomBytes(size));
+    try {
+      return Uint8Array.from(nodeCrypto.randomBytes(size));
+    } catch {
+      return null;
+    }
   }
 
   return null;

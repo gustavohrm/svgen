@@ -110,6 +110,76 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).not.toMatch(/<desc id="__svgen_style_placeholder__[^"]*"><\/desc>/);
   });
 
+  it("keeps safe styled SVGs when crypto random APIs are unavailable", () => {
+    const originalCrypto = globalThis.crypto;
+    const processWithBuiltin = process as typeof process & {
+      getBuiltinModule?: (id: string) => unknown;
+    };
+    const originalGetBuiltinModule = processWithBuiltin.getBuiltinModule;
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+    Object.defineProperty(processWithBuiltin, "getBuiltinModule", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+
+    try {
+      const result = sanitizeSvgMarkup(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{opacity:.5}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+      );
+
+      expect(result).not.toBeNull();
+      expect(result).toContain("<style>");
+      expect(result).toContain(".shape{opacity:.5}");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto,
+        writable: true,
+      });
+      Object.defineProperty(processWithBuiltin, "getBuiltinModule", {
+        configurable: true,
+        value: originalGetBuiltinModule,
+        writable: true,
+      });
+    }
+  });
+
+  it("falls back when crypto.getRandomValues throws", () => {
+    const originalCrypto = globalThis.crypto;
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: {
+        getRandomValues: () => {
+          throw new Error("random source unavailable");
+        },
+      },
+      writable: true,
+    });
+
+    try {
+      const result = sanitizeSvgMarkup(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{opacity:.5}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+      );
+
+      expect(result).not.toBeNull();
+      expect(result).toContain("<style>");
+      expect(result).toContain(".shape{opacity:.5}");
+    } finally {
+      Object.defineProperty(globalThis, "crypto", {
+        configurable: true,
+        value: originalCrypto,
+        writable: true,
+      });
+    }
+  });
+
   it("keeps broader permissive animation-safe CSS properties", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#0ff"/></linearGradient></defs><style>@keyframes pulse{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}} .shape{animation:pulse 1.2s ease-in-out infinite;fill:url(#g);stroke:#111;stroke-linecap:round;stroke-linejoin:round;mix-blend-mode:multiply;paint-order:stroke fill markers;--local-alpha:.85;fill-opacity:var(--local-alpha)}</style><rect class="shape" x="3" y="3" width="18" height="18" rx="3"/></svg>',
