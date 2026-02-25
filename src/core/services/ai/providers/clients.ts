@@ -113,11 +113,7 @@ function isStructuredOutputUnsupportedError(status: number, errorText: string): 
     normalized.includes("unknown field") ||
     normalized.includes("invalid");
 
-  if (!indicatesStructuredOutputIssue) {
-    return false;
-  }
-
-  return indicatesUnsupported || (status >= 400 && status < 500);
+  return indicatesStructuredOutputIssue && indicatesUnsupported;
 }
 
 function parseGoogleCandidateText(candidate: {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { extractSvgFromResult } from "../../utils/svg-parser";
+import { normalizePositiveInt } from "../../utils/number";
 
 const svgVariationsPayloadSchema = z.object({
   svgs: z.array(z.string().min(1)).min(1),
@@ -36,14 +37,6 @@ export const GCP_SVG_VARIATIONS_SCHEMA = {
     },
   },
 } as const;
-
-function normalizeRequestedCount(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 1;
-  }
-
-  return Math.max(1, Math.floor(value));
-}
 
 function normalizeSvgMarkup(svg: string): string | null {
   const extracted = extractSvgFromResult(svg).trim();
@@ -108,14 +101,14 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
     }
   }
 
-  return [...uniqueSvgs].slice(0, normalizeRequestedCount(requestedCount));
+  return [...uniqueSvgs].slice(0, normalizePositiveInt(requestedCount));
 }
 
 export function parseSvgVariationsFromResponses(
   responses: string[],
   requestedCount: number,
 ): string[] {
-  const normalizedCount = normalizeRequestedCount(requestedCount);
+  const normalizedCount = normalizePositiveInt(requestedCount);
   const parsedSvgs = new Set<string>();
 
   for (const response of responses) {

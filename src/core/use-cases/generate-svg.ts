@@ -1,5 +1,6 @@
 import { AppSettings } from "../modules/db/index";
 import { AiProviderId } from "../types";
+import { normalizePositiveInt } from "../utils/number";
 import { sanitizeSvgMarkup } from "../utils/svg-sanitizer";
 
 export interface GenerateSvgRequest {
@@ -85,7 +86,9 @@ export class GenerateSvgUseCase {
     }
 
     try {
-      const requestedVariations = variations || settings.variations || 4;
+      const requestedVariationsInput =
+        Number.isFinite(variations) && variations > 0 ? variations : (settings.variations ?? 4);
+      const requestedVariations = normalizePositiveInt(requestedVariationsInput);
       const generatedSvgs = await this.aiService.generateMultiple(
         {
           prompt,

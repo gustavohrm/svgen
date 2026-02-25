@@ -1,5 +1,6 @@
 import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
+import { normalizePositiveInt } from "../../utils/number";
 import { SVG_VARIATIONS_JSON_SCHEMA } from "./structured-output";
 
 export interface SettingsRepository {
@@ -55,7 +56,7 @@ export class AiService {
 
   /** @internal */
   buildUserPrompt(userPrompt: string, variationCount: number): string {
-    const normalizedVariationCount = normalizeVariationCount(variationCount);
+    const normalizedVariationCount = normalizePositiveInt(variationCount);
 
     return `<generation_request>
   <variation_count>${normalizedVariationCount}</variation_count>
@@ -121,14 +122,6 @@ export function createAiService(
   providerRegistry: ProviderRegistry,
 ): AiService {
   return new AiService(settingsRepository, providerRegistry);
-}
-
-function normalizeVariationCount(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 1;
-  }
-
-  return Math.max(1, Math.floor(value));
 }
 
 function toCdata(value: string): string {
