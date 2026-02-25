@@ -74,6 +74,10 @@ function getFilteredModels(models: ModelEntry[], state: SettingsState): ModelEnt
   }
 
   filtered.sort((a, b) => {
+    if (a.isSelected !== b.isSelected) {
+      return a.isSelected ? -1 : 1;
+    }
+
     const comparison = a.model.localeCompare(b.model);
     return state.sortDirection === "asc" ? comparison : -comparison;
   });

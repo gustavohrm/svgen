@@ -116,6 +116,35 @@ describe("settings page model selection workflows", () => {
     expect(toggleModelSelectionMock).toHaveBeenCalledWith("gcp-key", "gemini-2.5-flash", false);
   });
 
+  it("shows selected models first in the table", async () => {
+    getSettingsMock.mockReturnValue({
+      apiKeys: [
+        {
+          id: "gcp-key",
+          providerId: "gcp",
+          name: "GCP",
+          value: "secret",
+          createdAt: 1,
+          selectedModels: ["gemini-2.5-pro"],
+          availableModels: ["gemini-2.5-flash", "gemini-2.5-pro"],
+        },
+      ],
+      activeKeys: { gcp: "gcp-key" },
+      variations: 4,
+      temperature: 0.7,
+      systemPrompt: "",
+    });
+
+    await importSettingsPageModule();
+    document.dispatchEvent(new Event("DOMContentLoaded"));
+
+    const modelOrder = Array.from(
+      document.querySelectorAll<HTMLInputElement>(".model-checkbox"),
+    ).map((checkbox) => checkbox.value);
+
+    expect(modelOrder).toEqual(["gemini-2.5-pro", "gemini-2.5-flash"]);
+  });
+
   it("applies select-all updates with batched repository command", async () => {
     await importSettingsPageModule();
     document.dispatchEvent(new Event("DOMContentLoaded"));
