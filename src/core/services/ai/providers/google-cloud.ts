@@ -4,8 +4,8 @@ import {
   ProviderConfigField,
   AiProviderId,
 } from "../../../types/index";
-import { extractSvgFromResult } from "../../../utils/svg-parser";
 import { FetchGoogleCloudClient, GoogleCloudClient } from "./clients";
+import { parseSvgVariationsFromResponses } from "../structured-output";
 
 export class GoogleCloudProvider implements AiProvider {
   constructor(private readonly client: GoogleCloudClient = new FetchGoogleCloudClient()) {}
@@ -40,15 +40,14 @@ export class GoogleCloudProvider implements AiProvider {
       throw new Error("GCP (Gemini) API key is required");
     }
 
-    const candidates = await this.client.generate({
+    const responses = await this.client.generate({
       prompt,
       systemPrompt,
       model,
       apiKey,
-      count,
       temperature,
     });
 
-    return candidates.map((candidate) => extractSvgFromResult(candidate));
+    return parseSvgVariationsFromResponses(responses, count);
   }
 }

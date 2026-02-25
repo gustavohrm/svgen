@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { GCP_SVG_VARIATIONS_SCHEMA, SVG_VARIATIONS_JSON_SCHEMA } from "../structured-output";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+
+const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
 
 const openRouterModelsResponseSchema = z.object({
   data: z.array(
@@ -47,6 +50,86 @@ const gcpGenerateResponseSchema = z.object({
   ),
 });
 
+function formatRequestTarget(input: RequestInfo | URL): string {
+  if (typeof input === "string") {
+    return input;
+  }
+
+  if (input instanceof URL) {
+    return input.toString();
+  }
+
+  return input.url;
+}
+
+function isAbortError(error: unknown): boolean {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
+async function fetchWithTimeout(
+  fetchImpl: FetchLike,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  let didTimeout = false;
+  let hasUpstreamAbortListener = false;
+
+  const abortFromUpstream = () => {
+    controller.abort(upstreamSignal?.reason);
+  };
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      controller.abort(upstreamSignal.reason);
+    } else {
+      upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+      hasUpstreamAbortListener = true;
+    }
+  }
+
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetchImpl(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const target = formatRequestTarget(input);
+
+    if (didTimeout) {
+      throw new Error(`Request to ${target} timed out after ${timeoutMs}ms.`);
+    }
+
+    if (controller.signal.aborted || isAbortError(error)) {
+      throw new Error(`Request to ${target} was aborted before completion.`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+
+    if (upstreamSignal && hasUpstreamAbortListener) {
+      upstreamSignal.removeEventListener("abort", abortFromUpstream);
+    }
+  }
+}
+
 function parseOpenRouterMessageContent(
   content: string | Array<{ text?: string }> | undefined,
 ): string {
@@ -71,7 +154,6 @@ export interface OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
     appOrigin: string;
     appName: string;
@@ -85,20 +167,81 @@ export interface GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
   }): Promise<string[]>;
 }
 
+/**
+ * Detects whether a 4xx HTTP error indicates the API does not support structured output.
+ *
+ * @param status - The HTTP response status code
+ * @param errorText - The response body or error message text
+ * @returns `true` if the status is between 400 and 499 and the error text suggests structured-output fields (e.g., `response_format`, `json_schema`, `responseMimeType`) are unsupported or invalid, `false` otherwise.
+ */
+function isStructuredOutputUnsupportedError(status: number, errorText: string): boolean {
+  if (status < 400 || status >= 500) {
+    return false;
+  }
+
+  const normalized = errorText.toLowerCase();
+  const indicatesStructuredOutputIssue =
+    normalized.includes("response_format") ||
+    normalized.includes("json_schema") ||
+    normalized.includes("response schema") ||
+    normalized.includes("responseschema") ||
+    normalized.includes("responsemime") ||
+    normalized.includes("responsemimetype") ||
+    normalized.includes("structured output");
+  const indicatesUnsupported =
+    normalized.includes("not support") ||
+    normalized.includes("unsupported") ||
+    normalized.includes("not available") ||
+    normalized.includes("not recognized") ||
+    normalized.includes("unrecognized") ||
+    normalized.includes("unknown") ||
+    normalized.includes("unknown field") ||
+    normalized.includes("invalid");
+
+  return indicatesStructuredOutputIssue && indicatesUnsupported;
+}
+
+/**
+ * Extracts and concatenates text parts from a Google Cloud generate candidate's content.
+ *
+ * Iterates candidate.content.parts, keeps only string `text` values, and joins them with newline characters. Returns an empty string if no text parts are present.
+ *
+ * @param candidate - The candidate object returned by Google Cloud Generate which may include `content.parts` with optional `text` fields.
+ * @returns The concatenated text parts separated by `\n`, or an empty string if none.
+ */
+function parseGoogleCandidateText(candidate: {
+  content?: {
+    parts?: Array<{ text?: string }>;
+  };
+}): string {
+  const parts = candidate.content?.parts ?? [];
+  return parts
+    .map((part) => (typeof part.text === "string" ? part.text : ""))
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
 export class FetchOpenRouterClient implements OpenRouterClient {
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = fetch,
+    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+  ) {}
 
   async fetchModels(apiKey: string): Promise<string[]> {
-    const response = await this.fetchImpl("https://openrouter.ai/api/v1/models", {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+    const response = await fetchWithTimeout(
+      this.fetchImpl,
+      "https://openrouter.ai/api/v1/models",
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       },
-    });
+      this.requestTimeoutMs,
+    );
 
     if (!response.ok) {
       throw new Error("Failed to fetch OpenRouter models");
@@ -113,35 +256,76 @@ export class FetchOpenRouterClient implements OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
     appOrigin: string;
     appName: string;
   }): Promise<string[]> {
-    const response = await this.fetchImpl("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${options.apiKey}`,
-        "HTTP-Referer": options.appOrigin,
-        "X-Title": options.appName,
+    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${options.apiKey}`,
+      "HTTP-Referer": options.appOrigin,
+      "X-Title": options.appName,
+    };
+
+    const baseBody = {
+      model: options.model,
+      messages: [
+        { role: "system", content: options.systemPrompt },
+        { role: "user", content: options.prompt },
+      ],
+      temperature: options.temperature,
+    };
+
+    const structuredBody = {
+      ...baseBody,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "svg_variations",
+          strict: true,
+          schema: SVG_VARIATIONS_JSON_SCHEMA,
+        },
       },
-      body: JSON.stringify({
-        model: options.model,
-        messages: [
-          { role: "system", content: options.systemPrompt },
-          { role: "user", content: options.prompt },
-        ],
-        n: options.count,
-        temperature: options.temperature,
-      }),
-    });
+    };
+
+    let response = await fetchWithTimeout(
+      this.fetchImpl,
+      endpoint,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(structuredBody),
+      },
+      this.requestTimeoutMs,
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`,
+
+      if (!isStructuredOutputUnsupportedError(response.status, errorText)) {
+        throw new Error(
+          `OpenRouter API error: ${response.status} ${response.statusText} - ${errorText}`,
+        );
+      }
+
+      response = await fetchWithTimeout(
+        this.fetchImpl,
+        endpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(baseBody),
+        },
+        this.requestTimeoutMs,
       );
+
+      if (!response.ok) {
+        const fallbackErrorText = await response.text();
+        throw new Error(
+          `OpenRouter API error: ${response.status} ${response.statusText} - ${fallbackErrorText}`,
+        );
+      }
     }
 
     const payload = openRouterGenerateResponseSchema.parse(await response.json());
@@ -150,11 +334,17 @@ export class FetchOpenRouterClient implements OpenRouterClient {
 }
 
 export class FetchGoogleCloudClient implements GoogleCloudClient {
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = fetch,
+    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+  ) {}
 
   async fetchModels(apiKey: string): Promise<string[]> {
-    const response = await this.fetchImpl(
+    const response = await fetchWithTimeout(
+      this.fetchImpl,
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      {},
+      this.requestTimeoutMs,
     );
 
     if (!response.ok) {
@@ -172,10 +362,15 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
-    count: number;
     temperature?: number;
   }): Promise<string[]> {
-    const payload = {
+    const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`;
+
+    const baseGenerationConfig = {
+      temperature: options.temperature,
+    };
+
+    const structuredPayload = {
       system_instruction: {
         parts: [{ text: options.systemPrompt }],
       },
@@ -186,28 +381,60 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
         },
       ],
       generationConfig: {
-        candidateCount: options.count,
-        temperature: options.temperature,
+        ...baseGenerationConfig,
+        responseMimeType: "application/json",
+        responseSchema: GCP_SVG_VARIATIONS_SCHEMA,
       },
     };
 
-    const response = await this.fetchImpl(
-      `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`,
+    const fallbackPayload = {
+      system_instruction: structuredPayload.system_instruction,
+      contents: structuredPayload.contents,
+      generationConfig: baseGenerationConfig,
+    };
+
+    let response = await fetchWithTimeout(
+      this.fetchImpl,
+      generateUrl,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(structuredPayload),
       },
+      this.requestTimeoutMs,
     );
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
+
+      if (!isStructuredOutputUnsupportedError(response.status, errorText)) {
+        throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      response = await fetchWithTimeout(
+        this.fetchImpl,
+        generateUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(fallbackPayload),
+        },
+        this.requestTimeoutMs,
+      );
+
+      if (!response.ok) {
+        const fallbackErrorText = await response.text();
+        throw new Error(
+          `GCP API error: ${response.status} ${response.statusText} - ${fallbackErrorText}`,
+        );
+      }
     }
 
     const parsed = gcpGenerateResponseSchema.parse(await response.json());
-    return parsed.candidates.map((candidate) => candidate.content?.parts?.[0]?.text ?? "");
+    return parsed.candidates.map((candidate) => parseGoogleCandidateText(candidate));
   }
 }

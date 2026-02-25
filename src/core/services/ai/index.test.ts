@@ -37,20 +37,52 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const prompt = service.buildSystemPrompt();
     expect(prompt).toContain("expert SVG designer");
-    expect(prompt).toContain("Output contract");
-    expect(prompt).toContain("Return exactly one complete <svg>...</svg>");
+    expect(prompt).toContain("<system_instructions>");
+    expect(prompt).toContain("<response_contract>");
+    expect(prompt).toContain('"svgs"');
   });
 
   it("should build system prompt with references", () => {
     const prompt = service.buildSystemPrompt(["<svg>ref</svg>"]);
-    expect(prompt).toContain("Reference SVGs");
+    expect(prompt).toContain("<reference_svgs>");
+    expect(prompt).toContain('<reference index="1">');
     expect(prompt).toContain("<svg>ref</svg>");
   });
 
   it("should use custom system prompt when provided", () => {
     const prompt = service.buildSystemPrompt([], "Always prefer monochrome icon style.");
     expect(prompt).toContain("Always prefer monochrome icon style.");
-    expect(prompt).toContain("Output contract");
+    expect(prompt).toContain("<response_contract>");
+  });
+
+  it("should keep XML well-formed when custom system prompt contains CDATA terminator", () => {
+    const customPrompt = "Always prefer monochrome icon style ]]> with bold geometry.";
+    const prompt = service.buildSystemPrompt([], customPrompt);
+
+    expect(prompt).toContain("<system_instructions><![CDATA[");
+    expect(prompt).toContain(
+      "Always prefer monochrome icon style ]]]]><![CDATA[> with bold geometry.",
+    );
+    expect(prompt).not.toContain("Always prefer monochrome icon style ]]> with bold geometry.");
+    expect(prompt).toContain("<response_contract>");
+  });
+
+  it("should build XML-scoped user prompt for generation", () => {
+    const prompt = service.buildUserPrompt("draw an orbit icon", 3);
+
+    expect(prompt).toContain("<generation_request>");
+    expect(prompt).toContain("<variation_count>3</variation_count>");
+    expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
+  });
+
+  it("should keep XML well-formed when user prompt contains CDATA terminator", () => {
+    const prompt = service.buildUserPrompt("test ]]> end", 2);
+
+    expect(prompt).toContain("<generation_request>");
+    expect(prompt).toContain("<user_prompt><![CDATA[");
+    expect(prompt).toContain("]]]]><![CDATA[>");
+    expect(prompt).toContain("end]]></user_prompt>");
+    expect(prompt).not.toContain("test ]]></user_prompt>");
   });
 
   it("should generate SVG using injected provider", async () => {
@@ -66,11 +98,14 @@ describe("AiService", () => {
     expect(mockProviderRegistry.getProvider).toHaveBeenCalledWith("gcp");
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({
-        prompt: "draw a circle",
         apiKey: "test-key",
         temperature: 0.7,
       }),
     );
+
+    const providerCall = (mockProvider.generate as any).mock.calls[0][0];
+    expect(providerCall.prompt).toContain("<generation_request>");
+    expect(providerCall.prompt).toContain("<user_prompt><![CDATA[draw a circle]]></user_prompt>");
   });
 
   it("should generate multiple SVGs in a single request", async () => {
@@ -90,8 +125,23 @@ describe("AiService", () => {
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({
         count: 2,
+        prompt: expect.stringContaining("<variation_count>2</variation_count>"),
       }),
     );
+  });
+
+  it("should normalize count consistently for prompt and provider", async () => {
+    const options: Omit<GenerateOptions, "apiKey"> = {
+      prompt: "draw a circle",
+      model: "gemini-pro",
+      providerId: "gcp",
+    };
+
+    await service.generateMultiple(options, 2.9);
+
+    const providerCall = (mockProvider.generate as any).mock.calls[0][0];
+    expect(providerCall.count).toBe(2);
+    expect(providerCall.prompt).toContain("<variation_count>2</variation_count>");
   });
 
   it("should throw error if no active key", async () => {

@@ -1,5 +1,6 @@
 import { AppSettings } from "../modules/db/index";
 import { AiProviderId } from "../types";
+import { normalizePositiveInt } from "../utils/number";
 import { sanitizeSvgMarkup } from "../utils/svg-sanitizer";
 
 export interface GenerateSvgRequest {
@@ -85,8 +86,10 @@ export class GenerateSvgUseCase {
     }
 
     try {
-      const requestedVariations = variations || settings.variations || 4;
-      const generatedSvgs = await this.generateWithFallback(
+      const requestedVariationsInput =
+        Number.isFinite(variations) && variations > 0 ? variations : (settings.variations ?? 4);
+      const requestedVariations = normalizePositiveInt(requestedVariationsInput);
+      const generatedSvgs = await this.aiService.generateMultiple(
         {
           prompt,
           referenceSvgs,
@@ -101,14 +104,27 @@ export class GenerateSvgUseCase {
         throw new Error("Generated SVG content failed validation and was blocked.");
       }
 
+      let hasWarnings = false;
+
       if (safeResults.length < generatedSvgs.length) {
+        hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
           message: "One or more SVG results were blocked because they failed security validation.",
         });
       }
 
-      this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
+      if (generatedSvgs.length < requestedVariations) {
+        hasWarnings = true;
+        this.uiAdapter.notify({
+          type: "warning",
+          message: `Model returned ${generatedSvgs.length} of ${requestedVariations} requested variations before sanitization.`,
+        });
+      }
+
+      if (!hasWarnings && safeResults.length === requestedVariations) {
+        this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
+      }
       return {
         svgs: safeResults,
         prompt,
@@ -126,39 +142,14 @@ export class GenerateSvgUseCase {
       return { svgs: [] };
     }
   }
-
-  private async generateWithFallback(
-    options: {
-      prompt: string;
-      referenceSvgs: string[];
-      model: string;
-      providerId: AiProviderId;
-    },
-    requestedVariations: number,
-  ): Promise<string[]> {
-    try {
-      return await this.aiService.generateMultiple(options, requestedVariations);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "";
-      const shouldFallbackToSingle =
-        options.providerId === "gcp" &&
-        requestedVariations > 1 &&
-        /Multiple candidates is not enabled for this model/i.test(errorMessage);
-
-      if (!shouldFallbackToSingle) {
-        throw error;
-      }
-
-      this.uiAdapter.notify({
-        type: "warning",
-        message: `Model ${options.model} does not support multiple candidates. Generated 1 variation instead.`,
-      });
-
-      return this.aiService.generateMultiple(options, 1);
-    }
-  }
 }
 
+/**
+ * Sanitize an array of SVG markup strings and remove any entries that fail validation.
+ *
+ * @param svgs - Array of raw SVG markup strings to sanitize
+ * @returns An array of sanitized SVG markup strings with any invalid or empty results removed
+ */
 function sanitizeGeneratedSvgs(svgs: string[]): string[] {
   return svgs.map((svg) => sanitizeSvgMarkup(svg)).filter((svg): svg is string => Boolean(svg));
 }

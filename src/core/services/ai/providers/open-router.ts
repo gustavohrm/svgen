@@ -4,8 +4,8 @@ import {
   ProviderConfigField,
   AiProviderId,
 } from "../../../types/index";
-import { extractSvgFromResult } from "../../../utils/svg-parser";
 import { FetchOpenRouterClient, OpenRouterClient } from "./clients";
+import { parseSvgVariationsFromResponses } from "../structured-output";
 
 export class OpenRouterProvider implements AiProvider {
   constructor(private readonly client: OpenRouterClient = new FetchOpenRouterClient()) {}
@@ -47,17 +47,16 @@ export class OpenRouterProvider implements AiProvider {
       throw new Error("OpenRouter API key is required");
     }
 
-    const choices = await this.client.generate({
+    const responses = await this.client.generate({
       prompt,
       systemPrompt,
       model,
       apiKey,
-      count,
       temperature,
       appOrigin: typeof window === "undefined" ? "http://localhost" : window.location.origin,
       appName: "SVGen",
     });
 
-    return choices.map((choice) => extractSvgFromResult(choice));
+    return parseSvgVariationsFromResponses(responses, count);
   }
 }

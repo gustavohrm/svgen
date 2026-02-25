@@ -44,7 +44,13 @@ describe("GoogleCloudProvider", () => {
       candidates: [
         {
           content: {
-            parts: [{ text: "The result is: <svg>gcp-test</svg>" }],
+            parts: [
+              {
+                text: JSON.stringify({
+                  svgs: ["<svg>gcp-test-1</svg>", "<svg>gcp-test-2</svg>"],
+                }),
+              },
+            ],
           },
         },
       ],
@@ -60,14 +66,105 @@ describe("GoogleCloudProvider", () => {
       systemPrompt: "test",
       model: "test-model",
       apiKey: "test-key",
+      count: 2,
       temperature: 0.3,
     });
 
-    expect(result).toEqual(["<svg>gcp-test</svg>"]);
+    expect(result).toEqual(["<svg>gcp-test-1</svg>", "<svg>gcp-test-2</svg>"]);
 
     const fetchCall = (global.fetch as any).mock.calls[0];
     const payload = JSON.parse(fetchCall[1].body);
     expect(payload.generationConfig.temperature).toBe(0.3);
+    expect(payload.generationConfig.responseMimeType).toBe("application/json");
+  });
+
+  it("should accumulate parsed variations across multiple candidates", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      svgs: ["<svg>candidate-1</svg>"],
+                    }),
+                  },
+                ],
+              },
+            },
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      svgs: ["<svg>candidate-2</svg>"],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = await provider.generate({
+      prompt: "test",
+      systemPrompt: "test",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 2,
+    });
+
+    expect(result).toEqual(["<svg>candidate-1</svg>", "<svg>candidate-2</svg>"]);
+  });
+
+  it("should retry without structured output when model does not support schema", async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: () => Promise.resolve("responseSchema is not supported for this model"),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        svgs: ["<svg>fallback</svg>"],
+                      }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+      });
+
+    const result = await provider.generate({
+      prompt: "test",
+      systemPrompt: "test",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 1,
+    });
+
+    expect(result).toEqual(["<svg>fallback</svg>"]);
+    expect((global.fetch as any).mock.calls).toHaveLength(2);
+
+    const firstPayload = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(firstPayload.generationConfig.responseSchema).toBeDefined();
+
+    const secondPayload = JSON.parse((global.fetch as any).mock.calls[1][1].body);
+    expect(secondPayload.generationConfig.responseSchema).toBeUndefined();
   });
 
   it("should throw error if no API key is provided", async () => {

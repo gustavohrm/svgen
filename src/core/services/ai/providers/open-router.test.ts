@@ -37,7 +37,9 @@ describe("OpenRouterProvider", () => {
       choices: [
         {
           message: {
-            content: "Here is your SVG: <svg>test</svg>",
+            content: JSON.stringify({
+              svgs: ["<svg>test-1</svg>", "<svg>test-2</svg>"],
+            }),
           },
         },
       ],
@@ -53,14 +55,93 @@ describe("OpenRouterProvider", () => {
       systemPrompt: "test system prompt",
       model: "test-model",
       apiKey: "test-key",
+      count: 2,
       temperature: 1.1,
     });
 
-    expect(result).toEqual(["<svg>test</svg>"]);
+    expect(result).toEqual(["<svg>test-1</svg>", "<svg>test-2</svg>"]);
 
     const fetchCall = (global.fetch as any).mock.calls[0];
     const payload = JSON.parse(fetchCall[1].body);
     expect(payload.temperature).toBe(1.1);
+    expect(payload.response_format.type).toBe("json_schema");
+  });
+
+  it("should accumulate parsed variations across multiple responses", async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  svgs: ["<svg>from-choice-1</svg>"],
+                }),
+              },
+            },
+            {
+              message: {
+                content: JSON.stringify({
+                  svgs: ["<svg>from-choice-2</svg>"],
+                }),
+              },
+            },
+          ],
+        }),
+    });
+
+    const result = await provider.generate({
+      prompt: "test prompt",
+      systemPrompt: "test system prompt",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 2,
+    });
+
+    expect(result).toEqual(["<svg>from-choice-1</svg>", "<svg>from-choice-2</svg>"]);
+  });
+
+  it("should fall back to plain prompt when structured output is unsupported", async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: () => Promise.resolve("response_format json_schema is not supported for this model"),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    svgs: ["<svg>fallback</svg>"],
+                  }),
+                },
+              },
+            ],
+          }),
+      });
+
+    const result = await provider.generate({
+      prompt: "test prompt",
+      systemPrompt: "test system prompt",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 1,
+    });
+
+    expect(result).toEqual(["<svg>fallback</svg>"]);
+    expect((global.fetch as any).mock.calls).toHaveLength(2);
+
+    const firstPayload = JSON.parse((global.fetch as any).mock.calls[0][1].body);
+    expect(firstPayload.response_format).toBeDefined();
+
+    const secondPayload = JSON.parse((global.fetch as any).mock.calls[1][1].body);
+    expect(secondPayload.response_format).toBeUndefined();
   });
 
   it("should throw error when generation fails", async () => {
