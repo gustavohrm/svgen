@@ -144,6 +144,47 @@ describe("OpenRouterProvider", () => {
     expect(secondPayload.response_format).toBeUndefined();
   });
 
+  it("should retry fallback request when fallback generation times out", async () => {
+    (global.fetch as any)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: () => Promise.resolve("response_format json_schema is not supported for this model"),
+      })
+      .mockRejectedValueOnce(
+        new Error(
+          "Request to https://openrouter.ai/api/v1/chat/completions timed out after 120000ms.",
+        ),
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    svgs: ["<svg>fallback-timeout-retry</svg>"],
+                  }),
+                },
+              },
+            ],
+          }),
+      });
+
+    const result = await provider.generate({
+      prompt: "test prompt",
+      systemPrompt: "test system prompt",
+      model: "test-model",
+      apiKey: "test-key",
+      count: 1,
+    });
+
+    expect(result).toEqual(["<svg>fallback-timeout-retry</svg>"]);
+    expect((global.fetch as any).mock.calls).toHaveLength(3);
+  });
+
   it("should throw error when generation fails", async () => {
     (global.fetch as any).mockResolvedValue({
       ok: false,

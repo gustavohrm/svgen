@@ -173,4 +173,65 @@ describe("GenerateSvgUseCase", () => {
       message: "SVGs generated successfully",
     });
   });
+
+  it("shows user-friendly timeout message when generation exceeds timeout", async () => {
+    generateMultipleMock.mockRejectedValue(
+      new Error("Request to https://provider.example timed out after 120000ms."),
+    );
+
+    const result = await useCase.execute({
+      prompt: "draw a badge",
+      referenceSvgs: [],
+      model: "gemini-2.5-flash",
+      providerId: "gcp",
+      variations: 2,
+    });
+
+    expect(result).toEqual({ svgs: [] });
+    expect(uiAdapter.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringContaining("timed out"),
+      }),
+    );
+  });
+
+  it("shows user-friendly rate-limit message", async () => {
+    vi.mocked(settingsRepository.getSettings).mockReturnValue({
+      apiKeys: [
+        {
+          id: "key-or",
+          providerId: "open-router",
+          name: "Primary OpenRouter key",
+          value: "secret",
+          createdAt: Date.now(),
+          selectedModels: [],
+        },
+      ],
+      activeKeys: { "open-router": "key-or" },
+      variations: 4,
+      temperature: 0.7,
+      systemPrompt: "",
+    });
+
+    generateMultipleMock.mockRejectedValue(
+      new Error("OpenRouter API error: 429 Too Many Requests - rate limit exceeded"),
+    );
+
+    const result = await useCase.execute({
+      prompt: "draw a badge",
+      referenceSvgs: [],
+      model: "openai/gpt-4.1-mini",
+      providerId: "open-router",
+      variations: 2,
+    });
+
+    expect(result).toEqual({ svgs: [] });
+    expect(uiAdapter.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "error",
+        message: expect.stringContaining("Rate limit reached"),
+      }),
+    );
+  });
 });
