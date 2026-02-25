@@ -153,6 +153,8 @@ const ALLOWED_SVG_ATTRS = [
   "scale",
 ] as const;
 
+// Keep entries lowercase: BLOCKED_TAG_PATTERN uses case-insensitive matching and
+// DOMPurify normalizes tag names internally.
 const BLOCKED_TAG_NAMES = new Set<string>([
   "script",
   "foreignobject",
@@ -208,7 +210,7 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
     USE_PROFILES: { svg: true, svgFilters: true },
     ALLOWED_TAGS: [...ALLOWED_SVG_TAGS],
     ALLOWED_ATTR: [...ALLOWED_SVG_ATTRS],
-    FORBID_TAGS: Array.from(BLOCKED_TAG_NAMES),
+    FORBID_TAGS: Array.from(BLOCKED_TAG_NAMES).map((tagName) => tagName.toLowerCase()),
   });
 
   if (typeof sanitized !== "string" || !sanitized.trim()) {
@@ -219,6 +221,10 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
   const root = documentNode.documentElement;
   if (!root || root.nodeName.toLowerCase() !== "svg") {
     return null;
+  }
+
+  for (const styleElement of Array.from(documentNode.querySelectorAll("style"))) {
+    styleElement.remove();
   }
 
   if (documentNode.querySelector("parsererror") || containsBlockedElements(root)) {
@@ -346,6 +352,10 @@ function isSafeCssStylesheet(css: string): boolean {
       const atRuleNameMatch = css.slice(index).match(/^@([a-z-]+)/i);
       const atRuleName = atRuleNameMatch?.[1]?.toLowerCase();
       if (!atRuleName || !ALLOWED_CSS_AT_RULES.has(atRuleName)) {
+        return false;
+      }
+
+      if (atRuleName !== "keyframes") {
         return false;
       }
 
@@ -494,6 +504,7 @@ function isSafeCssDeclarations(block: string): boolean {
       return false;
     }
 
+    // Custom properties are intentionally allowed for SVG-local theming variables.
     if (!ALLOWED_CSS_PROPERTIES.has(property) && !isAllowedCustomProperty(property)) {
       return false;
     }

@@ -66,6 +66,24 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("--local-alpha:.85");
   });
 
+  it("keeps expected SVG custom properties with safe values", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{--local-opacity:.5;opacity:var(--local-opacity)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("--local-opacity:.5");
+    expect(result).toContain("opacity:var(--local-opacity)");
+  });
+
+  it("rejects invalid custom property names", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{--local$opacity:.5;opacity:var(--local$opacity)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("rejects SMIL animation tags", () => {
     const result = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"><animate attributeName="r" values="1;4;1" dur="1s" repeatCount="indefinite"/></circle></svg>',
@@ -123,6 +141,16 @@ describe("sanitizeSvgMarkup", () => {
     );
 
     expect(result).toBeNull();
+  });
+
+  it("strips unexpected style elements not from extracted blocks", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style/><rect x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("<rect");
+    expect(result).not.toContain("<style");
   });
 
   it("rejects external URLs inside CSS declarations", () => {
