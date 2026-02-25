@@ -203,7 +203,9 @@ export class GeneratorControls extends HTMLElement {
 
         if (targetId === "temperature-input" && temperatureInput) {
           const current = parseFloat(temperatureInput.value);
-          const base = Number.isNaN(current) ? DEFAULT_TEMPERATURE : current;
+          const base = Number.isNaN(current)
+            ? (settingsRepository.getSettings().temperature ?? DEFAULT_TEMPERATURE)
+            : current;
           const next = clampTemperature(Math.round((base + delta) * 10) / 10);
 
           temperatureInput.value = next.toFixed(1);
