@@ -5,7 +5,6 @@ const ALLOWED_SVG_TAGS = [
   "svg",
   "g",
   "defs",
-  "style",
   "desc",
   "title",
   "symbol",
@@ -273,6 +272,7 @@ function escapeRegExp(input: string): string {
 
 function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | null {
   const styleBlocks: ExtractedStyleBlock[] = [];
+  const existingDescIds = collectDescIds(source);
   let hasInvalidStyle = false;
 
   const svgWithoutStyles = source.replace(
@@ -302,7 +302,7 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
         return "";
       }
 
-      const placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${styleBlocks.length}`;
+      const placeholderId = generateUniqueStylePlaceholderId(existingDescIds);
       styleBlocks.push({ placeholderId, cssText: sanitizedCss });
       return `<desc id="${placeholderId}"></desc>`;
     },
@@ -316,6 +316,41 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
     svgWithoutStyles,
     styleBlocks,
   };
+}
+
+function collectDescIds(source: string): Set<string> {
+  const ids = new Set<string>();
+  const descTagPattern = /<desc\b[^>]*\bid\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\s"'>/]+))/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = descTagPattern.exec(source)) !== null) {
+    const id = match[1] ?? match[2] ?? match[3];
+    if (id) {
+      ids.add(id);
+    }
+  }
+
+  return ids;
+}
+
+function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string {
+  let placeholderId = "";
+
+  do {
+    placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${createRandomSuffix()}`;
+  } while (existingDescIds.has(placeholderId));
+
+  existingDescIds.add(placeholderId);
+  return placeholderId;
+}
+
+function createRandomSuffix(): string {
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    const randomBytes = globalThis.crypto.getRandomValues(new Uint8Array(8));
+    return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
 }
 
 function isAllowedStyleTagAttributes(attrsRaw: string): boolean {
