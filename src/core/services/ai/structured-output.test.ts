@@ -41,4 +41,24 @@ describe("parseSvgVariationsFromResponses", () => {
 
     expect(result).toEqual([validSvg]);
   });
+
+  it("parses fenced json payloads with surrounding text", () => {
+    const response = [
+      "Here are the variations:",
+      "```json",
+      JSON.stringify({ svgs: [validSvg] }),
+      "```",
+      "trailer {not: 'json'}",
+    ].join("\n");
+
+    const result = parseSvgVariationsFromResponses([response], 1);
+
+    expect(result).toEqual([validSvg]);
+  });
+
+  it("rejects concatenated multi-root svg payloads", () => {
+    expect(() => parseSvgVariationsFromResponses([`${validSvg}${secondSvg}`], 1)).toThrow(
+      "Model returned an invalid variations payload",
+    );
+  });
 });

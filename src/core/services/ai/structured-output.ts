@@ -6,8 +6,34 @@ const svgVariationsPayloadSchema = z.strictObject({
   svgs: z.array(z.string().min(1)).min(1),
 });
 
-const CODE_FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
+const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
+
+function isSingleSvgDocument(input: string): boolean {
+  const lowered = input.toLowerCase();
+  const firstSvgIndex = lowered.indexOf("<svg");
+  const lastSvgIndex = lowered.lastIndexOf("<svg");
+  const firstClosingSvgIndex = lowered.indexOf("</svg>");
+  const lastClosingSvgIndex = lowered.lastIndexOf("</svg>");
+
+  if (firstSvgIndex === -1 || firstClosingSvgIndex === -1) {
+    return false;
+  }
+
+  if (firstSvgIndex !== lastSvgIndex || firstClosingSvgIndex !== lastClosingSvgIndex) {
+    return false;
+  }
+
+  if (input.slice(0, firstSvgIndex).trim() !== "") {
+    return false;
+  }
+
+  if (input.slice(lastClosingSvgIndex + "</svg>".length).trim() !== "") {
+    return false;
+  }
+
+  return true;
+}
 
 export const SVG_VARIATIONS_JSON_SCHEMA = {
   type: "object",
@@ -45,7 +71,13 @@ export const GCP_SVG_VARIATIONS_SCHEMA = {
  * @returns The trimmed SVG markup if it begins with `<svg` and ends with `</svg>`, `null` otherwise
  */
 function normalizeSvgMarkup(svg: string): string | null {
-  const extracted = extractSvgFromResult(svg).trim();
+  const trimmedInput = svg.trim();
+  const extracted = extractSvgFromResult(trimmedInput).trim();
+
+  if (!isSingleSvgDocument(trimmedInput) || !isSingleSvgDocument(extracted)) {
+    return null;
+  }
+
   if (!SVG_MARKUP_REGEX.test(extracted)) {
     return null;
   }
