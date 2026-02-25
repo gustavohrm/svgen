@@ -90,6 +90,17 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toBeNull();
   });
 
+  it("keeps safe CSS when style closing tag has trailing whitespace", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{animation:spin 1s linear infinite;opacity:.9}@keyframes spin{to{transform:rotate(360deg)}}</style   ><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("<style>");
+    expect(result).toContain("animation:spin 1s linear infinite");
+    expect(result).toContain("@keyframes spin");
+  });
+
   it("keeps safe inline style attributes", () => {
     const result = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="fill:#f00;opacity:.7"/></svg>',

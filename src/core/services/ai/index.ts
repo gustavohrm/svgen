@@ -41,11 +41,11 @@ const SYSTEM_PROMPT_GUARDRAILS = `
   <rule>Prefer viewBox-based responsive coordinates.</rule>
 </generation_rules>
 <css_animation_profile>
-  <profile>${SVG_CSS_POLICY_PROFILE}</profile>
-  <allowed_at_rules>${formatSvgCssAllowedAtRulesForPrompt()}</allowed_at_rules>
-  <allowed_selectors>${formatSvgCssSelectorHintsForPrompt()}</allowed_selectors>
-  <allowed_css_properties>${formatSvgCssAllowedPropertiesForPrompt()}</allowed_css_properties>
-  <safety_rules>${formatSvgCssSafetyRulesForPrompt()}</safety_rules>
+  <profile>${xmlEscape(SVG_CSS_POLICY_PROFILE)}</profile>
+  <allowed_at_rules>${xmlEscape(formatSvgCssAllowedAtRulesForPrompt())}</allowed_at_rules>
+  <allowed_selectors>${xmlEscape(formatSvgCssSelectorHintsForPrompt())}</allowed_selectors>
+  <allowed_css_properties>${xmlEscape(formatSvgCssAllowedPropertiesForPrompt())}</allowed_css_properties>
+  <safety_rules>${xmlEscape(formatSvgCssSafetyRulesForPrompt())}</safety_rules>
 </css_animation_profile>
 <response_contract>
   <type>json_object</type>
@@ -153,4 +153,13 @@ export function createAiService(
  */
 function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
+}
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }

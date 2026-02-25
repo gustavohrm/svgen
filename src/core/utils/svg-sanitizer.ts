@@ -156,7 +156,7 @@ const ALLOWED_SVG_ATTRS = [
 const BLOCKED_TAG_PATTERN =
   /<\s*\/?\s*(script|foreignObject|animate|animateMotion|animateTransform|set)\b/i;
 const INLINE_EVENT_PATTERN = /\son[a-z][\w:-]*\s*=/i;
-const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style>/gi;
+const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const STYLE_PLACEHOLDER_PREFIX = "__svgen_style_placeholder__";
 const MAX_STYLE_BLOCKS = 4;
 const MAX_STYLE_CHARS = 5_000;
