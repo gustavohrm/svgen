@@ -278,6 +278,10 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
   const svgWithoutStyles = source.replace(
     STYLE_TAG_PATTERN,
     (_fullTag: string, attrsRaw: string, cssRaw: string) => {
+      if (hasInvalidStyle) {
+        return "";
+      }
+
       if (!isAllowedStyleTagAttributes(attrsRaw)) {
         hasInvalidStyle = true;
         return "";
@@ -481,7 +485,7 @@ function isSafeCssSelector(selector: string): boolean {
     return false;
   }
 
-  return /^[#.:[\]="'()*+,>~\s\w-]+$/.test(selector);
+  return /^[#.:\[\]="'()*+,>~\s\w-]+$/.test(selector);
 }
 
 function isSafeCssDeclarations(block: string): boolean {
@@ -679,7 +683,7 @@ function isAllowedCustomProperty(property: string): boolean {
 }
 
 function containsOnlyLocalFragmentUrls(value: string): boolean {
-  const urlRegex = /url\(([^)]*)\)/gi;
+  const urlRegex = /url\s*\(([^)]*)\)/gi;
   let match: RegExpExecArray | null;
 
   while ((match = urlRegex.exec(value)) !== null) {

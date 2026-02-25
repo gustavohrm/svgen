@@ -93,6 +93,30 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toBeNull();
   });
 
+  it("rejects animateMotion SMIL tag", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"><animateMotion dur="2s" path="M 0 0 L 5 5" repeatCount="indefinite"/></circle></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects animateTransform SMIL tag", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" transform="rotate(0 5 5)"><animateTransform attributeName="transform" type="rotate" from="0 5 5" to="360 5 5" dur="1s" repeatCount="indefinite"/></rect></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects set SMIL tag", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8"><set attributeName="opacity" to="0" begin="0s" dur="1s"/></rect></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("rejects unsafe CSS rules in style blocks", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@import "https://evil.example/style.css";</style><rect x="1" y="1" width="8" height="8"/></svg>',
