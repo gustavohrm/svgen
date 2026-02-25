@@ -319,6 +319,11 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
       }
 
       const placeholderId = generateUniqueStylePlaceholderId(existingDescIds);
+      if (placeholderId === null) {
+        hasInvalidStyle = true;
+        return "";
+      }
+
       styleBlocks.push({ placeholderId, cssText: sanitizedCss });
       return `<desc id="${placeholderId}"></desc>`;
     },
@@ -349,21 +354,26 @@ function collectDescIds(source: string): Set<string> {
   return ids;
 }
 
-function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string {
+function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string | null {
   let placeholderId = "";
 
   do {
-    placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${createRandomSuffix()}`;
+    const suffix = createRandomSuffix();
+    if (suffix === null) {
+      return null;
+    }
+
+    placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${suffix}`;
   } while (existingDescIds.has(placeholderId));
 
   existingDescIds.add(placeholderId);
   return placeholderId;
 }
 
-function createRandomSuffix(): string {
+function createRandomSuffix(): string | null {
   const randomBytes = getSecureRandomBytes(8);
   if (!randomBytes) {
-    throw new Error("Secure random source is unavailable.");
+    return null;
   }
 
   return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
