@@ -2,6 +2,13 @@ import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { normalizePositiveInt } from "../../utils/number";
 import { SVG_VARIATIONS_JSON_SCHEMA } from "./structured-output";
+import {
+  SVG_CSS_POLICY_PROFILE,
+  formatSvgCssAllowedAtRulesForPrompt,
+  formatSvgCssAllowedPropertiesForPrompt,
+  formatSvgCssSafetyRulesForPrompt,
+  formatSvgCssSelectorHintsForPrompt,
+} from "../../constants/svg-css-policy";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -17,16 +24,29 @@ Design goals:
 - Translate the request into a clear visual composition with intentional hierarchy and spacing.
 - Favor clean geometry, balanced proportions, and strong readability at small and large sizes.
 - Use cohesive color palettes with sufficient contrast between key shapes.
-- Prefer reusable structure (grouping, transforms, shared styles) when it keeps output clear and compact.`;
+- Prefer reusable structure (grouping, transforms, shared styles) when it keeps output clear and compact.
+- Prefer named SVG primitives (rect, circle, ellipse, line, polyline, polygon) over path whenever they can represent the same shape.
+- Use path only when geometry cannot be expressed cleanly with named primitives.
+- When animation is needed, prefer CSS keyframes inside an inline <style> block and do not use SMIL animation tags.`;
 
 const SYSTEM_PROMPT_GUARDRAILS = `
 <generation_rules>
   <rule>Generate the requested number of distinct SVG variations.</rule>
+  <rule>Each variation should differ meaningfully in composition, motion, color direction, or visual style.</rule>
   <rule>Each variation must be a complete, valid &lt;svg&gt;...&lt;/svg&gt; document.</rule>
   <rule>Do not use markdown, code fences, or explanatory text.</rule>
   <rule>Keep SVGs self-contained (no external assets, fonts, CSS, or scripts).</rule>
+  <rule>Prefer named SVG primitives over paths when equivalent.</rule>
+  <rule>If animation is requested, use inline CSS animation and avoid SMIL tags such as &lt;animate&gt;, &lt;animateTransform&gt;, &lt;animateMotion&gt;, and &lt;set&gt;.</rule>
   <rule>Prefer viewBox-based responsive coordinates.</rule>
 </generation_rules>
+<css_animation_profile>
+  <profile>${SVG_CSS_POLICY_PROFILE}</profile>
+  <allowed_at_rules>${formatSvgCssAllowedAtRulesForPrompt()}</allowed_at_rules>
+  <allowed_selectors>${formatSvgCssSelectorHintsForPrompt()}</allowed_selectors>
+  <allowed_css_properties>${formatSvgCssAllowedPropertiesForPrompt()}</allowed_css_properties>
+  <safety_rules>${formatSvgCssSafetyRulesForPrompt()}</safety_rules>
+</css_animation_profile>
 <response_contract>
   <type>json_object</type>
   <schema>${JSON.stringify(SVG_VARIATIONS_JSON_SCHEMA)}</schema>
