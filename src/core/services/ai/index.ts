@@ -79,6 +79,7 @@ export class AiService {
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
   ): Promise<string[]> {
+    const normalizedCount = normalizePositiveInt(count);
     const settings = this.settingsRepository.getSettings();
     const activeKeyId = settings.activeKeys[options.providerId];
     const activeKey = settings.apiKeys.find((k) => k.id === activeKeyId);
@@ -94,14 +95,14 @@ export class AiService {
     }
 
     const systemPrompt = this.buildSystemPrompt(options.referenceSvgs, settings.systemPrompt);
-    const userPrompt = this.buildUserPrompt(options.prompt, count);
+    const userPrompt = this.buildUserPrompt(options.prompt, normalizedCount);
 
     return provider.generate({
       prompt: userPrompt,
       systemPrompt,
       model: options.model,
       apiKey: activeKey.value,
-      count,
+      count: normalizedCount,
       temperature: settings.temperature,
     });
   }

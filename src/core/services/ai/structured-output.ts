@@ -119,6 +119,10 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
 
   const uniqueSvgs = new Set<string>();
   for (const svg of parsedPayload.data.svgs) {
+    if (uniqueSvgs.size >= requestedCount) {
+      break;
+    }
+
     const normalized = normalizeSvgMarkup(svg);
     if (normalized) {
       uniqueSvgs.add(normalized);
@@ -173,7 +177,13 @@ export function parseSvgVariationsFromResponses(
     return fallbackResults;
   }
 
+  const responseContext =
+    responses
+      .map((response, index) => `[${index}] ${response.trim().slice(0, 300)}`)
+      .filter((response) => response !== "")
+      .join(" | ") || "no response content";
+
   throw new Error(
-    "Model returned an invalid variations payload. Expected JSON with an 'svgs' array of SVG strings.",
+    `Model returned an invalid variations payload. Expected JSON with an 'svgs' array or raw SVG content; attempted JSON parse then raw SVG fallback. Response context: ${responseContext}`,
   );
 }

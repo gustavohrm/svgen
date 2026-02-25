@@ -117,6 +117,20 @@ describe("AiService", () => {
     );
   });
 
+  it("should normalize count consistently for prompt and provider", async () => {
+    const options: Omit<GenerateOptions, "apiKey"> = {
+      prompt: "draw a circle",
+      model: "gemini-pro",
+      providerId: "gcp",
+    };
+
+    await service.generateMultiple(options, 2.9);
+
+    const providerCall = (mockProvider.generate as any).mock.calls[0][0];
+    expect(providerCall.count).toBe(2);
+    expect(providerCall.prompt).toContain("<variation_count>2</variation_count>");
+  });
+
   it("should throw error if no active key", async () => {
     (mockSettingsRepository.getSettings as any).mockReturnValue({
       apiKeys: [],

@@ -3,6 +3,8 @@ import { GCP_SVG_VARIATIONS_SCHEMA, SVG_VARIATIONS_JSON_SCHEMA } from "../struct
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
+const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+
 const openRouterModelsResponseSchema = z.object({
   data: z.array(
     z.object({
@@ -47,6 +49,86 @@ const gcpGenerateResponseSchema = z.object({
     }),
   ),
 });
+
+function formatRequestTarget(input: RequestInfo | URL): string {
+  if (typeof input === "string") {
+    return input;
+  }
+
+  if (input instanceof URL) {
+    return input.toString();
+  }
+
+  return input.url;
+}
+
+function isAbortError(error: unknown): boolean {
+  if (typeof DOMException !== "undefined" && error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
+}
+
+async function fetchWithTimeout(
+  fetchImpl: FetchLike,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const upstreamSignal = init.signal;
+  let didTimeout = false;
+  let hasUpstreamAbortListener = false;
+
+  const abortFromUpstream = () => {
+    controller.abort(upstreamSignal?.reason);
+  };
+
+  if (upstreamSignal) {
+    if (upstreamSignal.aborted) {
+      controller.abort(upstreamSignal.reason);
+    } else {
+      upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+      hasUpstreamAbortListener = true;
+    }
+  }
+
+  const timeoutId = setTimeout(() => {
+    didTimeout = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetchImpl(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    const target = formatRequestTarget(input);
+
+    if (didTimeout) {
+      throw new Error(`Request to ${target} timed out after ${timeoutMs}ms.`);
+    }
+
+    if (controller.signal.aborted || isAbortError(error)) {
+      throw new Error(`Request to ${target} was aborted before completion.`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+
+    if (upstreamSignal && hasUpstreamAbortListener) {
+      upstreamSignal.removeEventListener("abort", abortFromUpstream);
+    }
+  }
+}
 
 function parseOpenRouterMessageContent(
   content: string | Array<{ text?: string }> | undefined,
@@ -144,14 +226,22 @@ function parseGoogleCandidateText(candidate: {
 }
 
 export class FetchOpenRouterClient implements OpenRouterClient {
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = fetch,
+    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+  ) {}
 
   async fetchModels(apiKey: string): Promise<string[]> {
-    const response = await this.fetchImpl("https://openrouter.ai/api/v1/models", {
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
+    const response = await fetchWithTimeout(
+      this.fetchImpl,
+      "https://openrouter.ai/api/v1/models",
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
       },
-    });
+      this.requestTimeoutMs,
+    );
 
     if (!response.ok) {
       throw new Error("Failed to fetch OpenRouter models");
@@ -199,11 +289,16 @@ export class FetchOpenRouterClient implements OpenRouterClient {
       },
     };
 
-    let response = await this.fetchImpl(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(structuredBody),
-    });
+    let response = await fetchWithTimeout(
+      this.fetchImpl,
+      endpoint,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(structuredBody),
+      },
+      this.requestTimeoutMs,
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -214,11 +309,16 @@ export class FetchOpenRouterClient implements OpenRouterClient {
         );
       }
 
-      response = await this.fetchImpl(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(baseBody),
-      });
+      response = await fetchWithTimeout(
+        this.fetchImpl,
+        endpoint,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(baseBody),
+        },
+        this.requestTimeoutMs,
+      );
 
       if (!response.ok) {
         const fallbackErrorText = await response.text();
@@ -234,11 +334,17 @@ export class FetchOpenRouterClient implements OpenRouterClient {
 }
 
 export class FetchGoogleCloudClient implements GoogleCloudClient {
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = fetch,
+    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+  ) {}
 
   async fetchModels(apiKey: string): Promise<string[]> {
-    const response = await this.fetchImpl(
+    const response = await fetchWithTimeout(
+      this.fetchImpl,
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+      {},
+      this.requestTimeoutMs,
     );
 
     if (!response.ok) {
@@ -287,13 +393,18 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
       generationConfig: baseGenerationConfig,
     };
 
-    let response = await this.fetchImpl(generateUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    let response = await fetchWithTimeout(
+      this.fetchImpl,
+      generateUrl,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(structuredPayload),
       },
-      body: JSON.stringify(structuredPayload),
-    });
+      this.requestTimeoutMs,
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -302,13 +413,18 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
         throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      response = await this.fetchImpl(generateUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      response = await fetchWithTimeout(
+        this.fetchImpl,
+        generateUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(fallbackPayload),
         },
-        body: JSON.stringify(fallbackPayload),
-      });
+        this.requestTimeoutMs,
+      );
 
       if (!response.ok) {
         const fallbackErrorText = await response.text();
