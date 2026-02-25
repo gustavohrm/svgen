@@ -225,7 +225,7 @@ export function sanitizeSvgMarkup(rawSvg: string): string | null {
     USE_PROFILES: { svg: true, svgFilters: true },
     ALLOWED_TAGS: [...ALLOWED_SVG_TAGS],
     ALLOWED_ATTR: [...ALLOWED_SVG_ATTRS],
-    FORBID_TAGS: Array.from(BLOCKED_TAG_NAMES).map((tagName) => tagName.toLowerCase()),
+    FORBID_TAGS: Array.from(BLOCKED_TAG_NAMES),
   });
 
   if (typeof sanitized !== "string" || !sanitized.trim()) {
