@@ -56,6 +56,38 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("@keyframes fade");
   });
 
+  it("keeps safe CSS inside CDATA sections", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style><![CDATA[@keyframes pulse{0%{opacity:.4}100%{opacity:1}} .shape{animation:pulse 1s linear infinite}]]></style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("<style>");
+    expect(result).toContain("@keyframes pulse");
+    expect(result).toContain("animation:pulse 1s linear infinite");
+  });
+
+  it("strips empty style blocks without rejecting the SVG", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>   \n\t  </style><rect x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("<rect");
+    expect(result).not.toContain("<style");
+  });
+
+  it("keeps multiple keyframes in one style block", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{0%{opacity:.5}100%{opacity:1}} .shape{animation:spin 1s linear infinite,pulse 1.5s ease-in-out infinite}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("@keyframes spin");
+    expect(result).toContain("@keyframes pulse");
+    expect(result).toContain("animation:spin 1s linear infinite,pulse 1.5s ease-in-out infinite");
+  });
+
   it("reinserts extracted style blocks without colliding with existing desc ids", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><desc id="__svgen_style_placeholder__0">existing-desc</desc><style>.shape{opacity:.5}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',

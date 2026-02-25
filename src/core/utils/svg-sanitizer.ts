@@ -359,6 +359,11 @@ function isAllowedStyleTagAttributes(attrsRaw: string): boolean {
 
 function sanitizeInlineSvgCss(cssRaw: string): string | null {
   const withoutCdata = cssRaw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+
+  if (hasUnterminatedCssComment(withoutCdata)) {
+    return null;
+  }
+
   const withoutComments = withoutCdata.replace(/\/\*[\s\S]*?\*\//g, "");
   const css = withoutComments.trim();
 
@@ -375,6 +380,26 @@ function sanitizeInlineSvgCss(cssRaw: string): string | null {
   }
 
   return css;
+}
+
+function hasUnterminatedCssComment(css: string): boolean {
+  let searchStart = 0;
+
+  while (searchStart < css.length) {
+    const commentStart = css.indexOf("/*", searchStart);
+    if (commentStart === -1) {
+      return false;
+    }
+
+    const commentEnd = css.indexOf("*/", commentStart + 2);
+    if (commentEnd === -1) {
+      return true;
+    }
+
+    searchStart = commentEnd + 2;
+  }
+
+  return false;
 }
 
 function isSafeCssStylesheet(css: string): boolean {
@@ -790,18 +815,56 @@ function reinsertStyleBlocks(
     return true;
   }
 
+  const svgContainer = findClosestSvgContainer(root);
+  if (!svgContainer) {
+    return false;
+  }
+
+  const defs = findOrCreateDefs(documentNode, svgContainer);
+
   let inserted = 0;
   for (const style of styles) {
-    const placeholder = root.querySelector(`desc[id="${style.placeholderId}"]`);
+    const placeholder = svgContainer.querySelector(`desc[id="${style.placeholderId}"]`);
     if (!placeholder) {
       return false;
     }
 
     const styleElement = documentNode.createElementNS("http://www.w3.org/2000/svg", "style");
     styleElement.textContent = style.cssText;
-    placeholder.replaceWith(styleElement);
+    defs.append(styleElement);
+    placeholder.remove();
     inserted += 1;
   }
 
   return inserted === styles.length;
+}
+
+function findClosestSvgContainer(root: Element): SVGElement | null {
+  const nearestSvg = root.closest("svg");
+  if (nearestSvg instanceof SVGElement) {
+    return nearestSvg;
+  }
+
+  if (root instanceof SVGElement) {
+    return root;
+  }
+
+  if (root instanceof SVGGraphicsElement) {
+    return root.ownerSVGElement;
+  }
+
+  return null;
+}
+
+function findOrCreateDefs(documentNode: Document, svgContainer: SVGElement): SVGDefsElement {
+  const existingDefs = Array.from(svgContainer.children).find(
+    (child) => child.tagName.toLowerCase() === "defs",
+  );
+  if (existingDefs instanceof SVGDefsElement) {
+    return existingDefs;
+  }
+
+  const defs = documentNode.createElementNS("http://www.w3.org/2000/svg", "defs");
+  svgContainer.insertBefore(defs, svgContainer.firstChild);
+  return defs;
 }
