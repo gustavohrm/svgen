@@ -2,9 +2,11 @@ import { z } from "zod";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
-const svgVariationsPayloadSchema = z.object({
-  svgs: z.array(z.string().min(1)).min(1),
-});
+const svgVariationsPayloadSchema = z
+  .object({
+    svgs: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
 
 const CODE_FENCE_REGEX = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
