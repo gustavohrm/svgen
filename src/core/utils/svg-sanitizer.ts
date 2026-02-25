@@ -170,8 +170,8 @@ const BLOCKED_TAG_PATTERN = new RegExp(
 const INLINE_EVENT_PATTERN = /\son[a-z][\w:-]*\s*=/i;
 const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const STYLE_PLACEHOLDER_PREFIX = "__svgen_style_placeholder__";
-const MAX_STYLE_BLOCKS = 4;
-const MAX_STYLE_CHARS = 5_000;
+export const MAX_STYLE_BLOCKS = 4;
+export const MAX_STYLE_CHARS = 5_000;
 const MAX_STYLE_ATTR_CHARS = 1_500;
 const DISALLOWED_CSS_PATTERN =
   /(?:@import\b|javascript\s*:|expression\s*\(|behavior\s*:|-moz-binding\b|<\/style\b)/i;
@@ -273,7 +273,6 @@ function escapeRegExp(input: string): string {
 
 function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | null {
   const styleBlocks: ExtractedStyleBlock[] = [];
-  const extractionToken = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   let hasInvalidStyle = false;
 
   const svgWithoutStyles = source.replace(
@@ -299,7 +298,7 @@ function extractAndValidateStyleBlocks(source: string): StyleExtractionResult | 
         return "";
       }
 
-      const placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${extractionToken}_${styleBlocks.length}`;
+      const placeholderId = `${STYLE_PLACEHOLDER_PREFIX}${styleBlocks.length}`;
       styleBlocks.push({ placeholderId, cssText: sanitizedCss });
       return `<desc id="${placeholderId}"></desc>`;
     },
@@ -487,8 +486,12 @@ function isSafeCssSelector(selector: string): boolean {
 
 function isSafeCssDeclarations(block: string): boolean {
   const declarations = splitCssDeclarations(block);
-  if (declarations === null || declarations.length === 0) {
+  if (declarations === null) {
     return false;
+  }
+
+  if (declarations.length === 0) {
+    return true;
   }
 
   for (const declaration of declarations) {

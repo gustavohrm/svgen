@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeSvgMarkup } from "./svg-sanitizer";
+import { SVG_CSS_ALLOWED_PROPERTIES } from "../constants/svg-css-policy";
+import { MAX_STYLE_BLOCKS, MAX_STYLE_CHARS, sanitizeSvgMarkup } from "./svg-sanitizer";
 
 describe("sanitizeSvgMarkup", () => {
   it("keeps safe svg content", () => {
@@ -127,9 +128,21 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain('style="fill:#f00;opacity:.7"');
   });
 
-  it("rejects unsafe inline style attributes", () => {
+  it("rejects inline style when property is not in ALLOWED_CSS_PROPERTIES (position)", () => {
+    expect(SVG_CSS_ALLOWED_PROPERTIES).not.toContain("position");
+
     const result = sanitizeSvgMarkup(
-      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="position:fixed;left:0"/></svg>',
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="position:fixed"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects inline style when property is not in ALLOWED_CSS_PROPERTIES (left)", () => {
+    expect(SVG_CSS_ALLOWED_PROPERTIES).not.toContain("left");
+
+    const result = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="left:0"/></svg>',
     );
 
     expect(result).toBeNull();
@@ -156,6 +169,52 @@ describe("sanitizeSvgMarkup", () => {
   it("rejects external URLs inside CSS declarations", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{fill:url(https://evil.example/fill)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects SVG with more than MAX_STYLE_BLOCKS style tags", () => {
+    const styleTags = Array.from(
+      { length: MAX_STYLE_BLOCKS + 1 },
+      (_entry, index) => `<style>.shape${index}{opacity:.5}</style>`,
+    ).join("");
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">${styleTags}<rect class="shape0" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects SVG when a style block exceeds MAX_STYLE_CHARS", () => {
+    const oversizedCss = Array.from(
+      { length: 500 },
+      (_entry, index) => `.s${index}{opacity:.5}`,
+    ).join("");
+    expect(oversizedCss.length).toBeGreaterThan(MAX_STYLE_CHARS);
+
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>${oversizedCss}</style><rect class="s1" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects inline style values containing expression(...) and javascript:", () => {
+    const expressionResult = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="color:expression(alert(1))"/></svg>',
+    );
+    const javascriptResult = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style=\'fill:url(javascript:alert(1))\'/></svg>',
+    );
+
+    expect(expressionResult).toBeNull();
+    expect(javascriptResult).toBeNull();
+  });
+
+  it("rejects style blocks with nested or injected closing-brace selector sequences", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.foo } .evil { position:fixed }</style><rect class="foo" x="1" y="1" width="8" height="8"/></svg>',
     );
 
     expect(result).toBeNull();
