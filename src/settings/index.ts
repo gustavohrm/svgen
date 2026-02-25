@@ -100,6 +100,7 @@ function renderTableHeader(state: SettingsState, filteredModels: ModelEntry[]) {
         <input
           type="checkbox"
           id="select-all-models"
+          aria-label="Select all visible models"
           ${allSelected ? "checked" : ""}
           class="absolute inset-0 opacity-0 cursor-pointer"
         />
