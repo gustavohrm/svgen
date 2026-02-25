@@ -268,15 +268,19 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toBeNull();
   });
 
-  it("rejects inline style values containing expression(...) and javascript:", () => {
+  it("rejects inline style values containing expression(...)", () => {
     const expressionResult = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="color:expression(alert(1))"/></svg>',
     );
+
+    expect(expressionResult).toBeNull();
+  });
+
+  it("rejects inline style values containing javascript:", () => {
     const javascriptResult = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style=\'fill:url(javascript:alert(1))\'/></svg>',
     );
 
-    expect(expressionResult).toBeNull();
     expect(javascriptResult).toBeNull();
   });
 

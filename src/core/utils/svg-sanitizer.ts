@@ -178,7 +178,23 @@ const STYLE_TAG_ALLOWED_ATTRS_PATTERN =
   /^\s*(?:type\s*=\s*(?:"text\/css"|'text\/css'|text\/css))?\s*$/i;
 
 const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
-const ALLOWED_CSS_AT_RULES = new Set<string>(SVG_CSS_ALLOWED_AT_RULES.map((rule) => rule.slice(1)));
+const ALLOWED_CSS_AT_RULES = new Set<string>(
+  SVG_CSS_ALLOWED_AT_RULES.map((rule) => normalizeCssAtRule(rule)).filter(
+    (rule) => rule.length > 0,
+  ),
+);
+
+interface NodeCryptoModule {
+  webcrypto?: Crypto;
+  randomBytes?: (size: number) => Uint8Array;
+}
+
+interface NodeProcess {
+  versions?: {
+    node?: string;
+  };
+  getBuiltinModule?: (id: string) => unknown;
+}
 
 interface ExtractedStyleBlock {
   placeholderId: string;
@@ -345,12 +361,56 @@ function generateUniqueStylePlaceholderId(existingDescIds: Set<string>): string 
 }
 
 function createRandomSuffix(): string {
-  if (typeof globalThis.crypto?.getRandomValues === "function") {
-    const randomBytes = globalThis.crypto.getRandomValues(new Uint8Array(8));
-    return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const randomBytes = getSecureRandomBytes(8);
+  if (!randomBytes) {
+    throw new Error("Secure random source is unavailable.");
   }
 
-  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`;
+  return Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function normalizeCssAtRule(rule: string): string {
+  const trimmedRule = rule.trim().toLowerCase();
+  if (trimmedRule.length === 0) {
+    return "";
+  }
+
+  return trimmedRule.startsWith("@") ? trimmedRule.slice(1) : trimmedRule;
+}
+
+function getSecureRandomBytes(size: number): Uint8Array | null {
+  if (typeof globalThis.crypto?.getRandomValues === "function") {
+    return globalThis.crypto.getRandomValues(new Uint8Array(size));
+  }
+
+  const nodeCrypto = getNodeCryptoModule();
+  if (typeof nodeCrypto?.webcrypto?.getRandomValues === "function") {
+    return nodeCrypto.webcrypto.getRandomValues(new Uint8Array(size));
+  }
+
+  if (typeof nodeCrypto?.randomBytes === "function") {
+    return Uint8Array.from(nodeCrypto.randomBytes(size));
+  }
+
+  return null;
+}
+
+function getNodeCryptoModule(): NodeCryptoModule | null {
+  const nodeProcess = (globalThis as typeof globalThis & { process?: NodeProcess }).process;
+  if (!nodeProcess?.versions?.node) {
+    return null;
+  }
+
+  if (typeof nodeProcess.getBuiltinModule !== "function") {
+    return null;
+  }
+
+  const cryptoModule = nodeProcess.getBuiltinModule("node:crypto");
+  return isNodeCryptoModule(cryptoModule) ? cryptoModule : null;
+}
+
+function isNodeCryptoModule(value: unknown): value is NodeCryptoModule {
+  return typeof value === "object" && value !== null;
 }
 
 function isAllowedStyleTagAttributes(attrsRaw: string): boolean {
@@ -841,19 +901,7 @@ function reinsertStyleBlocks(
 
 function findClosestSvgContainer(root: Element): SVGElement | null {
   const nearestSvg = root.closest("svg");
-  if (nearestSvg instanceof SVGElement) {
-    return nearestSvg;
-  }
-
-  if (root instanceof SVGElement) {
-    return root;
-  }
-
-  if (root instanceof SVGGraphicsElement) {
-    return root.ownerSVGElement;
-  }
-
-  return null;
+  return nearestSvg instanceof SVGElement ? nearestSvg : null;
 }
 
 function findOrCreateDefs(documentNode: Document, svgContainer: SVGElement): SVGDefsElement {
