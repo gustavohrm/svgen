@@ -90,27 +90,79 @@ export function renderGeneratorControls(settings: AppSettings): string {
               >
                 <div class="flex items-center justify-between gap-3">
                   <label class="text-sm font-medium text-text-secondary whitespace-nowrap" for="variation-input">Variations</label>
-                  <input
-                    type="number"
-                    id="variation-input"
-                    min="1"
-                    max="4"
-                    value="${settings.variations}"
-                    class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
-                  />
+                  <div class="relative w-12">
+                    <div class="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10">
+                      <button
+                        type="button"
+                        data-step-target="variation-input"
+                        data-step-delta="1"
+                        class="h-3 w-3 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover/60 transition-colors flex items-center justify-center"
+                        aria-label="Increase variations"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5">
+                          <path d="m6 14 6-6 6 6" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        data-step-target="variation-input"
+                        data-step-delta="-1"
+                        class="h-3 w-3 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover/60 transition-colors flex items-center justify-center"
+                        aria-label="Decrease variations"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5">
+                          <path d="m6 10 6 6 6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      id="variation-input"
+                      min="1"
+                      max="4"
+                      value="${settings.variations}"
+                      class="numeric-input-clean bg-background rounded-lg pl-4 pr-1 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-12 font-medium text-right"
+                    />
+                  </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3">
                   <label class="text-sm font-medium text-text-secondary whitespace-nowrap" for="temperature-input">Temperature</label>
-                  <input
-                    type="number"
-                    id="temperature-input"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value="${settings.temperature.toFixed(1)}"
-                    class="bg-background rounded-lg px-2 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-14 font-medium"
-                  />
+                  <div class="relative w-12">
+                    <div class="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10">
+                      <button
+                        type="button"
+                        data-step-target="temperature-input"
+                        data-step-delta="0.1"
+                        class="h-3 w-3 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover/60 transition-colors flex items-center justify-center"
+                        aria-label="Increase temperature"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5">
+                          <path d="m6 14 6-6 6 6" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        data-step-target="temperature-input"
+                        data-step-delta="-0.1"
+                        class="h-3 w-3 rounded-sm text-text-muted hover:text-text hover:bg-surface-hover/60 transition-colors flex items-center justify-center"
+                        aria-label="Decrease temperature"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5">
+                          <path d="m6 10 6 6 6-6" />
+                        </svg>
+                      </button>
+                    </div>
+                    <input
+                      type="number"
+                      id="temperature-input"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value="${settings.temperature.toFixed(1)}"
+                      class="numeric-input-clean bg-background rounded-lg pl-4 pr-1 py-1.5 text-xs text-text outline-none focus:border-border-bright transition-all w-12 font-medium text-right"
+                    />
+                  </div>
                 </div>
 
                 <div class="flex items-center justify-between gap-3">

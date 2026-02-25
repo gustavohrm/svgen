@@ -50,6 +50,18 @@
 }
 
 @layer utilities {
+  .numeric-input-clean {
+    appearance: textfield;
+    -moz-appearance: textfield;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .numeric-input-clean::-webkit-outer-spin-button,
+  .numeric-input-clean::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
   .custom-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border) transparent;
