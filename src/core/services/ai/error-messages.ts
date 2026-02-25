@@ -4,6 +4,12 @@ interface ErrorMappingContext {
   providerId?: AiProviderId;
 }
 
+/**
+ * Extracts a user-facing message from an unknown error value.
+ *
+ * @param error - The value to extract a message from; may be an Error, string, null, or other types.
+ * @returns The `message` property if `error` is an `Error`; otherwise the stringified `error`, using an empty string for `null` or `undefined`.
+ */
 function getErrorText(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -12,10 +18,24 @@ function getErrorText(error: unknown): string {
   return String(error ?? "");
 }
 
+/**
+ * Checks whether any of the provided substrings appear within the given text.
+ *
+ * @param text - The text to search
+ * @param fragments - Substrings to look for in `text`
+ * @returns `true` if at least one fragment is found in `text`, `false` otherwise
+ */
 function includesAny(text: string, fragments: string[]): boolean {
   return fragments.some((fragment) => text.includes(fragment));
 }
 
+/**
+ * Map a raw generation error to a concise, user-facing message.
+ *
+ * @param error - The original error value produced during generation.
+ * @param context - Optional context influencing message selection; when `context.providerId` is `"gcp"`, messages may reference Google Gemini specifically.
+ * @returns A human-readable message describing the likely cause and suggested next steps.
+ */
 export function mapGenerationErrorToUserMessage(
   error: unknown,
   context: ErrorMappingContext = {},
