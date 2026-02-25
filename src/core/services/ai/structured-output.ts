@@ -64,7 +64,7 @@ function normalizeSvgMarkup(svg: string): string | null {
  * @param text - The input text to search for a JSON payload
  * @returns The parsed JSON value if parsing succeeds, or `undefined` if no valid JSON is found
  */
-function parseJsonCandidate(text: string): unknown | undefined {
+function parseJsonCandidate(text: string): unknown {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
     return undefined;
@@ -108,7 +108,7 @@ function parseJsonCandidate(text: string): unknown | undefined {
  */
 function parseSvgVariationsFromText(text: string, requestedCount: number): string[] {
   const parsedJson = parseJsonCandidate(text);
-  if (!parsedJson) {
+  if (parsedJson === undefined) {
     return [];
   }
 
@@ -179,8 +179,14 @@ export function parseSvgVariationsFromResponses(
 
   const responseContext =
     responses
-      .map((response, index) => `[${index}] ${response.trim().slice(0, 300)}`)
-      .filter((response) => response !== "")
+      .flatMap((response, index) => {
+        const trimmed = response.trim();
+        if (trimmed === "") {
+          return [];
+        }
+
+        return [`[${index}] ${trimmed.slice(0, 300)}`];
+      })
       .join(" | ") || "no response content";
 
   throw new Error(

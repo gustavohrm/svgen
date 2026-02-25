@@ -55,6 +55,18 @@ describe("AiService", () => {
     expect(prompt).toContain("<response_contract>");
   });
 
+  it("should keep XML well-formed when custom system prompt contains CDATA terminator", () => {
+    const customPrompt = "Always prefer monochrome icon style ]]> with bold geometry.";
+    const prompt = service.buildSystemPrompt([], customPrompt);
+
+    expect(prompt).toContain("<system_instructions><![CDATA[");
+    expect(prompt).toContain(
+      "Always prefer monochrome icon style ]]]]><![CDATA[> with bold geometry.",
+    );
+    expect(prompt).not.toContain("Always prefer monochrome icon style ]]> with bold geometry.");
+    expect(prompt).toContain("<response_contract>");
+  });
+
   it("should build XML-scoped user prompt for generation", () => {
     const prompt = service.buildUserPrompt("draw an orbit icon", 3);
 
