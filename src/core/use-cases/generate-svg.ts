@@ -202,6 +202,11 @@ export class GenerateSvgUseCase {
  * @param prompt - The original generation prompt to preserve context and constraints
  * @param missingCount - Number of additional variations to request (normalized to a positive integer)
  * @returns A refill prompt string tailored for a single refill pass requesting `missingCount` net-new, stylistically consistent, and distinct SVGs
+ * Build a refill prompt that preserves style family while forcing distinct additions.
+ *
+ * @param prompt - The original generation prompt
+ * @param missingCount - Number of missing variations to recover
+ * @returns Prompt text for a single refill pass
  */
 function buildRefillPrompt(prompt: string, missingCount: number): string {
   const normalizedMissingCount = normalizePositiveInt(missingCount);
@@ -249,6 +254,11 @@ interface SanitizedMergeResult {
  * @param rawSvgs - Generated SVG strings to sanitize and evaluate
  * @param existingSvgs - Previously accepted sanitized SVG strings to preserve and deduplicate against
  * @returns An object with `svgs` (merged sanitized SVG strings), `blockedCount` (number of inputs removed by sanitation), and `duplicateCount` (number of duplicates skipped)
+ * Sanitize raw SVGs and merge only unique safe outputs with previously accepted SVGs.
+ *
+ * @param rawSvgs - Raw generated SVG strings from a model call
+ * @param existingSvgs - Previously accepted sanitized SVG strings
+ * @returns Merged sanitized outputs plus blocked and duplicate counters
  */
 function sanitizeAndMergeGeneratedSvgs(
   rawSvgs: string[],

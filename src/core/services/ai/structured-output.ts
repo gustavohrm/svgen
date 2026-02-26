@@ -267,6 +267,7 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
  * Selects and returns exactly `requestedCount` normalized SVG markup strings extracted from model responses.
  *
  * Attempts structured exact-count parsing first, then accumulates valid partial structured entries across responses, and finally falls back to extracting raw SVG documents; throws if the exact count cannot be satisfied.
+ * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no single response satisfies the exact-count contract, it attempts to accumulate partial structured payloads across responses until the requested unique count is met. If structured parsing cannot satisfy the contract, it falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
  *
  * @param responses - Array of textual model responses to search for SVG variations
  * @param requestedCount - Number of SVGs required; coerced to a positive integer

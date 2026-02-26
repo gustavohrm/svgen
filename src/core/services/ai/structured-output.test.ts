@@ -83,6 +83,15 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg]);
   });
 
+  it("accumulates partial structured payloads across responses", () => {
+    const result = parseSvgVariationsFromResponses(
+      [JSON.stringify({ svgs: [validSvg] }), JSON.stringify({ svgs: [secondSvg] })],
+      2,
+    );
+
+    expect(result).toEqual([validSvg, secondSvg]);
+  });
+
   it("rejects concatenated multi-root svg payloads", () => {
     expect(() => parseSvgVariationsFromResponses([`${validSvg}${secondSvg}`], 1)).toThrow(
       "Model returned an invalid variations payload",
