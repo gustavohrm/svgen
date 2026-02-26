@@ -31,14 +31,29 @@ const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
  * (http://www.w3.org/1999/xhtml). Downstream namespace-sensitive code or XPath queries
  * may need to account for this.
  */
-function parseHtmlFragment(text: string): Element | Document | null {
+function parseHtmlFragment(text: string): Element | null {
   if (typeof DOMParser === "undefined" || typeof window === "undefined") {
     try {
       const doc = new XmldomParser({
         locator: {},
         errorHandler: () => {}, // Suppress console output for parsing errors
       }).parseFromString(text, "text/html");
-      return doc;
+
+      const body = doc.getElementsByTagName("body")[0];
+      if (body) {
+        return body as Element;
+      }
+
+      const docElement = doc.documentElement;
+      if (!docElement) return null;
+
+      if (docElement.tagName?.toLowerCase() === "svg") {
+        const wrapper = doc.createElement("body");
+        wrapper.appendChild(docElement);
+        return wrapper as Element;
+      }
+
+      return docElement as Element;
     } catch {
       return null;
     }
@@ -46,7 +61,7 @@ function parseHtmlFragment(text: string): Element | Document | null {
 
   try {
     const parsed = new DOMParser().parseFromString(text, "text/html");
-    return parsed.body;
+    return parsed.body || parsed.documentElement || null;
   } catch {
     return null;
   }
@@ -314,7 +329,7 @@ function extractSvgDocumentsFromText(text: string): string[] {
   const normalizedSvgs: string[] = [];
   const uniqueSvgs = new Set<string>();
 
-  const svgElements = Array.from((parsedBody as Document | Element).getElementsByTagName("svg"));
+  const svgElements = Array.from(parsedBody.getElementsByTagName("svg"));
 
   for (const node of svgElements) {
     const element = node as Element;
@@ -348,6 +363,24 @@ function extractSvgDocumentsFromText(text: string): string[] {
   }
 
   return normalizedSvgs;
+}
+
+function getCanonicalSvg(svg: string): string {
+  const parsed = parseHtmlFragment(svg);
+  if (!parsed) {
+    return svg;
+  }
+  const elements =
+    parsed.tagName?.toLowerCase() === "svg"
+      ? [parsed]
+      : Array.from(parsed.getElementsByTagName("svg"));
+  if (elements.length === 0) {
+    return svg;
+  }
+  const element = elements[0];
+  return typeof element.outerHTML === "string"
+    ? element.outerHTML
+    : new XmldomSerializer().serializeToString(element);
 }
 
 /**
@@ -396,17 +429,32 @@ export function parseSvgVariationsFromResponses(
     }
   }
 
-  const fallbackSvgs = new Set<string>(accumulatedStructuredSvgs);
-  for (const [index, response] of responses.entries()) {
+  const fallbackSvgs = new Set<string>();
+  const canonicalSeen = new Set<string>();
+
+  for (const svg of accumulatedStructuredSvgs) {
+    fallbackSvgs.add(svg);
+    canonicalSeen.add(getCanonicalSvg(svg));
+  }
+
+  for (const response of responses) {
     const normalized = normalizeSvgMarkup(response);
     if (normalized) {
-      fallbackSvgs.add(normalized);
+      const canonical = getCanonicalSvg(normalized);
+      if (!canonicalSeen.has(canonical)) {
+        fallbackSvgs.add(normalized);
+        canonicalSeen.add(canonical);
+      }
     }
 
-    if (fallbackSvgs.size < normalizedCount && !structuredPayloadResponseIndexes.has(index)) {
+    if (fallbackSvgs.size < normalizedCount) {
       const extractedSvgs = extractSvgDocumentsFromText(response);
       for (const svg of extractedSvgs) {
-        fallbackSvgs.add(svg);
+        const canonical = getCanonicalSvg(svg);
+        if (!canonicalSeen.has(canonical)) {
+          fallbackSvgs.add(svg);
+          canonicalSeen.add(canonical);
+        }
         if (fallbackSvgs.size >= normalizedCount) {
           break;
         }

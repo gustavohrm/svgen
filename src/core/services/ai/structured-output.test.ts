@@ -163,4 +163,10 @@ describe("parseSvgVariationsFromResponses", () => {
     const result = parseSvgVariationsFromResponses([`${validSvg}${secondSvg}`], 1);
     expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
+
+  it("demonstrates mixed structured+raw same-response recovery via parseSvgVariationsFromResponses combining validSvg and secondSvg (verified by canonicalizeSvg)", () => {
+    const response = `${JSON.stringify({ svgs: [validSvg] })}\n\n${secondSvg}`;
+    const result = parseSvgVariationsFromResponses([response], 2);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg, secondSvg].map(canonicalizeSvg));
+  });
 });
