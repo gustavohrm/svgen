@@ -90,7 +90,7 @@ export class GenerateSvgUseCase {
       const requestedVariationsInput =
         Number.isFinite(variations) && variations > 0 ? variations : (settings.variations ?? 4);
       const requestedVariations = normalizePositiveInt(requestedVariationsInput);
-      const generatedSvgs = await this.aiService.generateMultiple(
+      const firstPassGeneratedSvgs = await this.aiService.generateMultiple(
         {
           prompt,
           referenceSvgs,
@@ -99,27 +99,79 @@ export class GenerateSvgUseCase {
         },
         requestedVariations,
       );
-      const safeResults = sanitizeGeneratedSvgs(generatedSvgs);
+      const firstPassMerge = sanitizeAndMergeGeneratedSvgs(firstPassGeneratedSvgs);
+      let safeResults = firstPassMerge.svgs;
+      let refillRequestCount = 0;
+      let refillPassGeneratedSvgs: string[] = [];
+      let refillPassMerge: SanitizedMergeResult = {
+        svgs: safeResults,
+        blockedCount: 0,
+        duplicateCount: 0,
+      };
+
+      const missingAfterFirstPass = Math.max(0, requestedVariations - safeResults.length);
+
+      if (missingAfterFirstPass > 0) {
+        refillRequestCount = missingAfterFirstPass;
+        const refillPrompt = buildRefillPrompt(prompt, missingAfterFirstPass);
+        const refillReferences = mergeReferenceSvgs(referenceSvgs, safeResults);
+
+        refillPassGeneratedSvgs = await this.aiService.generateMultiple(
+          {
+            prompt: refillPrompt,
+            referenceSvgs: refillReferences,
+            model,
+            providerId,
+          },
+          missingAfterFirstPass,
+        );
+
+        refillPassMerge = sanitizeAndMergeGeneratedSvgs(refillPassGeneratedSvgs, safeResults);
+        safeResults = refillPassMerge.svgs;
+      }
+
+      if (safeResults.length > requestedVariations) {
+        safeResults = safeResults.slice(0, requestedVariations);
+      }
 
       if (safeResults.length === 0) {
         throw new Error("Generated SVG content failed validation and was blocked.");
       }
 
       let hasWarnings = false;
+      const blockedCount = firstPassMerge.blockedCount + refillPassMerge.blockedCount;
+      const duplicateCount = firstPassMerge.duplicateCount + refillPassMerge.duplicateCount;
+      const refillAttempted = refillRequestCount > 0;
 
-      if (safeResults.length < generatedSvgs.length) {
+      if (blockedCount > 0) {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: "One or more SVG results were blocked because they failed security validation.",
+          message: `${blockedCount} SVG result(s) were blocked because they failed security validation.`,
         });
       }
 
-      if (generatedSvgs.length < requestedVariations) {
+      if (duplicateCount > 0) {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Model returned ${generatedSvgs.length} of ${requestedVariations} requested variations before sanitization.`,
+          message: `${duplicateCount} duplicate SVG result(s) were removed while merging generation passes.`,
+        });
+      }
+
+      if (refillAttempted && safeResults.length === requestedVariations) {
+        hasWarnings = true;
+        this.uiAdapter.notify({
+          type: "warning",
+          message: `Initial results underfilled after sanitization; a single refill pass recovered all ${refillRequestCount} missing variation(s).`,
+        });
+      }
+
+      if (refillAttempted && safeResults.length < requestedVariations) {
+        hasWarnings = true;
+        this.uiAdapter.notify({
+          type: "warning",
+          message: `Initial results underfilled after sanitization; one refill pass requested ${refillRequestCount} more variation(s) but only ${safeResults.length} of ${requestedVariations} safe SVGs are available.`,
         });
       }
 
@@ -145,11 +197,87 @@ export class GenerateSvgUseCase {
 }
 
 /**
- * Sanitize an array of SVG markup strings and remove any entries that fail validation.
+ * Build a refill prompt that preserves style family while forcing distinct additions.
  *
- * @param svgs - Array of raw SVG markup strings to sanitize
- * @returns An array of sanitized SVG markup strings with any invalid or empty results removed
+ * @param prompt - The original generation prompt
+ * @param missingCount - Number of missing variations to recover
+ * @returns Prompt text for a single refill pass
  */
-function sanitizeGeneratedSvgs(svgs: string[]): string[] {
-  return svgs.map((svg) => sanitizeSvgMarkup(svg)).filter((svg): svg is string => Boolean(svg));
+function buildRefillPrompt(prompt: string, missingCount: number): string {
+  const normalizedMissingCount = normalizePositiveInt(missingCount);
+
+  return `${prompt}\n\n<refill_request>
+  <missing_variations>${normalizedMissingCount}</missing_variations>
+  <style_continuity>Preserve the same style family and design language as previously accepted SVGs.</style_continuity>
+  <distinctness_requirements>Each new SVG must use a clearly distinct composition, motion direction, and color direction versus prior accepted outputs and versus other refill outputs.</distinctness_requirements>
+  <novelty_rule>Return only net-new variations; do not duplicate or trivially mutate previous outputs.</novelty_rule>
+</refill_request>`;
+}
+
+/**
+ * Merge reference SVG arrays while preserving order and removing duplicates.
+ *
+ * @param existingReferences - Original user-provided references
+ * @param acceptedSvgs - Already accepted generated SVGs
+ * @returns A single deduplicated reference list
+ */
+function mergeReferenceSvgs(existingReferences: string[], acceptedSvgs: string[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const svg of [...existingReferences, ...acceptedSvgs]) {
+    if (seen.has(svg)) {
+      continue;
+    }
+
+    seen.add(svg);
+    merged.push(svg);
+  }
+
+  return merged;
+}
+
+interface SanitizedMergeResult {
+  svgs: string[];
+  blockedCount: number;
+  duplicateCount: number;
+}
+
+/**
+ * Sanitize raw SVGs and merge only unique safe outputs with previously accepted SVGs.
+ *
+ * @param rawSvgs - Raw generated SVG strings from a model call
+ * @param existingSvgs - Previously accepted sanitized SVG strings
+ * @returns Merged sanitized outputs plus blocked and duplicate counters
+ */
+function sanitizeAndMergeGeneratedSvgs(
+  rawSvgs: string[],
+  existingSvgs: string[] = [],
+): SanitizedMergeResult {
+  const seen = new Set(existingSvgs);
+  const mergedSvgs = [...existingSvgs];
+  let blockedCount = 0;
+  let duplicateCount = 0;
+
+  for (const rawSvg of rawSvgs) {
+    const sanitizedSvg = sanitizeSvgMarkup(rawSvg);
+    if (!sanitizedSvg) {
+      blockedCount += 1;
+      continue;
+    }
+
+    if (seen.has(sanitizedSvg)) {
+      duplicateCount += 1;
+      continue;
+    }
+
+    seen.add(sanitizedSvg);
+    mergedSvgs.push(sanitizedSvg);
+  }
+
+  return {
+    svgs: mergedSvgs,
+    blockedCount,
+    duplicateCount,
+  };
 }
