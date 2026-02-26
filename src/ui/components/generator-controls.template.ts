@@ -72,46 +72,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
               <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
             </label>
 
-            <div class="relative flex items-center" id="settings-container">
-              <div class="relative flex items-center" id="color-palette-container">
-                <button
-                  id="color-palette-btn"
-                  class="size-7 rounded-lg border border-border/80 hover:border-border-bright transition duration-300 p-[2px]"
-                  title="Color palette"
-                  aria-label="Choose color palette"
-                >
-                  <span
-                    id="color-palette-btn-preview"
-                    class="block w-full h-full rounded-[6px]"
-                    style="${selectedPaletteStyle}"
-                  ></span>
-                </button>
-                <div
-                  id="color-palette-menu"
-                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-2 p-2 shadow-2xl z-50 min-w-56 duration-200"
-                >
-                  ${COLOR_PALETTE_OPTIONS.map((palette) => {
-                    const isSelected = palette.id === selectedPaletteId;
-                    const paletteStyle = getColorPalettePreviewStyle(palette.id);
-
-                    return `<button
-                      type="button"
-                      data-color-palette-id="${palette.id}"
-                      class="${getColorPaletteOptionButtonClass(isSelected)}"
-                    >
-                      <span class="flex items-center gap-2" data-color-palette-option-content>
-                        <span class="size-5 rounded-md border border-border/70" style="${paletteStyle}"></span>
-                        <span class="flex-1 min-w-0">
-                          <span class="block text-xs font-semibold text-text">${palette.label}</span>
-                          <span class="block text-[11px] text-text-muted truncate">${palette.description}</span>
-                        </span>
-                        ${isSelected ? '<span data-selected-palette-badge="true" class="text-[11px] text-text-secondary">Selected</span>' : ""}
-                      </span>
-                    </button>`;
-                  }).join("")}
-                </div>
-              </div>
-
+            <div class="relative flex items-center gap-2" id="settings-container">
               <button
                 id="settings-btn"
                 class="cursor-pointer text-text-secondary hover:text-text transition duration-400 flex items-center"
@@ -131,6 +92,38 @@ export function renderGeneratorControls(settings: AppSettings): string {
                   <circle cx="7" cy="7" r="3"/>
                 </svg>
               </button>
+
+              <div class="relative flex items-center" id="color-palette-container">
+                <button
+                  id="color-palette-btn"
+                  class="size-7 rounded-lg border border-border/80 hover:border-border-bright transition duration-300 overflow-hidden"
+                  title="Color palette"
+                  aria-label="Choose color palette"
+                  style="${selectedPaletteStyle}"
+                ></button>
+                <div
+                  id="color-palette-menu"
+                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden p-2 shadow-2xl z-50 duration-200"
+                >
+                  <div class="grid grid-cols-3 gap-2">
+                    ${COLOR_PALETTE_OPTIONS.map((palette) => {
+                      const isSelected = palette.id === selectedPaletteId;
+                      const paletteStyle = getColorPalettePreviewStyle(palette.id);
+                      const tooltip = `${palette.label}: ${palette.description}`;
+
+                      return `<button
+                        type="button"
+                        data-color-palette-id="${palette.id}"
+                        class="${getColorPaletteOptionButtonClass(isSelected)}"
+                        style="${paletteStyle}"
+                        title="${tooltip}"
+                        aria-label="${tooltip}"
+                      ></button>`;
+                    }).join("")}
+                  </div>
+                </div>
+              </div>
+
               <div
                 id="settings-menu"
                 class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-3 p-3 shadow-2xl z-50 min-w-3xs duration-200"

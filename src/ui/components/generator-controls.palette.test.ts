@@ -5,25 +5,15 @@ function createOptionNode(paletteId: string, isSelected: boolean): HTMLButtonEle
   const button = document.createElement("button");
   button.dataset.colorPaletteId = paletteId;
   button.className = isSelected
-    ? "w-full text-left rounded-lg px-2 py-2 border transition-colors border-border-bright bg-surface-hover/60"
-    : "w-full text-left rounded-lg px-2 py-2 border transition-colors border-transparent hover:border-border/60 hover:bg-surface-hover/50";
-
-  const content = document.createElement("span");
-  content.dataset.colorPaletteOptionContent = "true";
-  button.appendChild(content);
-
-  if (isSelected) {
-    const selectedBadge = document.createElement("span");
-    selectedBadge.dataset.selectedPaletteBadge = "true";
-    content.appendChild(selectedBadge);
-  }
+    ? "size-8 rounded-md border transition-all duration-200 border-border-bright"
+    : "size-8 rounded-md border transition-all duration-200 border-border/70 hover:border-border-bright/80";
 
   return button;
 }
 
 describe("updatePaletteSelectionUi", () => {
-  it("updates preview style and selected badge state", () => {
-    const previewNode = document.createElement("span");
+  it("updates preview style and selection classes", () => {
+    const previewNode = document.createElement("button");
     const selectedOption = createOptionNode("monochrome", true);
     const targetOption = createOptionNode("sunset", false);
 
@@ -38,9 +28,7 @@ describe("updatePaletteSelectionUi", () => {
     });
 
     expect(previewNode.getAttribute("style")).toContain("linear-gradient");
-    expect(selectedOption.querySelector("[data-selected-palette-badge]")).toBeNull();
-    expect(targetOption.querySelector("[data-selected-palette-badge]")).toBeTruthy();
     expect(targetOption.className).toContain("border-border-bright");
-    expect(selectedOption.className).toContain("hover:border-border/60");
+    expect(selectedOption.className).toContain("hover:border-border-bright/80");
   });
 });

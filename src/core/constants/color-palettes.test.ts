@@ -44,9 +44,10 @@ describe("color palettes", () => {
     const selectedClassName = getColorPaletteOptionButtonClass(true);
     const unselectedClassName = getColorPaletteOptionButtonClass(false);
 
+    expect(selectedClassName).toContain("size-8");
     expect(selectedClassName).toContain("border-border-bright");
-    expect(selectedClassName).not.toContain("hover:border-border/60");
-    expect(unselectedClassName).toContain("hover:border-border/60");
-    expect(unselectedClassName).toContain("border-transparent");
+    expect(selectedClassName).toContain("focus-visible:ring-2");
+    expect(unselectedClassName).toContain("hover:border-border-bright/80");
+    expect(unselectedClassName).toContain("border-border/70");
   });
 });

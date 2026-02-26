@@ -68,13 +68,14 @@ export function getColorPalettePreviewStyle(paletteId: ColorPaletteId): string {
 }
 
 export function getColorPaletteOptionButtonClass(isSelected: boolean): string {
-  const baseClass = "w-full text-left rounded-lg px-2 py-2 border transition-colors";
+  const baseClass =
+    "size-8 rounded-md border transition-all duration-200 hover:scale-102 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-bright";
 
   if (isSelected) {
-    return `${baseClass} border-border-bright bg-surface-hover/60`;
+    return `${baseClass} border-border-bright`;
   }
 
-  return `${baseClass} border-transparent hover:border-border/60 hover:bg-surface-hover/50`;
+  return `${baseClass} border-border/70 hover:border-border-bright/80`;
 }
 
 export function buildColorPalettePolicyXml(paletteId: ColorPaletteId): string {

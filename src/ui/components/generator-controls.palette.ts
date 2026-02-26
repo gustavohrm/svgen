@@ -6,7 +6,7 @@ import {
 
 interface UpdatePaletteSelectionUiInput {
   paletteId: ColorPaletteId;
-  previewNode: HTMLSpanElement | null;
+  previewNode: HTMLElement | null;
   optionNodes: NodeListOf<HTMLButtonElement>;
 }
 
@@ -24,18 +24,5 @@ export function updatePaletteSelectionUi({
     const isSelected = optionPaletteId === paletteId;
 
     optionNode.className = getColorPaletteOptionButtonClass(isSelected);
-
-    const selectedBadge = optionNode.querySelector("[data-selected-palette-badge]");
-    if (isSelected && !selectedBadge) {
-      const badge = document.createElement("span");
-      badge.className = "text-[11px] text-text-secondary";
-      badge.dataset.selectedPaletteBadge = "true";
-      badge.textContent = "Selected";
-      optionNode.querySelector("[data-color-palette-option-content]")?.appendChild(badge);
-    }
-
-    if (!isSelected && selectedBadge) {
-      selectedBadge.remove();
-    }
   });
 }

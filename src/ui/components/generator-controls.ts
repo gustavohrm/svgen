@@ -137,9 +137,6 @@ export class GeneratorControls extends HTMLElement {
   private attachEvents() {
     // Component level events
     const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
-    const colorPaletteBtnPreview = this.querySelector(
-      "#color-palette-btn-preview",
-    ) as HTMLSpanElement | null;
     const colorPaletteMenu = this.querySelector("#color-palette-menu") as HTMLDivElement | null;
     const colorPaletteOptions = this.querySelectorAll<HTMLButtonElement>(
       "button[data-color-palette-id]",
@@ -190,7 +187,7 @@ export class GeneratorControls extends HTMLElement {
         settingsRepository.setColorPaletteId(paletteId);
         updatePaletteSelectionUi({
           paletteId,
-          previewNode: colorPaletteBtnPreview,
+          previewNode: colorPaletteBtn,
           optionNodes: colorPaletteOptions,
         });
 
