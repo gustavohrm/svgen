@@ -158,9 +158,8 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg, secondSvg]);
   });
 
-  it("rejects concatenated multi-root svg payloads", () => {
-    expect(() => parseSvgVariationsFromResponses([`${validSvg}${secondSvg}`], 1)).toThrow(
-      "Model returned an invalid variations payload",
-    );
+  it("salvages the first valid entry from concatenated multi-root svg payloads when requestedCount is 1", () => {
+    const result = parseSvgVariationsFromResponses([`${validSvg}${secondSvg}`], 1);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 });

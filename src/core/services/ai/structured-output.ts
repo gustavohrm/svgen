@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DOMParser as XmldomParser } from "@xmldom/xmldom";
+import { DOMParser as XmldomParser, XMLSerializer as XmldomSerializer } from "@xmldom/xmldom";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
@@ -17,9 +17,9 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
   });
 }
 
-function buildPartialSvgVariationsPayloadSchema(_requestedCount: number) {
+function buildPartialSvgVariationsPayloadSchema() {
   return z.object({
-    svgs: z.array(z.any()).min(1),
+    svgs: z.array(z.unknown()).min(1),
   });
 }
 
@@ -244,8 +244,7 @@ function parsePartialSvgVariationsFromText(text: string, requestedCount: number)
     return [];
   }
 
-  const parsedPayload =
-    buildPartialSvgVariationsPayloadSchema(normalizedCount).safeParse(parsedJson);
+  const parsedPayload = buildPartialSvgVariationsPayloadSchema().safeParse(parsedJson);
   if (!parsedPayload.success) {
     return [];
   }
@@ -310,19 +309,14 @@ function extractSvgDocumentsFromText(text: string): string[] {
   const normalizedSvgs: string[] = [];
   const uniqueSvgs = new Set<string>();
 
-  for (const node of Array.from(parsedBody.childNodes)) {
-    if (node.nodeType !== 1) {
-      // Node.ELEMENT_NODE === 1
-      continue;
-    }
+  const svgElements = Array.from((parsedBody as Document | Element).getElementsByTagName("svg"));
 
+  for (const node of svgElements) {
     const element = node as Element;
-    if (element.tagName?.toLowerCase() !== "svg") {
-      continue;
-    }
-
     const html =
-      typeof element.outerHTML === "string" ? element.outerHTML : (element as any).toString();
+      typeof element.outerHTML === "string"
+        ? element.outerHTML
+        : new XmldomSerializer().serializeToString(element);
 
     const normalized = normalizeSvgMarkup(html);
     if (!normalized || uniqueSvgs.has(normalized)) {
@@ -389,11 +383,7 @@ export function parseSvgVariationsFromResponses(
       fallbackSvgs.add(normalized);
     }
 
-    if (
-      normalizedCount > 1 &&
-      fallbackSvgs.size < normalizedCount &&
-      !structuredPayloadResponseIndexes.has(index)
-    ) {
+    if (fallbackSvgs.size < normalizedCount && !structuredPayloadResponseIndexes.has(index)) {
       const extractedSvgs = extractSvgDocumentsFromText(response);
       for (const svg of extractedSvgs) {
         fallbackSvgs.add(svg);
