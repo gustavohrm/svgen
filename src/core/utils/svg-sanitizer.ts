@@ -1143,7 +1143,7 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
     return null;
   }
 
-  if (!isSafeCssDeclarations(trimmed)) {
+  if (!isSafeCssDeclarations(normalizedTrimmed)) {
     return null;
   }
 
