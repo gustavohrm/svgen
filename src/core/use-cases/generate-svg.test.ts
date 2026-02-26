@@ -215,6 +215,22 @@ describe("GenerateSvgUseCase", () => {
       }),
       1,
     );
+    expect(aiService.generateMultiple).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        prompt: expect.stringContaining("<failure_feedback>"),
+      }),
+      1,
+    );
+    expect(aiService.generateMultiple).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        prompt: expect.stringContaining(
+          "<blocked_after_sanitization>1</blocked_after_sanitization>",
+        ),
+      }),
+      1,
+    );
     expect(result.svgs).toHaveLength(2);
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",

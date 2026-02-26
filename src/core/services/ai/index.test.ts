@@ -69,6 +69,10 @@ describe("AiService", () => {
       "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
     );
     expect(prompt).toContain("<system_instructions>");
+    expect(prompt).toContain('<complexity_policy mode="single-craft">');
+    expect(prompt).toContain("<variation_matrix>");
+    expect(prompt).toContain("<sanitizer_compatibility>");
+    expect(prompt).toContain("blocked tags: script, foreignObject, animate, animateMotion");
     expect(prompt).toContain("<quality_rubric>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
@@ -147,6 +151,7 @@ describe("AiService", () => {
 
     expect(prompt).toContain("Generate exactly 3 distinct SVG variations.");
     expect(prompt).toContain('Return exactly 3 SVG strings under the "svgs" key');
+    expect(prompt).toContain('<complexity_policy mode="compact-multi">');
     expect(prompt).toContain('"minItems":3');
     expect(prompt).toContain('"maxItems":3');
   });
@@ -158,6 +163,8 @@ describe("AiService", () => {
     expect(prompt).toContain("<variation_count>3</variation_count>");
     expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
     expect(prompt).toContain('Return exactly 3 SVG strings in "svgs".');
+    expect(prompt).toContain("Each pair of SVG variations must differ on at least two axes");
+    expect(prompt).toContain("Avoid sanitizer-triggering features");
   });
 
   it("should keep XML well-formed when user prompt contains CDATA terminator", () => {
