@@ -3,7 +3,35 @@ import { GCP_SVG_VARIATIONS_SCHEMA, SVG_VARIATIONS_JSON_SCHEMA } from "../struct
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
-const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+const DEFAULT_FETCH_MODELS_TIMEOUT_MS = 30_000;
+const DEFAULT_GENERATION_TIMEOUT_MS = 120_000;
+const DEFAULT_GENERATION_TIMEOUT_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 600;
+
+interface ImportMetaEnvLike {
+  [key: string]: string | undefined;
+}
+
+interface AiRequestConfig {
+  modelFetchTimeoutMs: number;
+  generationTimeoutMs: number;
+  generationTimeoutRetries: number;
+  retryDelayMs: number;
+}
+
+interface RequestConfigOverrides {
+  modelFetchTimeoutMs?: number;
+  generationTimeoutMs?: number;
+  generationTimeoutRetries?: number;
+  retryDelayMs?: number;
+}
+
+const AI_TIMEOUT_ENV_KEYS = {
+  modelFetchTimeoutMs: "VITE_AI_FETCH_TIMEOUT_MS",
+  generationTimeoutMs: "VITE_AI_GENERATE_TIMEOUT_MS",
+  generationTimeoutRetries: "VITE_AI_GENERATE_TIMEOUT_RETRIES",
+  retryDelayMs: "VITE_AI_TIMEOUT_RETRY_DELAY_MS",
+} as const;
 
 const openRouterModelsResponseSchema = z.object({
   data: z.array(
@@ -62,6 +90,11 @@ function formatRequestTarget(input: RequestInfo | URL): string {
   return input.url;
 }
 
+/**
+ * Determines whether the given error represents an abort (an "AbortError") across environments.
+ *
+ * @returns `true` if the error's name is "AbortError", `false` otherwise.
+ */
 function isAbortError(error: unknown): boolean {
   if (typeof DOMException !== "undefined" && error instanceof DOMException) {
     return error.name === "AbortError";
@@ -75,11 +108,164 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Parse a string as a positive integer.
+ *
+ * @param rawValue - The input string to parse, or `undefined`
+ * @returns The parsed integer if greater than zero, `undefined` otherwise
+ */
+function parsePositiveInt(rawValue: string | undefined): number | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+/**
+ * Parses a string into a non-negative integer.
+ *
+ * @param rawValue - The string to parse; may be `undefined`.
+ * @returns The integer value if `rawValue` represents an integer greater than or equal to 0, `undefined` otherwise.
+ */
+function parseNonNegativeInt(rawValue: string | undefined): number | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
+/**
+ * Safely obtains the environment map exposed on import.meta.env when available.
+ *
+ * If the current runtime does not expose import.meta.env or accessing it throws,
+ * the function returns `undefined`.
+ *
+ * @returns The environment mapping from `import.meta.env`, or `undefined` if it is unavailable.
+ */
+function getImportMetaEnv(): ImportMetaEnvLike | undefined {
+  try {
+    return (import.meta as ImportMeta & { env?: ImportMetaEnvLike }).env;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Build a resolved AI request configuration by combining explicit overrides, environment variables, and defaults.
+ *
+ * @param overrides - Optional partial configuration values that take highest precedence when present
+ * @returns The effective AiRequestConfig where each field is taken from `overrides` if provided, otherwise from the corresponding environment variable if valid, otherwise from the built-in default
+ */
+function resolveAiRequestConfig(overrides: RequestConfigOverrides = {}): AiRequestConfig {
+  const env = getImportMetaEnv();
+
+  const modelFetchTimeoutFromEnv = parsePositiveInt(env?.[AI_TIMEOUT_ENV_KEYS.modelFetchTimeoutMs]);
+  const generationTimeoutFromEnv = parsePositiveInt(env?.[AI_TIMEOUT_ENV_KEYS.generationTimeoutMs]);
+  const generationRetriesFromEnv = parseNonNegativeInt(
+    env?.[AI_TIMEOUT_ENV_KEYS.generationTimeoutRetries],
+  );
+  const retryDelayFromEnv = parseNonNegativeInt(env?.[AI_TIMEOUT_ENV_KEYS.retryDelayMs]);
+
+  return {
+    modelFetchTimeoutMs:
+      overrides.modelFetchTimeoutMs ?? modelFetchTimeoutFromEnv ?? DEFAULT_FETCH_MODELS_TIMEOUT_MS,
+    generationTimeoutMs:
+      overrides.generationTimeoutMs ?? generationTimeoutFromEnv ?? DEFAULT_GENERATION_TIMEOUT_MS,
+    generationTimeoutRetries:
+      overrides.generationTimeoutRetries ??
+      generationRetriesFromEnv ??
+      DEFAULT_GENERATION_TIMEOUT_RETRIES,
+    retryDelayMs: overrides.retryDelayMs ?? retryDelayFromEnv ?? DEFAULT_RETRY_DELAY_MS,
+  };
+}
+
+/**
+ * Detects whether an Error represents a timeout by inspecting its message.
+ *
+ * @returns `true` if the error's message contains "timed out" (case-insensitive), `false` otherwise.
+ */
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /timed out/i.test(error.message);
+}
+
+/**
+ * Delays execution for the specified duration.
+ *
+ * @param delayMs - The number of milliseconds to wait before the delay completes
+ */
+async function sleep(delayMs: number): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
+}
+
+/**
+ * Executes an async operation and retries it on timeout errors up to a configured number of attempts.
+ *
+ * Retries occur only when the thrown error is identified as a timeout via `isTimeoutError`. Between retry attempts the function waits for `retryDelayMs` milliseconds. If the error is not a timeout or retries are exhausted, the last error is rethrown.
+ *
+ * @param options.execute - Function that performs the operation to execute
+ * @param options.retries - Maximum number of retry attempts after the initial try (0 means no retries)
+ * @param options.retryDelayMs - Milliseconds to wait between retries; no wait when 0 or negative
+ * @returns The resolved value from a successful `execute` call
+ * @throws The error thrown by `execute` when it is not considered retryable or when retry attempts are exhausted
+ */
+async function runWithTimeoutRetry<T>(options: {
+  execute: () => Promise<T>;
+  retries: number;
+  retryDelayMs: number;
+}): Promise<T> {
+  let currentAttempt = 0;
+
+  while (true) {
+    try {
+      return await options.execute();
+    } catch (error: unknown) {
+      const canRetry = currentAttempt < options.retries && isTimeoutError(error);
+      if (!canRetry) {
+        throw error;
+      }
+
+      currentAttempt += 1;
+      if (options.retryDelayMs > 0) {
+        await sleep(options.retryDelayMs);
+      }
+    }
+  }
+}
+
+/**
+ * Performs a fetch using the provided fetch implementation and aborts the request if an upstream AbortSignal triggers or the operation exceeds the given timeout.
+ *
+ * @param fetchImpl - A fetch-like function to perform the request.
+ * @param input - The resource to fetch (URL or RequestInfo).
+ * @param init - RequestInit to pass to the fetch; if `init.signal` is provided it will be wired to abort this request.
+ * @param timeoutMs - Maximum time in milliseconds to wait before aborting the request.
+ * @returns The Response returned by the fetch implementation.
+ * @throws An Error with message "Request to <target> timed out after <ms>ms." if the request exceeded `timeoutMs`.
+ * @throws An Error with message "Request to <target> was aborted before completion." if the request was aborted via an AbortSignal.
+ */
 async function fetchWithTimeout(
   fetchImpl: FetchLike,
   input: RequestInfo | URL,
   init: RequestInit = {},
-  timeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
+  timeoutMs: number = DEFAULT_FETCH_MODELS_TIMEOUT_MS,
 ): Promise<Response> {
   const controller = new AbortController();
   const upstreamSignal = init.signal;
@@ -226,10 +412,14 @@ function parseGoogleCandidateText(candidate: {
 }
 
 export class FetchOpenRouterClient implements OpenRouterClient {
+  private readonly requestConfig: AiRequestConfig;
+
   constructor(
     private readonly fetchImpl: FetchLike = fetch,
-    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
-  ) {}
+    requestConfig: RequestConfigOverrides = {},
+  ) {
+    this.requestConfig = resolveAiRequestConfig(requestConfig);
+  }
 
   async fetchModels(apiKey: string): Promise<string[]> {
     const response = await fetchWithTimeout(
@@ -240,7 +430,7 @@ export class FetchOpenRouterClient implements OpenRouterClient {
           Authorization: `Bearer ${apiKey}`,
         },
       },
-      this.requestTimeoutMs,
+      this.requestConfig.modelFetchTimeoutMs,
     );
 
     if (!response.ok) {
@@ -289,16 +479,21 @@ export class FetchOpenRouterClient implements OpenRouterClient {
       },
     };
 
-    let response = await fetchWithTimeout(
-      this.fetchImpl,
-      endpoint,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify(structuredBody),
-      },
-      this.requestTimeoutMs,
-    );
+    let response = await runWithTimeoutRetry({
+      execute: () =>
+        fetchWithTimeout(
+          this.fetchImpl,
+          endpoint,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify(structuredBody),
+          },
+          this.requestConfig.generationTimeoutMs,
+        ),
+      retries: this.requestConfig.generationTimeoutRetries,
+      retryDelayMs: this.requestConfig.retryDelayMs,
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -309,16 +504,21 @@ export class FetchOpenRouterClient implements OpenRouterClient {
         );
       }
 
-      response = await fetchWithTimeout(
-        this.fetchImpl,
-        endpoint,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(baseBody),
-        },
-        this.requestTimeoutMs,
-      );
+      response = await runWithTimeoutRetry({
+        execute: () =>
+          fetchWithTimeout(
+            this.fetchImpl,
+            endpoint,
+            {
+              method: "POST",
+              headers,
+              body: JSON.stringify(baseBody),
+            },
+            this.requestConfig.generationTimeoutMs,
+          ),
+        retries: this.requestConfig.generationTimeoutRetries,
+        retryDelayMs: this.requestConfig.retryDelayMs,
+      });
 
       if (!response.ok) {
         const fallbackErrorText = await response.text();
@@ -334,17 +534,21 @@ export class FetchOpenRouterClient implements OpenRouterClient {
 }
 
 export class FetchGoogleCloudClient implements GoogleCloudClient {
+  private readonly requestConfig: AiRequestConfig;
+
   constructor(
     private readonly fetchImpl: FetchLike = fetch,
-    private readonly requestTimeoutMs: number = DEFAULT_FETCH_TIMEOUT_MS,
-  ) {}
+    requestConfig: RequestConfigOverrides = {},
+  ) {
+    this.requestConfig = resolveAiRequestConfig(requestConfig);
+  }
 
   async fetchModels(apiKey: string): Promise<string[]> {
     const response = await fetchWithTimeout(
       this.fetchImpl,
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       {},
-      this.requestTimeoutMs,
+      this.requestConfig.modelFetchTimeoutMs,
     );
 
     if (!response.ok) {
@@ -393,18 +597,23 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
       generationConfig: baseGenerationConfig,
     };
 
-    let response = await fetchWithTimeout(
-      this.fetchImpl,
-      generateUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(structuredPayload),
-      },
-      this.requestTimeoutMs,
-    );
+    let response = await runWithTimeoutRetry({
+      execute: () =>
+        fetchWithTimeout(
+          this.fetchImpl,
+          generateUrl,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(structuredPayload),
+          },
+          this.requestConfig.generationTimeoutMs,
+        ),
+      retries: this.requestConfig.generationTimeoutRetries,
+      retryDelayMs: this.requestConfig.retryDelayMs,
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -413,18 +622,23 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
         throw new Error(`GCP API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      response = await fetchWithTimeout(
-        this.fetchImpl,
-        generateUrl,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(fallbackPayload),
-        },
-        this.requestTimeoutMs,
-      );
+      response = await runWithTimeoutRetry({
+        execute: () =>
+          fetchWithTimeout(
+            this.fetchImpl,
+            generateUrl,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(fallbackPayload),
+            },
+            this.requestConfig.generationTimeoutMs,
+          ),
+        retries: this.requestConfig.generationTimeoutRetries,
+        retryDelayMs: this.requestConfig.retryDelayMs,
+      });
 
       if (!response.ok) {
         const fallbackErrorText = await response.text();

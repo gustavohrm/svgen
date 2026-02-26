@@ -19,6 +19,24 @@ The goal is not just to forward a prompt to a provider. The app focuses on a mor
 - `src/settings/`: provider/settings page
 - `src/gallery/`: generated result browsing page
 
+## Optional timeout tuning
+
+Generation requests can be slower than model-list requests. You can tune request behavior with Vite env vars:
+
+- `VITE_AI_FETCH_TIMEOUT_MS`: timeout for model-list fetches (default: `30000`)
+- `VITE_AI_GENERATE_TIMEOUT_MS`: timeout for SVG generation requests (default: `120000`)
+- `VITE_AI_GENERATE_TIMEOUT_RETRIES`: number of timeout-only retries for generation (default: `1`)
+- `VITE_AI_TIMEOUT_RETRY_DELAY_MS`: delay before timeout retry (default: `600`)
+
+Example `.env`:
+
+```bash
+VITE_AI_FETCH_TIMEOUT_MS=30000
+VITE_AI_GENERATE_TIMEOUT_MS=120000
+VITE_AI_GENERATE_TIMEOUT_RETRIES=1
+VITE_AI_TIMEOUT_RETRY_DELAY_MS=600
+```
+
 ## License
 
 This project is licensed under the GNU AGPLv3 to ensure that all improvements to the hub remain open and benefit the community.

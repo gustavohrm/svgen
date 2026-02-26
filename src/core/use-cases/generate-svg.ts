@@ -2,6 +2,7 @@ import { AppSettings } from "../modules/db/index";
 import { AiProviderId } from "../types";
 import { normalizePositiveInt } from "../utils/number";
 import { sanitizeSvgMarkup } from "../utils/svg-sanitizer";
+import { mapGenerationErrorToUserMessage } from "../services/ai/error-messages";
 
 export interface GenerateSvgRequest {
   prompt: string;
@@ -132,8 +133,7 @@ export class GenerateSvgUseCase {
         generatedAt: Date.now(),
       };
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to generate SVG. Please try again.";
+      const errorMessage = mapGenerationErrorToUserMessage(error, { providerId });
       console.error("Generation failed:", error);
       this.uiAdapter.notify({
         type: "error",
