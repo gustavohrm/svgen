@@ -73,6 +73,9 @@ export const SVG_CSS_CAPABILITY_CONTRACT = {
 } as const;
 
 /**
+ * Produce a prompt-friendly description of allowed CSS properties for use in prompts.
+ *
+ * @returns A string stating that standard CSS properties and custom properties (`--tokens`) are allowed, followed by the comma-separated list of blocked properties.
  * Produce a prompt-friendly statement for CSS property capability.
  *
  * @returns A statement describing standard CSS and custom property support with blocked-property exceptions.
@@ -90,10 +93,20 @@ export function formatSvgCssAllowedAtRulesForPrompt(): string {
   return SVG_CSS_ALLOWED_AT_RULES.join(", ");
 }
 
+/**
+ * Produces a comma-separated list of allowed SVG/CSS selector hint formats for prompts.
+ *
+ * @returns A string containing the selector hints joined by ", " (for example: "element, .class, #id").
+ */
 export function formatSvgCssSelectorHintsForPrompt(): string {
   return SVG_CSS_ALLOWED_SELECTOR_HINTS.join(", ");
 }
 
+/**
+ * Produce a single prompt-friendly sentence summarizing SVG/CSS safety rules.
+ *
+ * @returns A single string containing the blocked feature descriptions, the URL-fragment rule, and guidance to use `<style>` blocks, separated by spaces.
+ */
 export function formatSvgCssSafetyRulesForPrompt(): string {
   return [
     ...SVG_BLOCKED_FEATURES,

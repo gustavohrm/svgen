@@ -165,6 +165,11 @@ function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }
 
+/**
+ * Builds an XML fragment containing the serialized SVG CSS capability contract.
+ *
+ * @returns An XML string with a top-level `<css_capability_contract>` element whose content is a CDATA-wrapped JSON serialization of `SVG_CSS_CAPABILITY_CONTRACT` (escaped to be safe inside CDATA).
+ */
 function buildSvgCssCapabilityContractXml(): string {
   const contractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
   return `<css_capability_contract><![CDATA[${toCdata(contractPayload)}]]></css_capability_contract>`;

@@ -484,6 +484,14 @@ function isAllowedStyleTagAttributes(attrsRaw: string): boolean {
   return STYLE_TAG_ALLOWED_ATTRS_PATTERN.test(attrsRaw);
 }
 
+/**
+ * Validates and sanitizes CSS extracted from an SVG <style> element.
+ *
+ * Removes CDATA wrappers and comments, enforces size and disallowed-pattern limits, and validates the stylesheet against the SVG CSS policy.
+ *
+ * @param cssRaw - Raw CSS text extracted from a `<style>` element (may include CDATA or comments)
+ * @returns An empty string if the input contains no remaining CSS after stripping, `null` if the CSS is disallowed or invalid, or the sanitized CSS string otherwise
+ */
 function sanitizeInlineSvgCss(cssRaw: string): string | null {
   const withoutCdata = cssRaw.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
 
@@ -674,6 +682,34 @@ function isSafeAtRuleStatement(
 }
 
 /**
+ * Validate a semicolon-terminated at-rule statement (non-block form) against the CSS policy.
+ *
+ * @param css - The entire stylesheet text containing the at-rule.
+ * @param atRuleStartIndex - Index of the at-rule start (`@`) in `css`.
+ * @param statementTerminatorIndex - Index of the semicolon that terminates this at-rule statement.
+ * @param atRuleName - Normalized at-rule name (lowercased, e.g. `"layer"`, `"media"`).
+ * @returns `true` if the at-rule statement is permitted by policy (currently only `@layer` statements with an empty or safe prelude), `false` otherwise.
+ */
+function isSafeAtRuleStatement(
+  css: string,
+  atRuleStartIndex: number,
+  statementTerminatorIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName !== "layer") {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, statementTerminatorIndex);
+  const normalizedPrelude = atRulePrelude.replace(/^@[a-z-]+/i, "").trim();
+  if (normalizedPrelude.length === 0) {
+    return true;
+  }
+
+  return isSafeAtRulePrelude(atRulePrelude, atRuleName, false);
+}
+
+/**
  * Validates the prelude (the portion following an at-rule name) for allowed characters, balanced structure, and rule-specific requirements.
  *
  * @param prelude - The raw at-rule prelude string to validate (may include the leading at-rule token).
@@ -722,6 +758,18 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: 
   return false;
 }
 
+function isSafeLayerPrelude(prelude: string): boolean {
+  return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
+    prelude,
+  );
+}
+
+/**
+ * Validate a CSS `@layer` prelude as a comma-separated list of identifiers with optional dotted segments.
+ *
+ * @param prelude - The `@layer` prelude to validate; each item must start with a letter or underscore, may contain letters, digits, underscores, or hyphens, and items may include dot-separated segments (e.g., "a", "namespace.sub").
+ * @returns `true` if `prelude` is a valid comma-separated list of layer identifiers, `false` otherwise.
+ */
 function isSafeLayerPrelude(prelude: string): boolean {
   return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
     prelude,
@@ -1093,11 +1141,11 @@ function findTopLevelCharacter(input: string, targetCharacter: string, startInde
 }
 
 /**
- * Determines whether a CSS property value is safe to allow in inline SVG styles.
+ * Determines whether a CSS property value is permitted in inline SVG styles.
  *
- * This validates length and character constraints, rejects disallowed CSS constructs (e.g., @import, javascript:, expression(), -moz-binding, closing </style>), forbids braces, angle brackets, backticks, backslashes, and ensures any url(...) references are local fragment URLs.
+ * Performs policy checks: enforces length and allowed-character limits, rejects disallowed CSS constructs and characters (braces, angle brackets, backticks, backslashes), and requires any `url(...)` references to target local fragment identifiers.
  *
- * @param value - The CSS property value to validate (e.g., the right-hand side of `property: value`).
+ * @param value - The CSS property value to validate (right-hand side of a declaration)
  * @returns `true` if `value` satisfies the safety checks, `false` otherwise.
  */
 function isSafeCssValue(value: string): boolean {
