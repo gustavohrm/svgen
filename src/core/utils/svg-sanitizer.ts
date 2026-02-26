@@ -662,25 +662,6 @@ function isSafeAtRuleBody(
   return isSafeCssStylesheet(nestedStylesheet);
 }
 
-function isSafeAtRuleStatement(
-  css: string,
-  atRuleStartIndex: number,
-  statementTerminatorIndex: number,
-  atRuleName: string,
-): boolean {
-  if (atRuleName !== "layer") {
-    return false;
-  }
-
-  const atRulePrelude = css.slice(atRuleStartIndex, statementTerminatorIndex);
-  const normalizedPrelude = atRulePrelude.replace(/^@[a-z-]+/i, "").trim();
-  if (normalizedPrelude.length === 0) {
-    return true;
-  }
-
-  return isSafeAtRulePrelude(atRulePrelude, atRuleName, false);
-}
-
 /**
  * Validate a semicolon-terminated at-rule statement (non-block form) against the CSS policy.
  *
@@ -710,12 +691,12 @@ function isSafeAtRuleStatement(
 }
 
 /**
- * Validates the prelude (the portion following an at-rule name) for allowed characters, balanced structure, and rule-specific requirements.
+ * Validate an at-rule prelude for allowed characters, balanced structure, local fragment URL usage, and rule-specific constraints.
  *
- * @param prelude - The raw at-rule prelude string to validate (may include the leading at-rule token).
- * @param atRuleName - The at-rule name (normalized, e.g., "media" or "supports") to apply rule-specific checks.
- * @param hasBlockBody - Whether the at-rule has a `{...}` body (`true`) or is statement-form (`false`).
- * @returns `true` if the prelude is syntactically safe, contains only allowed local fragment URLs, has balanced parentheses, and meets any at-rule-specific constraints; `false` otherwise.
+ * @param prelude - Raw at-rule prelude text (may include the leading `@name` token).
+ * @param atRuleName - Normalized at-rule name (e.g., `"media"`, `"supports"`, `"layer"`) used for rule-specific checks.
+ * @param hasBlockBody - Whether the at-rule has a block body (`true` for `{ ... }`, `false` for statement form).
+ * @returns `true` if the prelude is syntactically safe, contains only allowed local fragment URLs, has balanced parentheses, and meets at-rule-specific requirements; `false` otherwise.
  */
 function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: boolean): boolean {
   const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
@@ -756,12 +737,6 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: 
   }
 
   return false;
-}
-
-function isSafeLayerPrelude(prelude: string): boolean {
-  return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
-    prelude,
-  );
 }
 
 /**

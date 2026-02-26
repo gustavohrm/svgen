@@ -7,6 +7,8 @@ export interface ProviderGenerateOptions {
   apiKey: string;
   count?: number;
   temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
 }
 
 export interface ProviderConfigField {
@@ -31,4 +33,6 @@ export interface GenerateOptions {
   model: string;
   providerId: AiProviderId;
   apiKey: string;
+  topP?: number;
+  maxOutputTokens?: number;
 }

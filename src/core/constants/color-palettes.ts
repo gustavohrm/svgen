@@ -8,7 +8,7 @@ export interface ColorPaletteOption {
   promptDirective: string;
 }
 
-export const DEFAULT_COLOR_PALETTE_ID: ColorPaletteId = "monochrome";
+export const DEFAULT_COLOR_PALETTE_ID: ColorPaletteId = "ai-choice";
 
 export const COLOR_PALETTE_OPTIONS: readonly ColorPaletteOption[] = [
   {
@@ -64,12 +64,14 @@ export function isColorPaletteId(value: unknown): value is ColorPaletteId {
 /**
  * Retrieve the color palette option that corresponds to the given palette id.
  *
- * @returns The matching ColorPaletteOption; if no palette matches `paletteId`, returns the first entry in `COLOR_PALETTE_OPTIONS` as a fallback.
+ * @returns The matching ColorPaletteOption; if no palette matches `paletteId`, returns the declared default palette option.
  */
 export function getColorPaletteById(paletteId: ColorPaletteId): ColorPaletteOption {
-  return (
-    COLOR_PALETTE_OPTIONS.find((palette) => palette.id === paletteId) || COLOR_PALETTE_OPTIONS[0]
-  );
+  const defaultPalette =
+    COLOR_PALETTE_OPTIONS.find((palette) => palette.id === DEFAULT_COLOR_PALETTE_ID) ||
+    COLOR_PALETTE_OPTIONS[0];
+
+  return COLOR_PALETTE_OPTIONS.find((palette) => palette.id === paletteId) || defaultPalette;
 }
 
 /**

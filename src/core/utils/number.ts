@@ -13,3 +13,13 @@ export function normalizePositiveInt(value: number): number {
 
   return Math.min(MAX_POSITIVE_INT, Math.max(1, Math.floor(value)));
 }
+
+/**
+ * Normalize a schema variation count into a positive integer.
+ *
+ * @param value - Optional requested schema count
+ * @returns A normalized positive integer count
+ */
+export function normalizeSchemaCount(value: number | undefined): number {
+  return normalizePositiveInt(value ?? 1);
+}
