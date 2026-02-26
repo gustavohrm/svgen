@@ -64,9 +64,12 @@ export class AiService {
     private readonly providerRegistry: ProviderRegistry,
   ) {}
 
-  buildSystemPrompt(referenceSvgs?: string[], customSystemPrompt?: string): string {
+  buildSystemPrompt(
+    settings: AppSettings,
+    referenceSvgs?: string[],
+    customSystemPrompt?: string,
+  ): string {
     const basePrompt = customSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
-    const settings = this.settingsRepository.getSettings();
     const paletteId = isColorPaletteId(settings.colorPaletteId)
       ? settings.colorPaletteId
       : DEFAULT_COLOR_PALETTE_ID;
@@ -125,7 +128,11 @@ export class AiService {
       throw new Error(`Provider implementation for '${providerId}' not found.`);
     }
 
-    const systemPrompt = this.buildSystemPrompt(options.referenceSvgs, settings.systemPrompt);
+    const systemPrompt = this.buildSystemPrompt(
+      settings,
+      options.referenceSvgs,
+      settings.systemPrompt,
+    );
     const userPrompt = this.buildUserPrompt(options.prompt, normalizedCount);
 
     return provider.generate({

@@ -45,7 +45,8 @@ describe("AiService", () => {
   });
 
   it("should build correct system prompt", () => {
-    const prompt = service.buildSystemPrompt();
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings);
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
     expect(prompt).toContain("avoid SMIL tags");
@@ -83,28 +84,32 @@ describe("AiService", () => {
       colorPaletteId: "ai-choice",
     });
 
-    const prompt = service.buildSystemPrompt();
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings);
 
     expect(prompt).toContain('<color_palette_policy mode="adaptive">');
     expect(prompt).toContain('id="ai-choice"');
   });
 
   it("should build system prompt with references", () => {
-    const prompt = service.buildSystemPrompt(["<svg>ref</svg>"]);
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, ["<svg>ref</svg>"]);
     expect(prompt).toContain("<reference_svgs>");
     expect(prompt).toContain('<reference index="1">');
     expect(prompt).toContain("<svg>ref</svg>");
   });
 
   it("should use custom system prompt when provided", () => {
-    const prompt = service.buildSystemPrompt([], "Always prefer monochrome icon style.");
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, [], "Always prefer monochrome icon style.");
     expect(prompt).toContain("Always prefer monochrome icon style.");
     expect(prompt).toContain("<response_contract>");
   });
 
   it("should keep XML well-formed when custom system prompt contains CDATA terminator", () => {
     const customPrompt = "Always prefer monochrome icon style ]]> with bold geometry.";
-    const prompt = service.buildSystemPrompt([], customPrompt);
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, [], customPrompt);
 
     expect(prompt).toContain("<system_instructions><![CDATA[");
     expect(prompt).toContain(
