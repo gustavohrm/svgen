@@ -1,6 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AiService, createAiService, ProviderRegistry, SettingsRepository } from "./index";
 import { AiProvider, GenerateOptions } from "../../types/index";
+import { AppSettings } from "../../modules/db/index";
+import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
+
+function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
+  return {
+    apiKeys: [
+      {
+        id: "key1",
+        providerId: "gcp",
+        name: "Primary GCP key",
+        value: "test-key",
+        createdAt: Date.now(),
+        selectedModels: [],
+      },
+    ],
+    activeKeys: { gcp: "key1" },
+    variations: 1,
+    temperature: 0.7,
+    systemPrompt: "",
+    colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
+    ...overrides,
+  };
+}
 
 describe("AiService", () => {
   let mockSettingsRepository: SettingsRepository;
@@ -18,23 +41,7 @@ describe("AiService", () => {
     } as any;
 
     mockSettingsRepository = {
-      getSettings: vi.fn().mockReturnValue({
-        apiKeys: [
-          {
-            id: "key1",
-            providerId: "gcp",
-            name: "Primary GCP key",
-            value: "test-key",
-            createdAt: Date.now(),
-            selectedModels: [],
-          },
-        ],
-        activeKeys: { gcp: "key1" },
-        variations: 1,
-        temperature: 0.7,
-        systemPrompt: "",
-        colorPaletteId: "monochrome",
-      }),
+      getSettings: vi.fn().mockReturnValue(makeTestSettings()),
     };
 
     mockProviderRegistry = {
@@ -62,27 +69,13 @@ describe("AiService", () => {
     expect(prompt).toContain('"svgs"');
     expect(prompt).toContain('<color_palette_policy mode="strict">');
     expect(prompt).toContain("<allowed_hex_colors>");
-    expect(prompt).toContain("Exception: if the user explicitly asks for a specific color");
+    expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
   });
 
   it("should use adaptive color policy when palette is AI choice", () => {
-    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue({
-      apiKeys: [
-        {
-          id: "key1",
-          providerId: "gcp",
-          name: "Primary GCP key",
-          value: "test-key",
-          createdAt: Date.now(),
-          selectedModels: [],
-        },
-      ],
-      activeKeys: { gcp: "key1" },
-      variations: 1,
-      temperature: 0.7,
-      systemPrompt: "",
-      colorPaletteId: "ai-choice",
-    });
+    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue(
+      makeTestSettings({ colorPaletteId: "ai-choice" }),
+    );
 
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings);
@@ -91,31 +84,24 @@ describe("AiService", () => {
     expect(prompt).toContain('id="ai-choice"');
   });
 
-  it("should fall back to default palette when colorPaletteId is invalid", () => {
-    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue({
-      apiKeys: [
-        {
-          id: "key1",
-          providerId: "gcp",
-          name: "Primary GCP key",
-          value: "test-key",
-          createdAt: Date.now(),
-          selectedModels: [],
-        },
-      ],
-      activeKeys: { gcp: "key1" },
-      variations: 1,
-      temperature: 0.7,
-      systemPrompt: "",
-      colorPaletteId: "not-a-valid-palette" as any,
-    });
+  it.each([
+    { caseName: "invalid", colorPaletteId: "not-a-valid-palette" as any },
+    { caseName: "null", colorPaletteId: null as any },
+    { caseName: "undefined", colorPaletteId: undefined as any },
+  ])(
+    "should fall back to default palette when colorPaletteId is $caseName",
+    ({ colorPaletteId }) => {
+      vi.mocked(mockSettingsRepository.getSettings).mockReturnValue(
+        makeTestSettings({ colorPaletteId } as Partial<AppSettings>),
+      );
 
-    const settings = mockSettingsRepository.getSettings();
-    const prompt = service.buildSystemPrompt(settings);
+      const settings = mockSettingsRepository.getSettings();
+      const prompt = service.buildSystemPrompt(settings);
 
-    expect(prompt).toContain('<color_palette_policy mode="strict">');
-    expect(prompt).toContain('id="monochrome"');
-  });
+      expect(prompt).toContain('<color_palette_policy mode="strict">');
+      expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
+    },
+  );
 
   it("should build system prompt with references", () => {
     const settings = mockSettingsRepository.getSettings();
@@ -223,11 +209,12 @@ describe("AiService", () => {
   });
 
   it("should throw error if no active key", async () => {
-    (mockSettingsRepository.getSettings as any).mockReturnValue({
-      apiKeys: [],
-      activeKeys: {},
-      colorPaletteId: "monochrome",
-    });
+    (mockSettingsRepository.getSettings as any).mockReturnValue(
+      makeTestSettings({
+        apiKeys: [],
+        activeKeys: {},
+      }),
+    );
 
     await expect(
       service.generate({ prompt: "test", model: "test", providerId: "gcp" }),
