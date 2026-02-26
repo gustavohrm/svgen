@@ -7,13 +7,7 @@ import {
   DEFAULT_COLOR_PALETTE_ID,
   isColorPaletteId,
 } from "../../constants/color-palettes";
-import {
-  SVG_CSS_POLICY_PROFILE,
-  formatSvgCssAllowedAtRulesForPrompt,
-  formatSvgCssAllowedPropertiesForPrompt,
-  formatSvgCssSafetyRulesForPrompt,
-  formatSvgCssSelectorHintsForPrompt,
-} from "../../constants/svg-css-policy";
+import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -26,9 +20,12 @@ export interface ProviderRegistry {
 export const DEFAULT_SYSTEM_PROMPT = `You are an expert SVG designer creating production-ready SVG artwork from user instructions.
 
 Design goals:
-- Translate the request into a clear visual composition with intentional hierarchy and spacing.
-- Favor clean geometry, balanced proportions, and strong readability at small and large sizes.
-- Use cohesive color palettes with sufficient contrast between key shapes.
+- Translate the request into an intentional composition with hierarchy, depth, and focal flow.
+- Build layered scenes (foreground/midground/background) when useful to avoid flat output.
+- Use cohesive palettes with strong contrast and accessibility-minded legibility.
+- Use gradients, filters, masks, and blend modes deliberately for depth and material feel.
+- Choreograph motion with clear timing, stagger, and easing; keep loops smooth and purposeful.
+- Keep artwork scalable and readable at icon and poster sizes.
 - Prefer reusable structure (grouping, transforms, shared styles) when it keeps output clear and compact.
 - Prefer named SVG primitives (rect, circle, ellipse, line, polyline, polygon) over path whenever they can represent the same shape.
 - Use path only when geometry cannot be expressed cleanly with named primitives.
@@ -44,14 +41,9 @@ const SYSTEM_PROMPT_GUARDRAILS = `
   <rule>Prefer named SVG primitives over paths when equivalent.</rule>
   <rule>If animation is requested, use inline CSS animation and avoid SMIL tags such as &lt;animate&gt;, &lt;animateTransform&gt;, &lt;animateMotion&gt;, and &lt;set&gt;.</rule>
   <rule>Prefer viewBox-based responsive coordinates.</rule>
+  <rule>Treat the CSS capability contract below as strict enforcement, not guidance.</rule>
 </generation_rules>
-<css_animation_profile>
-  <profile>${xmlEscape(SVG_CSS_POLICY_PROFILE)}</profile>
-  <allowed_at_rules>${xmlEscape(formatSvgCssAllowedAtRulesForPrompt())}</allowed_at_rules>
-  <allowed_selectors>${xmlEscape(formatSvgCssSelectorHintsForPrompt())}</allowed_selectors>
-  <allowed_css_properties>${xmlEscape(formatSvgCssAllowedPropertiesForPrompt())}</allowed_css_properties>
-  <safety_rules>${xmlEscape(formatSvgCssSafetyRulesForPrompt())}</safety_rules>
-</css_animation_profile>
+${buildSvgCssCapabilityContractXml()}
 <response_contract>
   <type>json_object</type>
   <schema>${JSON.stringify(SVG_VARIATIONS_JSON_SCHEMA)}</schema>
@@ -173,11 +165,12 @@ function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }
 
-function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
+/**
+ * Builds an XML fragment containing the serialized SVG CSS capability contract.
+ *
+ * @returns An XML string with a top-level `<css_capability_contract>` element whose content is a CDATA-wrapped JSON serialization of `SVG_CSS_CAPABILITY_CONTRACT` (escaped to be safe inside CDATA).
+ */
+function buildSvgCssCapabilityContractXml(): string {
+  const contractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+  return `<css_capability_contract><![CDATA[${toCdata(contractPayload)}]]></css_capability_contract>`;
 }
