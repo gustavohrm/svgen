@@ -491,7 +491,7 @@ function sanitizeInlineSvgCss(cssRaw: string): string | null {
     return null;
   }
 
-  const withoutComments = withoutCdata.replace(/\/\*[\s\S]*?\*\//g, "");
+  const withoutComments = stripCssComments(withoutCdata);
   const css = withoutComments.trim();
 
   if (css.length === 0) {
@@ -507,6 +507,10 @@ function sanitizeInlineSvgCss(cssRaw: string): string | null {
   }
 
   return css;
+}
+
+function stripCssComments(input: string): string {
+  return input.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 function hasUnterminatedCssComment(css: string): boolean {
@@ -1101,7 +1105,7 @@ function isSafeCssValue(value: string): boolean {
     return false;
   }
 
-  const normalizedValue = value.replace(/\/\*[\s\S]*?\*\//g, "");
+  const normalizedValue = stripCssComments(value);
   if (DISALLOWED_CSS_PATTERN.test(normalizedValue)) {
     return false;
   }
@@ -1133,7 +1137,7 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
     return "";
   }
 
-  const normalizedTrimmed = trimmed.replace(/\/\*[\s\S]*?\*\//g, "");
+  const normalizedTrimmed = stripCssComments(trimmed);
 
   if (
     trimmed.length > MAX_STYLE_ATTR_CHARS ||
