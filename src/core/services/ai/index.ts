@@ -172,7 +172,8 @@ export class AiService {
       normalizedCount,
     );
     const userPrompt = this.buildUserPrompt(options.prompt, normalizedCount);
-    const maxOutputTokens = calculateMaxOutputTokens(normalizedCount);
+    const topP = options.topP ?? DEFAULT_MODEL_TOP_P;
+    const maxOutputTokens = options.maxOutputTokens ?? calculateMaxOutputTokens(normalizedCount);
 
     return provider.generate({
       prompt: userPrompt,
@@ -181,7 +182,7 @@ export class AiService {
       apiKey: activeKey.value,
       count: normalizedCount,
       temperature: settings.temperature,
-      topP: DEFAULT_MODEL_TOP_P,
+      topP,
       maxOutputTokens,
     });
   }

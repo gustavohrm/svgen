@@ -33,4 +33,6 @@ export interface GenerateOptions {
   model: string;
   providerId: AiProviderId;
   apiKey: string;
+  topP?: number;
+  maxOutputTokens?: number;
 }

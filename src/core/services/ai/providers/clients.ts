@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { buildGcpSvgVariationsSchema, buildSvgVariationsJsonSchema } from "../structured-output";
+import { normalizeSchemaCount } from "../../../utils/number";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -337,20 +338,6 @@ function parseOpenRouterMessageContent(
   }
 
   return "";
-}
-
-/**
- * Normalizes a requested schema count into a valid integer to use for variations.
- *
- * @param value - Desired count of schema variations, which may be undefined or an arbitrary number.
- * @returns The integer count to use: `1` if `value` is undefined, non-finite, or less than `1`; otherwise `Math.floor(value)`.
- */
-function normalizeSchemaCount(value: number | undefined): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
-    return 1;
-  }
-
-  return Math.floor(value);
 }
 
 export interface OpenRouterClient {

@@ -195,6 +195,26 @@ describe("AiService", () => {
     expect(providerCall.prompt).toContain("<user_prompt><![CDATA[draw a circle]]></user_prompt>");
   });
 
+  it("should prefer explicit topP and maxOutputTokens over defaults", async () => {
+    const options: Omit<GenerateOptions, "apiKey"> = {
+      prompt: "draw a circle",
+      model: "gemini-pro",
+      providerId: "gcp",
+      topP: 0.61,
+      maxOutputTokens: 4096,
+    };
+
+    await service.generate(options);
+
+    expect(mockProvider.generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topP: 0.61,
+        maxOutputTokens: 4096,
+        prompt: expect.stringContaining("<user_prompt><![CDATA[draw a circle]]></user_prompt>"),
+      }),
+    );
+  });
+
   it("should generate multiple SVGs in a single request", async () => {
     (mockProvider.generate as any).mockResolvedValue(["<svg>test1</svg>", "<svg>test2</svg>"]);
     const options: Omit<GenerateOptions, "apiKey"> = {

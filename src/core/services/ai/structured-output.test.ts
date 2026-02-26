@@ -60,13 +60,13 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg]);
   });
 
-  it("caps parsed svg results to requestedCount", () => {
-    const result = parseSvgVariationsFromResponses(
-      [JSON.stringify({ svgs: [validSvg, secondSvg, thirdSvg] })],
-      1,
-    );
-
-    expect(result).toEqual([validSvg]);
+  it("rejects structured payloads when svgs array length does not match requestedCount", () => {
+    expect(() =>
+      parseSvgVariationsFromResponses(
+        [JSON.stringify({ svgs: [validSvg, secondSvg, thirdSvg] })],
+        1,
+      ),
+    ).toThrow("exactly 1 SVG strings");
   });
 
   it("parses fenced json payloads with surrounding text", () => {
