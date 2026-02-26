@@ -1,5 +1,15 @@
 import DOMPurify from "dompurify";
-import { SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
+import {
+  SVG_BLOCKED_TAG_NAMES,
+  SVG_CSS_ALLOWED_AT_RULES,
+  SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  SVG_CSS_BLOCKED_PROPERTIES,
+  SVG_CSS_MAX_SELECTOR_CHARS,
+  SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS,
+  SVG_CSS_MAX_STYLE_BLOCKS,
+  SVG_CSS_MAX_STYLE_CHARS,
+  SVG_CSS_MAX_VALUE_CHARS,
+} from "../constants/svg-css-policy";
 
 const ALLOWED_SVG_TAGS = [
   "svg",
@@ -152,16 +162,7 @@ const ALLOWED_SVG_ATTRS = [
   "scale",
 ] as const;
 
-// Keep entries lowercase: BLOCKED_TAG_PATTERN uses case-insensitive matching and
-// DOMPurify normalizes tag names internally.
-const BLOCKED_TAG_NAMES = new Set<string>([
-  "script",
-  "foreignobject",
-  "animate",
-  "animatemotion",
-  "animatetransform",
-  "set",
-]);
+const BLOCKED_TAG_NAMES = new Set<string>(SVG_BLOCKED_TAG_NAMES.map((tag) => tag.toLowerCase()));
 const BLOCKED_TAG_PATTERN = new RegExp(
   `<\\s*\\/?\\s*(?:${Array.from(BLOCKED_TAG_NAMES).map(escapeRegExp).join("|")})\\b`,
   "i",
@@ -170,11 +171,10 @@ const INLINE_EVENT_PATTERN = /\son[a-z][\w:-]*\s*=/i;
 const STYLE_TAG_PATTERN = /<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi;
 const STYLE_PLACEHOLDER_PREFIX = "__svgen_style_placeholder__";
 const STYLE_PLACEHOLDER_FALLBACK_PREFIX = "fallback";
-export const MAX_STYLE_BLOCKS = 4;
-export const MAX_STYLE_CHARS = 5_000;
-const MAX_STYLE_ATTR_CHARS = 1_500;
-const DISALLOWED_CSS_PATTERN =
-  /(?:@import\b|javascript\s*:|expression\s*\(|behavior\s*:|-moz-binding\b|<\/style\b)/i;
+export const MAX_STYLE_BLOCKS = SVG_CSS_MAX_STYLE_BLOCKS;
+export const MAX_STYLE_CHARS = SVG_CSS_MAX_STYLE_CHARS;
+export const MAX_STYLE_ATTR_CHARS = SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS;
+const DISALLOWED_CSS_PATTERN = new RegExp(`(?:${SVG_CSS_BLOCKED_PATTERN_SOURCES.join("|")})`, "i");
 const STYLE_TAG_ALLOWED_ATTRS_PATTERN =
   /^\s*(?:type\s*=\s*(?:"text\/css"|'text\/css'|text\/css))?\s*$/i;
 const URL_REFERENCE_ATTR_NAMES = new Set<string>([
@@ -194,11 +194,13 @@ const NORMALIZED_ALLOWED_CSS_AT_RULES = SVG_CSS_ALLOWED_AT_RULES.map((rule) =>
   normalizeCssAtRule(rule),
 ).filter((rule) => rule.length > 0);
 const ALLOWED_CSS_AT_RULES = new Set<string>(NORMALIZED_ALLOWED_CSS_AT_RULES);
-const CSS_NESTED_RULE_NAME_CANDIDATES = new Set<string>(["media", "supports"]);
+const CSS_NESTED_RULE_NAME_CANDIDATES = new Set<string>(["media", "supports", "layer"]);
 const CSS_NESTED_RULE_AT_RULES = new Set<string>(
   NORMALIZED_ALLOWED_CSS_AT_RULES.filter((rule) => CSS_NESTED_RULE_NAME_CANDIDATES.has(rule)),
 );
-const BLOCKED_CSS_PROPERTIES = new Set<string>(["behavior", "-moz-binding"]);
+const BLOCKED_CSS_PROPERTIES = new Set<string>(
+  SVG_CSS_BLOCKED_PROPERTIES.map((property) => property.toLowerCase()),
+);
 
 interface NodeCryptoModule {
   webcrypto?: Crypto;
@@ -644,6 +646,10 @@ function isSafeAtRuleBody(
  */
 function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
   const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
+  if (atRuleName === "layer" && normalizedPrelude.length === 0) {
+    return true;
+  }
+
   if (!normalizedPrelude) {
     return false;
   }
@@ -672,7 +678,17 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
     return normalizedPrelude.includes("(");
   }
 
+  if (atRuleName === "layer") {
+    return isSafeLayerPrelude(normalizedPrelude);
+  }
+
   return false;
+}
+
+function isSafeLayerPrelude(prelude: string): boolean {
+  return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
+    prelude,
+  );
 }
 
 /**
@@ -756,7 +772,7 @@ function isSafeKeyframeSelector(selector: string): boolean {
  * @returns `true` if the selector meets the length and character restrictions allowed by the sanitizer, `false` otherwise.
  */
 function isSafeCssSelector(selector: string): boolean {
-  if (!selector || selector.length > 300) {
+  if (!selector || selector.length > SVG_CSS_MAX_SELECTOR_CHARS) {
     return false;
   }
 
@@ -1048,7 +1064,7 @@ function findTopLevelCharacter(input: string, targetCharacter: string, startInde
  * @returns `true` if `value` satisfies the safety checks, `false` otherwise.
  */
 function isSafeCssValue(value: string): boolean {
-  if (!value || value.length > 300) {
+  if (!value || value.length > SVG_CSS_MAX_VALUE_CHARS) {
     return false;
   }
 

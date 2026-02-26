@@ -35,6 +35,20 @@ describe("sanitizeSvgForDisplay", () => {
     expect(iframe.getAttribute("srcdoc")).toContain('viewBox="0 0 48 48"');
   });
 
+  it("keeps rich CSS in srcdoc while preserving iframe sandbox isolation", () => {
+    const html = sanitizeSvgForDisplay(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><style>@layer effects{.shape{fill:url(#g);filter:url(#f);mix-blend-mode:screen}}@keyframes drift{0%{transform:translateY(0)}50%{transform:translateY(-1px)}100%{transform:translateY(0)}}.shape{animation:drift 2s ease-in-out infinite}</style><filter id="f"><feGaussianBlur stdDeviation="0.2"/></filter><circle class="shape" cx="12" cy="12" r="8"/></svg>',
+    );
+
+    const iframe = getIframeFromSanitizedHtml(html);
+
+    expect(iframe.getAttribute("sandbox")).toBe("");
+    expect(iframe.getAttribute("srcdoc")).toContain("@layer effects");
+    expect(iframe.getAttribute("srcdoc")).toContain("mix-blend-mode:screen");
+    expect(iframe.getAttribute("srcdoc")).toContain("<html>");
+    expect(iframe.getAttribute("srcdoc")).toContain("<svg");
+  });
+
   it("backfills viewBox from width and height for preview scaling", () => {
     const html = sanitizeSvgForDisplay(
       '<svg width="1024" height="1024"><circle cx="512" cy="512" r="300" fill="#111"/></svg>',

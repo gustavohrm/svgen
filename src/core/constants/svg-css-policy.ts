@@ -1,67 +1,36 @@
 export const SVG_CSS_POLICY_PROFILE = "sandboxed-permissive" as const;
 
-export const SVG_CSS_ALLOWED_AT_RULES = ["@keyframes", "@media", "@supports"] as const;
+export const SVG_CSS_ALLOWED_AT_RULES = ["@keyframes", "@media", "@supports", "@layer"] as const;
 
-export const SVG_CSS_ALLOWED_PROPERTIES = [
-  "animation",
-  "animation-name",
-  "animation-duration",
-  "animation-delay",
-  "animation-timing-function",
-  "animation-iteration-count",
-  "animation-direction",
-  "animation-fill-mode",
-  "animation-play-state",
-  "transform",
-  "transform-origin",
-  "transform-box",
-  "opacity",
-  "fill",
-  "fill-opacity",
-  "fill-rule",
-  "stroke",
-  "stroke-width",
-  "stroke-opacity",
-  "stroke-dasharray",
-  "stroke-dashoffset",
-  "stroke-linecap",
-  "stroke-linejoin",
-  "stroke-miterlimit",
-  "color",
-  "color-interpolation",
-  "color-interpolation-filters",
-  "stop-color",
-  "stop-opacity",
-  "flood-color",
-  "flood-opacity",
-  "lighting-color",
-  "filter",
-  "clip-path",
-  "mask",
-  "paint-order",
-  "vector-effect",
-  "mix-blend-mode",
-  "isolation",
-  "display",
-  "visibility",
-  "pointer-events",
-  "font-size",
-  "font-family",
-  "font-weight",
-  "font-style",
-  "letter-spacing",
-  "word-spacing",
-  "text-anchor",
-  "dominant-baseline",
-  "x",
-  "y",
-  "width",
-  "height",
-  "cx",
-  "cy",
-  "r",
-  "rx",
-  "ry",
+export const SVG_CSS_BLOCKED_PATTERN_SOURCES = [
+  "@import\\b",
+  "javascript\\s*:",
+  "expression\\s*\\(",
+  "behavior\\s*:",
+  "-moz-binding\\b",
+  "<\\/style\\b",
+] as const;
+
+export const SVG_CSS_BLOCKED_PROPERTIES = ["behavior", "-moz-binding"] as const;
+
+export const SVG_CSS_MAX_STYLE_BLOCKS = 8;
+export const SVG_CSS_MAX_STYLE_CHARS = 12_000;
+export const SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS = 3_000;
+export const SVG_CSS_MAX_SELECTOR_CHARS = 600;
+export const SVG_CSS_MAX_VALUE_CHARS = 1_000;
+
+export const SVG_CSS_URL_REFERENCE_RULE =
+  "Only local fragment references are allowed: #id and url(#id)." as const;
+
+// Keep entries lowercase: svg-sanitizer uses case-insensitive checks and
+// normalizes tag names before enforcement.
+export const SVG_BLOCKED_TAG_NAMES = [
+  "script",
+  "foreignobject",
+  "animate",
+  "animatemotion",
+  "animatetransform",
+  "set",
 ] as const;
 
 export const SVG_CSS_ALLOWED_SELECTOR_HINTS = [
@@ -74,21 +43,42 @@ export const SVG_CSS_ALLOWED_SELECTOR_HINTS = [
   "attribute selectors",
 ] as const;
 
-export const SVG_CSS_SAFETY_RULE_HINTS = [
+export const SVG_BLOCKED_FEATURES = [
+  "No <script> tags.",
+  "No inline event handlers (on* attributes).",
+  "No external URLs in href/xlink:href or URL-valued SVG attributes.",
+  "No external URLs in CSS url(...); local fragments only.",
   "No @import.",
   "No javascript: URLs.",
-  "No expression() or executable legacy bindings.",
-  "Only local fragment URLs in url(...), e.g. url(#gradient).",
-  'Use <style> blocks (optional type="text/css").',
+  "No expression() or executable legacy bindings (behavior, -moz-binding).",
+  "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
 ] as const;
 
+export const SVG_CSS_CAPABILITY_CONTRACT = {
+  profile: SVG_CSS_POLICY_PROFILE,
+  allowedAtRules: SVG_CSS_ALLOWED_AT_RULES,
+  blockedPatternSources: SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  blockedProperties: SVG_CSS_BLOCKED_PROPERTIES,
+  styleLimits: {
+    maxStyleBlocks: SVG_CSS_MAX_STYLE_BLOCKS,
+    maxStyleChars: SVG_CSS_MAX_STYLE_CHARS,
+    maxStyleAttributeChars: SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS,
+    maxSelectorChars: SVG_CSS_MAX_SELECTOR_CHARS,
+    maxValueChars: SVG_CSS_MAX_VALUE_CHARS,
+  },
+  urlRule: SVG_CSS_URL_REFERENCE_RULE,
+  selectorHints: SVG_CSS_ALLOWED_SELECTOR_HINTS,
+  blockedSvgTagNames: SVG_BLOCKED_TAG_NAMES,
+  blockedFeatures: SVG_BLOCKED_FEATURES,
+} as const;
+
 /**
- * Produce a prompt-friendly list of allowed SVG CSS properties with an appended guidance note.
+ * Produce a prompt-friendly statement for CSS property capability.
  *
- * @returns A string of allowed properties joined by ", " followed by ", plus other standard CSS properties and custom properties (--tokens)."
+ * @returns A statement describing standard CSS and custom property support with blocked-property exceptions.
  */
 export function formatSvgCssAllowedPropertiesForPrompt(): string {
-  return `${SVG_CSS_ALLOWED_PROPERTIES.join(", ")}, plus other standard CSS properties and custom properties (--tokens).`;
+  return `Standard CSS properties and custom properties (--tokens), except blocked properties: ${SVG_CSS_BLOCKED_PROPERTIES.join(", ")}.`;
 }
 
 /**
@@ -105,5 +95,9 @@ export function formatSvgCssSelectorHintsForPrompt(): string {
 }
 
 export function formatSvgCssSafetyRulesForPrompt(): string {
-  return SVG_CSS_SAFETY_RULE_HINTS.join(" ");
+  return [
+    ...SVG_BLOCKED_FEATURES,
+    SVG_CSS_URL_REFERENCE_RULE,
+    'Use <style> blocks (optional type="text/css").',
+  ].join(" ");
 }
