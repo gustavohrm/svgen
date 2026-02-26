@@ -760,6 +760,12 @@ function isSafeCssDeclarations(block: string): boolean {
 }
 
 function isAllowedCssProperty(property: string): boolean {
+  // Security trade-off: isAllowedCssProperty moved from an allowlist to a
+  // blocklist model. It now relies on isSafeCssPropertyName,
+  // isAllowedCustomProperty, and BLOCKED_CSS_PROPERTIES to block dangerous CSS
+  // while allowing broader valid properties. Because this is more permissive,
+  // safe rendering also depends on sandboxed iframe isolation to mitigate any
+  // bypass that slips past these checks.
   if (!isSafeCssPropertyName(property)) {
     return false;
   }
