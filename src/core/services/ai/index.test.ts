@@ -19,11 +19,21 @@ describe("AiService", () => {
 
     mockSettingsRepository = {
       getSettings: vi.fn().mockReturnValue({
-        apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
+        apiKeys: [
+          {
+            id: "key1",
+            providerId: "gcp",
+            name: "Primary GCP key",
+            value: "test-key",
+            createdAt: Date.now(),
+            selectedModels: [],
+          },
+        ],
         activeKeys: { gcp: "key1" },
         variations: 1,
         temperature: 0.7,
         systemPrompt: "",
+        colorPaletteId: "monochrome",
       }),
     };
 
@@ -49,6 +59,34 @@ describe("AiService", () => {
     expect(prompt).toContain("<system_instructions>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
+    expect(prompt).toContain('<color_palette_policy mode="strict">');
+    expect(prompt).toContain("<allowed_hex_colors>");
+    expect(prompt).toContain("Exception: if the user explicitly asks for a specific color");
+  });
+
+  it("should use adaptive color policy when palette is AI choice", () => {
+    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue({
+      apiKeys: [
+        {
+          id: "key1",
+          providerId: "gcp",
+          name: "Primary GCP key",
+          value: "test-key",
+          createdAt: Date.now(),
+          selectedModels: [],
+        },
+      ],
+      activeKeys: { gcp: "key1" },
+      variations: 1,
+      temperature: 0.7,
+      systemPrompt: "",
+      colorPaletteId: "ai-choice",
+    });
+
+    const prompt = service.buildSystemPrompt();
+
+    expect(prompt).toContain('<color_palette_policy mode="adaptive">');
+    expect(prompt).toContain('id="ai-choice"');
   });
 
   it("should build system prompt with references", () => {
@@ -157,6 +195,7 @@ describe("AiService", () => {
     (mockSettingsRepository.getSettings as any).mockReturnValue({
       apiKeys: [],
       activeKeys: {},
+      colorPaletteId: "monochrome",
     });
 
     await expect(

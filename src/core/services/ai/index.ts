@@ -3,6 +3,11 @@ import { AppSettings } from "../../modules/db/index";
 import { normalizePositiveInt } from "../../utils/number";
 import { SVG_VARIATIONS_JSON_SCHEMA } from "./structured-output";
 import {
+  buildColorPalettePolicyXml,
+  DEFAULT_COLOR_PALETTE_ID,
+  isColorPaletteId,
+} from "../../constants/color-palettes";
+import {
   SVG_CSS_POLICY_PROFILE,
   formatSvgCssAllowedAtRulesForPrompt,
   formatSvgCssAllowedPropertiesForPrompt,
@@ -61,7 +66,13 @@ export class AiService {
 
   buildSystemPrompt(referenceSvgs?: string[], customSystemPrompt?: string): string {
     const basePrompt = customSystemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
-    let systemPrompt = `<system_instructions><![CDATA[${toCdata(basePrompt)}]]></system_instructions>\n${SYSTEM_PROMPT_GUARDRAILS}`;
+    const settings = this.settingsRepository.getSettings();
+    const paletteId = isColorPaletteId(settings.colorPaletteId)
+      ? settings.colorPaletteId
+      : DEFAULT_COLOR_PALETTE_ID;
+    const colorPalettePolicy = buildColorPalettePolicyXml(paletteId);
+
+    let systemPrompt = `<system_instructions><![CDATA[${toCdata(basePrompt)}]]></system_instructions>\n${SYSTEM_PROMPT_GUARDRAILS}\n${colorPalettePolicy}`;
 
     if (referenceSvgs && referenceSvgs.length > 0) {
       systemPrompt += `\n<reference_svgs>`;

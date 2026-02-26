@@ -1,4 +1,8 @@
 import type { AppSettings } from "../../core/modules/db";
+import {
+  COLOR_PALETTE_OPTIONS,
+  getColorPalettePreviewStyle,
+} from "../../core/constants/color-palettes";
 
 const GENERATE_ICON = `
   <svg
@@ -27,6 +31,9 @@ const GENERATE_LOADING_ICON = `
  * @returns An HTML string containing the generator controls markup, including the prompt textarea, model selector, reference SVG input, settings menu (variations and temperature), generate button, attachments container, and system prompt modal
  */
 export function renderGeneratorControls(settings: AppSettings): string {
+  const selectedPaletteId = settings.colorPaletteId;
+  const selectedPaletteStyle = getColorPalettePreviewStyle(selectedPaletteId);
+
   return `
     <div id="generator-controls-container" class="max-w-5xl mx-auto w-full py-0">
       <div
@@ -65,6 +72,45 @@ export function renderGeneratorControls(settings: AppSettings): string {
             </label>
 
             <div class="relative flex items-center" id="settings-container">
+              <div class="relative flex items-center" id="color-palette-container">
+                <button
+                  id="color-palette-btn"
+                  class="size-7 rounded-lg border border-border/80 hover:border-border-bright transition duration-300 p-[2px]"
+                  title="Color palette"
+                  aria-label="Choose color palette"
+                >
+                  <span
+                    id="color-palette-btn-preview"
+                    class="block w-full h-full rounded-[6px]"
+                    style="${selectedPaletteStyle}"
+                  ></span>
+                </button>
+                <div
+                  id="color-palette-menu"
+                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-2 p-2 shadow-2xl z-50 min-w-56 duration-200"
+                >
+                  ${COLOR_PALETTE_OPTIONS.map((palette) => {
+                    const isSelected = palette.id === selectedPaletteId;
+                    const paletteStyle = getColorPalettePreviewStyle(palette.id);
+
+                    return `<button
+                      type="button"
+                      data-color-palette-id="${palette.id}"
+                      class="w-full text-left rounded-lg px-2 py-2 border ${isSelected ? "border-border-bright bg-surface-hover/60" : "border-transparent hover:border-border/60 hover:bg-surface-hover/50"} transition-colors"
+                    >
+                      <span class="flex items-center gap-2">
+                        <span class="size-5 rounded-md border border-border/70" style="${paletteStyle}"></span>
+                        <span class="flex-1 min-w-0">
+                          <span class="block text-xs font-semibold text-text">${palette.label}</span>
+                          <span class="block text-[11px] text-text-muted truncate">${palette.description}</span>
+                        </span>
+                        ${isSelected ? '<span data-selected-palette-badge="true" class="text-[11px] text-text-secondary">Selected</span>' : ""}
+                      </span>
+                    </button>`;
+                  }).join("")}
+                </div>
+              </div>
+
               <button
                 id="settings-btn"
                 class="cursor-pointer text-text-secondary hover:text-text transition duration-400 flex items-center"

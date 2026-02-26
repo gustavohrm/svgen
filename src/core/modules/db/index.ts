@@ -1,4 +1,9 @@
 import { AiProviderId } from "../../types/index";
+import {
+  DEFAULT_COLOR_PALETTE_ID,
+  isColorPaletteId,
+  type ColorPaletteId,
+} from "../../constants/color-palettes";
 import { createId } from "../../utils/id";
 
 export interface ApiKeyItem {
@@ -17,6 +22,7 @@ export interface AppSettings {
   variations: number;
   temperature: number;
   systemPrompt: string;
+  colorPaletteId: ColorPaletteId;
   lastSelectedModel?: string;
   lastSelectedProviderId?: string;
 }
@@ -27,6 +33,7 @@ const defaultSettings: AppSettings = {
   variations: 4,
   temperature: 0.7,
   systemPrompt: "",
+  colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
   lastSelectedModel: undefined,
   lastSelectedProviderId: undefined,
 };
@@ -83,6 +90,9 @@ function normalizeSettings(input: Partial<AppSettings>): AppSettings {
         : defaultSettings.temperature,
     systemPrompt:
       typeof input.systemPrompt === "string" ? input.systemPrompt : defaultSettings.systemPrompt,
+    colorPaletteId: isColorPaletteId(input.colorPaletteId)
+      ? input.colorPaletteId
+      : defaultSettings.colorPaletteId,
     lastSelectedModel:
       typeof input.lastSelectedModel === "string"
         ? input.lastSelectedModel
@@ -105,6 +115,7 @@ export interface SettingsRepository {
   setVariations(value: number): AppSettings;
   setTemperature(value: number): AppSettings;
   setSystemPrompt(value: string): AppSettings;
+  setColorPaletteId(value: ColorPaletteId): AppSettings;
 }
 
 export class BrowserSettingsRepository implements SettingsRepository {
@@ -302,5 +313,9 @@ export class BrowserSettingsRepository implements SettingsRepository {
 
   setSystemPrompt(value: string): AppSettings {
     return this.saveSettings({ systemPrompt: value });
+  }
+
+  setColorPaletteId(value: ColorPaletteId): AppSettings {
+    return this.saveSettings({ colorPaletteId: value });
   }
 }

@@ -18,6 +18,11 @@ import {
   showPanel,
   togglePanel,
 } from "./generator-controls.settings";
+import {
+  getColorPalettePreviewStyle,
+  isColorPaletteId,
+  type ColorPaletteId,
+} from "../../core/constants/color-palettes";
 
 const settingsRepository = appComposition.settingsRepository;
 
@@ -27,8 +32,19 @@ export class GeneratorControls extends HTMLElement {
   private attachmentsRenderToken = 0;
 
   private handleDocumentClick = (e: Event) => {
+    const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
+    const colorPaletteMenu = this.querySelector("#color-palette-menu") as HTMLDivElement | null;
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement | null;
     const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement | null;
+
+    if (
+      colorPaletteBtn &&
+      colorPaletteMenu &&
+      !colorPaletteBtn.contains(e.target as Node) &&
+      !colorPaletteMenu.contains(e.target as Node)
+    ) {
+      hidePanel(colorPaletteMenu);
+    }
 
     if (
       settingsBtn &&
@@ -123,6 +139,14 @@ export class GeneratorControls extends HTMLElement {
 
   private attachEvents() {
     // Component level events
+    const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
+    const colorPaletteBtnPreview = this.querySelector(
+      "#color-palette-btn-preview",
+    ) as HTMLSpanElement | null;
+    const colorPaletteMenu = this.querySelector("#color-palette-menu") as HTMLDivElement | null;
+    const colorPaletteOptions = this.querySelectorAll<HTMLButtonElement>(
+      "button[data-color-palette-id]",
+    );
     const referenceInput = this.querySelector("#reference-input") as HTMLInputElement;
     const attachmentsContainer = this.querySelector("#attachments-container") as HTMLDivElement;
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement;
@@ -149,9 +173,66 @@ export class GeneratorControls extends HTMLElement {
       }
     };
 
+    const applyPaletteSelectionUi = (paletteId: ColorPaletteId) => {
+      if (colorPaletteBtnPreview) {
+        colorPaletteBtnPreview.setAttribute("style", getColorPalettePreviewStyle(paletteId));
+      }
+
+      colorPaletteOptions.forEach((option) => {
+        const optionPaletteId = option.dataset.colorPaletteId;
+        const isSelected = optionPaletteId === paletteId;
+
+        option.classList.toggle("border-border-bright", isSelected);
+        option.classList.toggle("bg-surface-hover/60", isSelected);
+        option.classList.toggle("border-transparent", !isSelected);
+
+        const existingSelectedBadge = option.querySelector("[data-selected-palette-badge]");
+        if (isSelected && !existingSelectedBadge) {
+          const badge = document.createElement("span");
+          badge.className = "text-[11px] text-text-secondary";
+          badge.dataset.selectedPaletteBadge = "true";
+          badge.textContent = "Selected";
+          option.querySelector("span.flex.items-center.gap-2")?.appendChild(badge);
+        }
+
+        if (!isSelected && existingSelectedBadge) {
+          existingSelectedBadge.remove();
+        }
+      });
+    };
+
+    colorPaletteBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (colorPaletteMenu) {
+        if (settingsMenu) {
+          hidePanel(settingsMenu);
+        }
+        togglePanel(colorPaletteMenu);
+      }
+    });
+
+    colorPaletteOptions.forEach((option) => {
+      option.addEventListener("click", () => {
+        const paletteId = option.dataset.colorPaletteId;
+        if (!isColorPaletteId(paletteId)) {
+          return;
+        }
+
+        settingsRepository.setColorPaletteId(paletteId);
+        applyPaletteSelectionUi(paletteId);
+
+        if (colorPaletteMenu) {
+          hidePanel(colorPaletteMenu);
+        }
+      });
+    });
+
     settingsBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       if (settingsMenu) {
+        if (colorPaletteMenu) {
+          hidePanel(colorPaletteMenu);
+        }
         togglePanel(settingsMenu);
       }
     });
