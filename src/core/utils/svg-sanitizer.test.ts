@@ -293,6 +293,32 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("@supports");
   });
 
+  it("keeps modern media query range syntax", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@media (400px <= width <= 1200px){.shape{opacity:.5}} .shape{opacity:1}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("@media");
+    expect(result).toContain("opacity:.5");
+  });
+
+  it("rejects nested at-rules with external URLs in prelude", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@supports (background-image:url(https://evil.example/a)){.shape{display:block}}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects nested at-rules with malformed prelude parentheses", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@supports ((display:grid){.shape{display:grid}}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("rejects legacy executable CSS properties", () => {
     const behaviorResult = sanitizeSvgMarkup(
       '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="behavior:url(#legacy)"/></svg>',

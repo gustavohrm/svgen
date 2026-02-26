@@ -13,6 +13,8 @@ describe("sanitizeSvgForDisplay", () => {
 
     expect(iframe).toBeTruthy();
     expect(iframe?.getAttribute("sandbox")).toBe("");
+    expect(iframe?.getAttribute("aria-hidden")).toBe("true");
+    expect(iframe?.getAttribute("tabindex")).toBe("-1");
     expect(iframe?.getAttribute("srcdoc")).toContain("<svg");
     expect(iframe?.getAttribute("srcdoc")).toContain("<rect");
   });

@@ -43,7 +43,12 @@ interface SvgCardActionHandler {
   handler: (cardId: string) => void;
 }
 
-const INVALID_SVG_FALLBACK = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="40" height="40" rx="8" stroke="#9ca3af" stroke-opacity="0.4" stroke-width="2"/><path d="M16 16L32 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/><path d="M32 16L16 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+const INVALID_SVG_FALLBACK =
+  `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+  `<rect x="4" y="4" width="40" height="40" rx="8" stroke="#9ca3af" stroke-opacity="0.4" stroke-width="2"/>` +
+  `<path d="M16 16L32 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `<path d="M32 16L16 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `</svg>`;
 
 // --- Helpers ---
 
@@ -56,7 +61,7 @@ export function sanitizeSvgForDisplay(rawSvg: string): string {
   const iframeDocument = buildSandboxedSvgDocument(safeSvg);
   const safeSrcDoc = escapeHtml(iframeDocument);
 
-  return `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" scrolling="no" title="SVG preview" srcdoc="${safeSrcDoc}"></iframe>`;
+  return `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" title="SVG preview" aria-hidden="true" tabindex="-1" srcdoc="${safeSrcDoc}"></iframe>`;
 }
 
 function buildSandboxedSvgDocument(svgMarkup: string): string {

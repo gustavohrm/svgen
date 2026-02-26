@@ -621,6 +621,18 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
     return false;
   }
 
+  if (DISALLOWED_CSS_PATTERN.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!hasBalancedParentheses(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!containsOnlyLocalFragmentUrls(normalizedPrelude)) {
+    return false;
+  }
+
   if (!/^[,.:()'"\/%+\-<>=\s\w]*$/.test(normalizedPrelude)) {
     return false;
   }
@@ -955,11 +967,52 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
 }
 
 function isSafeCssPropertyName(property: string): boolean {
-  return /^[a-z-]+$/.test(property) || /^--[a-z0-9-]+$/.test(property);
+  return /^-?[a-z](?:[a-z-]*[a-z])?$/.test(property) || /^--[a-z0-9-]+$/.test(property);
 }
 
 function isAllowedCustomProperty(property: string): boolean {
   return /^--[a-z0-9-]+$/.test(property);
+}
+
+function hasBalancedParentheses(input: string): boolean {
+  let depth = 0;
+  let quote: '"' | "'" | null = null;
+
+  for (let index = 0; index < input.length; index++) {
+    const char = input[index];
+
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+        continue;
+      }
+
+      if (char === quote) {
+        quote = null;
+      }
+
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (char === "(") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === ")") {
+      depth -= 1;
+      if (depth < 0) {
+        return false;
+      }
+    }
+  }
+
+  return depth === 0 && quote === null;
 }
 
 function containsOnlyLocalFragmentUrls(value: string): boolean {

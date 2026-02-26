@@ -70,7 +70,7 @@ export const SVG_CSS_ALLOWED_SELECTOR_HINTS = [
   "#id",
   "descendant",
   "comma-separated",
-  "pseudo-classes",
+  "pseudo-classes and pseudo-elements",
   "attribute selectors",
 ] as const;
 
