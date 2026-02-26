@@ -43,24 +43,98 @@ interface SvgCardActionHandler {
   handler: (cardId: string) => void;
 }
 
+const INVALID_SVG_FALLBACK =
+  `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+  `<rect x="4" y="4" width="40" height="40" rx="8" stroke="#9ca3af" stroke-opacity="0.4" stroke-width="2"/>` +
+  `<path d="M16 16L32 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `<path d="M32 16L16 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `</svg>`;
+
+interface PreviewRenderResult {
+  iframeHtml: string;
+  hasAutoViewportFix: boolean;
+}
+
+interface ViewportNormalizationResult {
+  svgMarkup: string;
+  hasAutoViewportFix: boolean;
+}
+
 // --- Helpers ---
 
 /**
- * Injects sizing classes into raw SVG markup so it scales
- * properly inside the card preview area.
+ * Sanitizes raw SVG markup and renders it inside a sandboxed iframe,
+ * preventing generated CSS from affecting the app UI.
  */
 export function sanitizeSvgForDisplay(rawSvg: string): string {
-  const safeSvg = sanitizeSvgMarkup(rawSvg);
-  if (!safeSvg) {
-    return `<svg viewBox="0 0 48 48" class="w-full h-full max-h-56 drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="40" height="40" rx="8" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"/><path d="M16 16L32 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/><path d="M32 16L16 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+  return buildSvgPreview(rawSvg).iframeHtml;
+}
+
+function buildSvgPreview(rawSvg: string): PreviewRenderResult {
+  const safeSvg = sanitizeSvgMarkup(rawSvg) ?? INVALID_SVG_FALLBACK;
+  const normalizedSvg = ensurePreviewViewBox(safeSvg);
+  const iframeDocument = buildSandboxedSvgDocument(normalizedSvg.svgMarkup);
+  const safeSrcDoc = escapeHtml(iframeDocument);
+
+  return {
+    iframeHtml: `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" title="SVG preview" aria-hidden="true" tabindex="-1" srcdoc="${safeSrcDoc}"></iframe>`,
+    hasAutoViewportFix: normalizedSvg.hasAutoViewportFix,
+  };
+}
+
+function ensurePreviewViewBox(svgMarkup: string): ViewportNormalizationResult {
+  const doc = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+  const root = doc.documentElement;
+
+  if (!root || root.nodeName.toLowerCase() !== "svg") {
+    return { svgMarkup, hasAutoViewportFix: false };
   }
 
-  const documentNode = new DOMParser().parseFromString(safeSvg, "image/svg+xml");
-  const root = documentNode.documentElement;
-  const currentClass = root.getAttribute("class") ?? "";
-  const displayClasses = "w-full h-full max-h-56 drop-shadow-xl";
-  root.setAttribute("class", `${displayClasses} ${currentClass}`.trim());
-  return root.outerHTML;
+  if (root.getAttribute("viewBox")?.trim()) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  const width = parseSvgDimension(root.getAttribute("width"));
+  const height = parseSvgDimension(root.getAttribute("height"));
+
+  if (!width || !height) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  root.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  return { svgMarkup: root.outerHTML, hasAutoViewportFix: true };
+}
+
+function parseSvgDimension(rawValue: string | null): string | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  const trimmed = rawValue.trim();
+  const match = trimmed.match(/^(?:\+)?(\d+(?:\.\d+)?|\.\d+)(?:px)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[1]);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed.toString();
+}
+
+function buildSandboxedSvgDocument(svgMarkup: string): string {
+  return [
+    "<!doctype html>",
+    '<html><head><meta charset="utf-8">',
+    "<style>",
+    "html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}",
+    "body{display:flex;align-items:center;justify-content:center}",
+    "svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%}",
+    "</style></head>",
+    `<body>${svgMarkup}</body></html>`,
+  ].join("");
 }
 
 function buildActionButton(action: CardAction, cardId: string): string {
@@ -154,11 +228,16 @@ export function renderSvgCard(options: SvgCardOptions): string {
   const sublabelHtml = safeSublabel
     ? `<span class="text-xs text-text-muted">${safeSublabel}</span>`
     : "";
+  const preview = buildSvgPreview(svg);
+  const viewportBadgeHtml = preview.hasAutoViewportFix
+    ? '<span class="absolute top-3 left-3 rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200" title="Preview auto-added a viewBox from width and height.">Auto-fit viewBox</span>'
+    : "";
 
   return `
     <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border flex flex-col">
       <div class="p-8 flex-1 min-h-[220px] flex items-center justify-center relative">
-        ${sanitizeSvgForDisplay(svg)}
+        ${preview.iframeHtml}
+        ${viewportBadgeHtml}
       </div>
       <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
         <div class="flex flex-col gap-0.5 min-w-0 flex-1">

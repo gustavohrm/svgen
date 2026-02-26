@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { SVG_CSS_ALLOWED_PROPERTIES, SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
+import { SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
 
 const ALLOWED_SVG_TAGS = [
   "svg",
@@ -190,12 +190,15 @@ const URL_REFERENCE_ATTR_NAMES = new Set<string>([
 const LOCAL_FRAGMENT_REFERENCE_PATTERN = /^#[-\w:.]+$/;
 const LOCAL_FRAGMENT_URL_REFERENCE_PATTERN = /^url\s*\(\s*(['"]?)#[-\w:.]+\1\s*\)$/i;
 
-const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
-const ALLOWED_CSS_AT_RULES = new Set<string>(
-  SVG_CSS_ALLOWED_AT_RULES.map((rule) => normalizeCssAtRule(rule)).filter(
-    (rule) => rule.length > 0,
-  ),
+const NORMALIZED_ALLOWED_CSS_AT_RULES = SVG_CSS_ALLOWED_AT_RULES.map((rule) =>
+  normalizeCssAtRule(rule),
+).filter((rule) => rule.length > 0);
+const ALLOWED_CSS_AT_RULES = new Set<string>(NORMALIZED_ALLOWED_CSS_AT_RULES);
+const CSS_NESTED_RULE_NAME_CANDIDATES = new Set<string>(["media", "supports"]);
+const CSS_NESTED_RULE_AT_RULES = new Set<string>(
+  NORMALIZED_ALLOWED_CSS_AT_RULES.filter((rule) => CSS_NESTED_RULE_NAME_CANDIDATES.has(rule)),
 );
+const BLOCKED_CSS_PROPERTIES = new Set<string>(["behavior", "-moz-binding"]);
 
 interface NodeCryptoModule {
   webcrypto?: Crypto;
@@ -540,23 +543,16 @@ function isSafeCssStylesheet(css: string): boolean {
         return false;
       }
 
-      if (atRuleName !== "keyframes") {
+      const openBraceIndex = findTopLevelCharacter(css, "{", index);
+      if (openBraceIndex === -1) {
         return false;
       }
-
-      const keyframesMatch = css.slice(index).match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*\{/i);
-      if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
-        return false;
-      }
-
-      const openBraceIndex = index + keyframesMatch[0].length - 1;
       const closeBraceIndex = findMatchingBrace(css, openBraceIndex);
       if (closeBraceIndex === -1) {
         return false;
       }
 
-      const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
-      if (!isSafeKeyframesBody(keyframesBody)) {
+      if (!isSafeAtRuleBody(css, index, openBraceIndex, closeBraceIndex, atRuleName)) {
         return false;
       }
 
@@ -588,6 +584,70 @@ function isSafeCssStylesheet(css: string): boolean {
   }
 
   return true;
+}
+
+function isSafeAtRuleBody(
+  css: string,
+  atRuleStartIndex: number,
+  openBraceIndex: number,
+  closeBraceIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName === "keyframes") {
+    const keyframesPrelude = css.slice(atRuleStartIndex, openBraceIndex);
+    const keyframesMatch = keyframesPrelude.match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*$/i);
+    if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
+      return false;
+    }
+
+    const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
+    return isSafeKeyframesBody(keyframesBody);
+  }
+
+  if (!CSS_NESTED_RULE_AT_RULES.has(atRuleName)) {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, openBraceIndex);
+  if (!isSafeAtRulePrelude(atRulePrelude, atRuleName)) {
+    return false;
+  }
+
+  const nestedStylesheet = css.slice(openBraceIndex + 1, closeBraceIndex);
+  return isSafeCssStylesheet(nestedStylesheet);
+}
+
+function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
+  const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
+  if (!normalizedPrelude) {
+    return false;
+  }
+
+  if (DISALLOWED_CSS_PATTERN.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!hasBalancedParentheses(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!containsOnlyLocalFragmentUrls(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!/^[,.:()'"\/%+\-<>=\s\w]*$/.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (atRuleName === "media") {
+    return /\(|\b(?:all|print|screen|speech)\b/i.test(normalizedPrelude);
+  }
+
+  if (atRuleName === "supports") {
+    return normalizedPrelude.includes("(");
+  }
+
+  return false;
 }
 
 function isSafeKeyframesName(name: string): boolean {
@@ -667,7 +727,7 @@ function isSafeCssSelector(selector: string): boolean {
     return false;
   }
 
-  return /^[#.:\[\]="'()*+,>~\s\w-]+$/.test(selector);
+  return /^[#.:\[\]="'()*+,>~|^$\s\w-]+$/.test(selector);
 }
 
 function isSafeCssDeclarations(block: string): boolean {
@@ -689,12 +749,7 @@ function isSafeCssDeclarations(block: string): boolean {
     const property = declaration.slice(0, colonIndex).trim().toLowerCase();
     const value = declaration.slice(colonIndex + 1).trim();
 
-    if (!isSafeCssPropertyName(property)) {
-      return false;
-    }
-
-    // Custom properties are intentionally allowed for SVG-local theming variables.
-    if (!ALLOWED_CSS_PROPERTIES.has(property) && !isAllowedCustomProperty(property)) {
+    if (!isAllowedCssProperty(property)) {
       return false;
     }
 
@@ -704,6 +759,24 @@ function isSafeCssDeclarations(block: string): boolean {
   }
 
   return true;
+}
+
+function isAllowedCssProperty(property: string): boolean {
+  // Security trade-off: isAllowedCssProperty moved from an allowlist to a
+  // blocklist model. It now relies on isSafeCssPropertyName,
+  // isAllowedCustomProperty, and BLOCKED_CSS_PROPERTIES to block dangerous CSS
+  // while allowing broader valid properties. Because this is more permissive,
+  // safe rendering also depends on sandboxed iframe isolation to mitigate any
+  // bypass that slips past these checks.
+  if (!isSafeCssPropertyName(property)) {
+    return false;
+  }
+
+  if (isAllowedCustomProperty(property)) {
+    return true;
+  }
+
+  return !BLOCKED_CSS_PROPERTIES.has(property);
 }
 
 function splitCssDeclarations(block: string): string[] | null {
@@ -766,11 +839,34 @@ function splitCssDeclarations(block: string): string[] | null {
   return declarations;
 }
 
-function findTopLevelColon(input: string): number {
-  let parenDepth = 0;
-  let quote: '"' | "'" | null = null;
+type QuoteCharacter = '"' | "'";
 
-  for (let index = 0; index < input.length; index++) {
+interface TopLevelCharacterContext {
+  index: number;
+  char: string;
+  parenDepth: number;
+}
+
+interface TopLevelCharacterTraversalOptions {
+  startIndex?: number;
+  canParenDepthBeNegative?: boolean;
+  shouldStop?: (context: TopLevelCharacterContext) => boolean;
+}
+
+interface TopLevelCharacterTraversalResult {
+  parenDepth: number;
+  quote: QuoteCharacter | null;
+}
+
+function iterateTopLevelChars(
+  input: string,
+  options: TopLevelCharacterTraversalOptions = {},
+): TopLevelCharacterTraversalResult {
+  const { startIndex = 0, canParenDepthBeNegative = false, shouldStop } = options;
+  let parenDepth = 0;
+  let quote: QuoteCharacter | null = null;
+
+  for (let index = startIndex; index < input.length; index++) {
     const char = input[index];
 
     if (quote) {
@@ -793,22 +889,65 @@ function findTopLevelColon(input: string): number {
 
     if (char === "(") {
       parenDepth += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      if (parenDepth > 0) {
+    } else if (char === ")") {
+      if (canParenDepthBeNegative || parenDepth > 0) {
         parenDepth -= 1;
       }
-      continue;
     }
 
-    if (char === ":" && parenDepth === 0) {
-      return index;
+    if (
+      shouldStop?.({
+        index,
+        char,
+        parenDepth,
+      })
+    ) {
+      return {
+        parenDepth,
+        quote,
+      };
     }
   }
 
-  return -1;
+  return {
+    parenDepth,
+    quote,
+  };
+}
+
+function findTopLevelColon(input: string): number {
+  let colonIndex = -1;
+
+  iterateTopLevelChars(input, {
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === ":" && parenDepth === 0) {
+        colonIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return colonIndex;
+}
+
+function findTopLevelCharacter(input: string, targetCharacter: string, startIndex = 0): number {
+  let characterIndex = -1;
+
+  iterateTopLevelChars(input, {
+    startIndex,
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === targetCharacter && parenDepth === 0) {
+        characterIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return characterIndex;
 }
 
 function isSafeCssValue(value: string): boolean {
@@ -832,7 +971,7 @@ function isSafeCssValue(value: string): boolean {
     return false;
   }
 
-  return /^[#(),.%/\s+\-!"'\w:]*$/.test(value);
+  return /^[#(),.%/\s+\-!"'\w:*\[\]?|=]*$/.test(value);
 }
 
 function sanitizeStyleAttribute(styleValue: string): string | null {
@@ -857,11 +996,32 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
 }
 
 function isSafeCssPropertyName(property: string): boolean {
-  return /^[a-z-]+$/.test(property) || /^--[a-z0-9-]+$/.test(property);
+  return /^-?[a-z](?:[a-z-]*[a-z])?$/.test(property) || /^--[a-z0-9-]+$/.test(property);
 }
 
 function isAllowedCustomProperty(property: string): boolean {
   return /^--[a-z0-9-]+$/.test(property);
+}
+
+function hasBalancedParentheses(input: string): boolean {
+  let hasUnbalancedClosingParenthesis = false;
+  const traversalResult = iterateTopLevelChars(input, {
+    canParenDepthBeNegative: true,
+    shouldStop: ({ char, parenDepth }) => {
+      if (char === ")" && parenDepth < 0) {
+        hasUnbalancedClosingParenthesis = true;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  if (hasUnbalancedClosingParenthesis) {
+    return false;
+  }
+
+  return traversalResult.parenDepth === 0 && traversalResult.quote === null;
 }
 
 function containsOnlyLocalFragmentUrls(value: string): boolean {
