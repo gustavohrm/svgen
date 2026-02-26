@@ -69,7 +69,7 @@ export function getColorPalettePreviewStyle(paletteId: ColorPaletteId): string {
 
 export function getColorPaletteOptionButtonClass(isSelected: boolean): string {
   const baseClass =
-    "size-8 rounded-md border transition-all duration-200 hover:scale-102 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-bright";
+    "w-full aspect-square rounded-md border transition-all duration-200 hover:scale-102 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-bright";
 
   if (isSelected) {
     return `${baseClass} border-border-bright`;

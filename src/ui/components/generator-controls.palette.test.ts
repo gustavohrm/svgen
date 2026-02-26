@@ -5,8 +5,8 @@ function createOptionNode(paletteId: string, isSelected: boolean): HTMLButtonEle
   const button = document.createElement("button");
   button.dataset.colorPaletteId = paletteId;
   button.className = isSelected
-    ? "size-8 rounded-md border transition-all duration-200 border-border-bright"
-    : "size-8 rounded-md border transition-all duration-200 border-border/70 hover:border-border-bright/80";
+    ? "w-full aspect-square rounded-md border transition-all duration-200 border-border-bright"
+    : "w-full aspect-square rounded-md border transition-all duration-200 border-border/70 hover:border-border-bright/80";
 
   return button;
 }

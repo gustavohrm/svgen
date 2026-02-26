@@ -72,7 +72,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
               <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
             </label>
 
-            <div class="relative flex items-center gap-2" id="settings-container">
+            <div class="relative flex items-center gap-4" id="settings-container">
               <button
                 id="settings-btn"
                 class="cursor-pointer text-text-secondary hover:text-text transition duration-400 flex items-center"
@@ -105,7 +105,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
                   id="color-palette-menu"
                   class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden p-2 shadow-2xl z-50 duration-200"
                 >
-                  <div class="grid grid-cols-3 gap-2">
+                  <div class="grid grid-cols-3 gap-2 w-28">
                     ${COLOR_PALETTE_OPTIONS.map((palette) => {
                       const isSelected = palette.id === selectedPaletteId;
                       const paletteStyle = getColorPalettePreviewStyle(palette.id);
