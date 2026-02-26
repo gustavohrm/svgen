@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MAX_STYLE_BLOCKS, MAX_STYLE_CHARS, sanitizeSvgMarkup } from "./svg-sanitizer";
+import {
+  MAX_STYLE_ATTR_CHARS,
+  MAX_STYLE_BLOCKS,
+  MAX_STYLE_CHARS,
+  sanitizeSvgMarkup,
+} from "./svg-sanitizer";
+import { SVG_CSS_MAX_SELECTOR_CHARS, SVG_CSS_MAX_VALUE_CHARS } from "../constants/svg-css-policy";
 
 describe("sanitizeSvgMarkup", () => {
   it("keeps safe svg content", () => {
@@ -303,6 +309,145 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("opacity:.5");
   });
 
+  it("keeps larger complex stylesheets within expanded limits", () => {
+    const denseRules = Array.from(
+      { length: 100 },
+      (_entry, index) =>
+        `.n${index}{opacity:.${(index % 9) + 1};transform:translate(${index % 37}px ${index % 29}px);filter:url(#noise);mix-blend-mode:screen}`,
+    ).join("");
+    expect(denseRules.length).toBeGreaterThan(5_000);
+    expect(denseRules.length).toBeLessThan(MAX_STYLE_CHARS);
+
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><defs><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2"/></filter></defs><style>@layer base{.core{fill:#6ee7ff;stroke:#082f49;stroke-width:1.2}}@supports (mix-blend-mode:screen){.core{mix-blend-mode:screen}}@media (prefers-reduced-motion: no-preference){.core{animation:spin 6s linear infinite}}@keyframes spin{to{transform:rotate(360deg)}}${denseRules}</style><g transform="translate(60 60)"><rect class="core n12" x="-24" y="-24" width="48" height="48" rx="8"/></g></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("@layer base");
+    expect(result).toContain("@supports");
+    expect(result).toContain("@media");
+    expect(result).toContain("@keyframes spin");
+    expect(result).toContain("mix-blend-mode:screen");
+    expect(result).toContain("filter:url(#noise)");
+  });
+
+  it("keeps @layer block and statement at-rules", () => {
+    const result = sanitizeSvgMarkup(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#ffedd5"/><stop offset="1" stop-color="#fb7185"/></linearGradient></defs><style>@layer base,theme;@layer theme.base{.shape{fill:url(#g)}}@layer{.shape{opacity:.86}}@layer motion{@media (prefers-reduced-motion: no-preference){.shape{animation:pulse 2s ease-in-out infinite}}}@keyframes pulse{0%{transform:scale(.95)}50%{transform:scale(1)}100%{transform:scale(.95)}}</style><circle class="shape" cx="12" cy="12" r="9"/></svg>',
+    );
+
+    expect(result).not.toBeNull();
+    expect(result).toContain("@layer base,theme;");
+    expect(result).toContain("@layer theme.base");
+    expect(result).toContain("@layer{");
+    expect(result).toContain("@layer motion");
+    expect(result).toContain("animation:pulse 2s ease-in-out infinite");
+  });
+
+  it("keeps SVG with exactly MAX_STYLE_BLOCKS style tags", () => {
+    const styleTags = Array.from(
+      { length: MAX_STYLE_BLOCKS },
+      (_entry, index) => `<style>.shape${index}{opacity:.${(index % 9) + 1}}</style>`,
+    ).join("");
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">${styleTags}<rect class="shape0" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("keeps style blocks exactly at MAX_STYLE_CHARS", () => {
+    const repeatedRule = ".shape{opacity:.5}";
+    const repeatedCount = Math.floor((MAX_STYLE_CHARS - 250) / repeatedRule.length);
+    const repeatedRules = repeatedRule.repeat(repeatedCount);
+    const tailPrefix = ".shape{--tail:";
+    const tailSuffix = ";opacity:.6}";
+    const tailValueLength =
+      MAX_STYLE_CHARS - repeatedRules.length - tailPrefix.length - tailSuffix.length;
+
+    expect(tailValueLength).toBeGreaterThan(0);
+    expect(tailValueLength).toBeLessThanOrEqual(SVG_CSS_MAX_VALUE_CHARS);
+
+    const css = `${repeatedRules}${tailPrefix}${"a".repeat(tailValueLength)}${tailSuffix}`;
+    expect(css.length).toBe(MAX_STYLE_CHARS);
+
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>${css}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("keeps style attributes exactly at MAX_STYLE_ATTR_CHARS", () => {
+    const styleAtLimit = [
+      `--a:${"a".repeat(980)}`,
+      `--b:${"b".repeat(980)}`,
+      `--c:${"c".repeat(980)}`,
+      `--d:${"d".repeat(31)}`,
+      "opacity:0",
+    ].join(";");
+    expect(styleAtLimit.length).toBe(MAX_STYLE_ATTR_CHARS);
+
+    const result = sanitizeSvgMarkup(
+      `<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="${styleAtLimit}"/></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects style attributes above MAX_STYLE_ATTR_CHARS", () => {
+    const styleAtLimit = [
+      `--a:${"a".repeat(980)}`,
+      `--b:${"b".repeat(980)}`,
+      `--c:${"c".repeat(980)}`,
+      `--d:${"d".repeat(31)}`,
+      "opacity:0",
+    ].join(";");
+    expect(styleAtLimit.length).toBe(MAX_STYLE_ATTR_CHARS);
+
+    const result = sanitizeSvgMarkup(
+      `<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="${styleAtLimit}a"/></svg>`,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("keeps selectors exactly at the selector length cap", () => {
+    const className = "a".repeat(SVG_CSS_MAX_SELECTOR_CHARS - 1);
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.${className}{opacity:.7}</style><rect class="${className}" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects selectors above the selector length cap", () => {
+    const className = "a".repeat(SVG_CSS_MAX_SELECTOR_CHARS);
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.${className}{opacity:.7}</style><rect class="${className}" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("keeps CSS values exactly at the value length cap", () => {
+    const valueAtLimit = "a".repeat(SVG_CSS_MAX_VALUE_CHARS);
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{--token:${valueAtLimit};opacity:var(--token)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).not.toBeNull();
+  });
+
+  it("rejects CSS values above the value length cap", () => {
+    const valueAboveLimit = "a".repeat(SVG_CSS_MAX_VALUE_CHARS + 1);
+    const result = sanitizeSvgMarkup(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>.shape{--token:${valueAboveLimit};opacity:var(--token)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>`,
+    );
+
+    expect(result).toBeNull();
+  });
+
   it("rejects nested at-rules with external URLs in prelude", () => {
     const result = sanitizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@supports (background-image:url(https://evil.example/a)){.shape{display:block}}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
@@ -415,10 +560,10 @@ describe("sanitizeSvgMarkup", () => {
   });
 
   it("rejects SVG when a style block exceeds MAX_STYLE_CHARS", () => {
-    const oversizedCss = Array.from(
-      { length: 500 },
-      (_entry, index) => `.s${index}{opacity:.5}`,
-    ).join("");
+    let oversizedCss = "";
+    for (let index = 0; oversizedCss.length <= MAX_STYLE_CHARS; index += 1) {
+      oversizedCss += `.s${index}{opacity:.5}`;
+    }
     expect(oversizedCss.length).toBeGreaterThan(MAX_STYLE_CHARS);
 
     const result = sanitizeSvgMarkup(
