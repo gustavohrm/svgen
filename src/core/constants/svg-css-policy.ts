@@ -46,7 +46,7 @@ export const SVG_CSS_ALLOWED_SELECTOR_HINTS = [
 export const SVG_BLOCKED_FEATURES = [
   "No <script> tags.",
   "No inline event handlers (on* attributes).",
-  "No external URLs in href/xlink:href or URL-valued SVG attributes.",
+  "No external URLs in href/xlink:href and sanitizer-checked URL reference attributes (filter, clip-path, mask, marker-start, marker-mid, marker-end).",
   "No external URLs in CSS url(...); local fragments only.",
   "No @import.",
   "No javascript: URLs.",

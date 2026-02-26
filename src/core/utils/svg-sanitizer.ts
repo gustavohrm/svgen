@@ -553,7 +553,20 @@ function isSafeCssStylesheet(css: string): boolean {
         return false;
       }
 
+      const statementTerminatorIndex = findTopLevelCharacter(css, ";", index);
       const openBraceIndex = findTopLevelCharacter(css, "{", index);
+      if (
+        statementTerminatorIndex !== -1 &&
+        (openBraceIndex === -1 || statementTerminatorIndex < openBraceIndex)
+      ) {
+        if (!isSafeAtRuleStatement(css, index, statementTerminatorIndex, atRuleName)) {
+          return false;
+        }
+
+        index = statementTerminatorIndex + 1;
+        continue;
+      }
+
       if (openBraceIndex === -1) {
         return false;
       }
@@ -629,7 +642,7 @@ function isSafeAtRuleBody(
   }
 
   const atRulePrelude = css.slice(atRuleStartIndex, openBraceIndex);
-  if (!isSafeAtRulePrelude(atRulePrelude, atRuleName)) {
+  if (!isSafeAtRulePrelude(atRulePrelude, atRuleName, true)) {
     return false;
   }
 
@@ -637,17 +650,37 @@ function isSafeAtRuleBody(
   return isSafeCssStylesheet(nestedStylesheet);
 }
 
+function isSafeAtRuleStatement(
+  css: string,
+  atRuleStartIndex: number,
+  statementTerminatorIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName !== "layer") {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, statementTerminatorIndex);
+  const normalizedPrelude = atRulePrelude.replace(/^@[a-z-]+/i, "").trim();
+  if (normalizedPrelude.length === 0) {
+    return true;
+  }
+
+  return isSafeAtRulePrelude(atRulePrelude, atRuleName, false);
+}
+
 /**
  * Validates the prelude (the portion following an at-rule name) for allowed characters, balanced structure, and rule-specific requirements.
  *
  * @param prelude - The raw at-rule prelude string to validate (may include the leading at-rule token).
  * @param atRuleName - The at-rule name (normalized, e.g., "media" or "supports") to apply rule-specific checks.
+ * @param hasBlockBody - Whether the at-rule has a `{...}` body (`true`) or is statement-form (`false`).
  * @returns `true` if the prelude is syntactically safe, contains only allowed local fragment URLs, has balanced parentheses, and meets any at-rule-specific constraints; `false` otherwise.
  */
-function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
+function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: boolean): boolean {
   const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
   if (atRuleName === "layer" && normalizedPrelude.length === 0) {
-    return true;
+    return hasBlockBody;
   }
 
   if (!normalizedPrelude) {

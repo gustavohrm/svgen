@@ -331,12 +331,13 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain("filter:url(#noise)");
   });
 
-  it("keeps @layer block at-rules", () => {
+  it("keeps @layer block and statement at-rules", () => {
     const result = sanitizeSvgMarkup(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#ffedd5"/><stop offset="1" stop-color="#fb7185"/></linearGradient></defs><style>@layer theme.base{.shape{fill:url(#g)}}@layer{.shape{opacity:.86}}@layer motion{@media (prefers-reduced-motion: no-preference){.shape{animation:pulse 2s ease-in-out infinite}}}@keyframes pulse{0%{transform:scale(.95)}50%{transform:scale(1)}100%{transform:scale(.95)}}</style><circle class="shape" cx="12" cy="12" r="9"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><defs><linearGradient id="g"><stop offset="0" stop-color="#ffedd5"/><stop offset="1" stop-color="#fb7185"/></linearGradient></defs><style>@layer base,theme;@layer theme.base{.shape{fill:url(#g)}}@layer{.shape{opacity:.86}}@layer motion{@media (prefers-reduced-motion: no-preference){.shape{animation:pulse 2s ease-in-out infinite}}}@keyframes pulse{0%{transform:scale(.95)}50%{transform:scale(1)}100%{transform:scale(.95)}}</style><circle class="shape" cx="12" cy="12" r="9"/></svg>',
     );
 
     expect(result).not.toBeNull();
+    expect(result).toContain("@layer base,theme;");
     expect(result).toContain("@layer theme.base");
     expect(result).toContain("@layer{");
     expect(result).toContain("@layer motion");
@@ -559,10 +560,10 @@ describe("sanitizeSvgMarkup", () => {
   });
 
   it("rejects SVG when a style block exceeds MAX_STYLE_CHARS", () => {
-    const oversizedCss = Array.from(
-      { length: 1_500 },
-      (_entry, index) => `.s${index}{opacity:.5}`,
-    ).join("");
+    let oversizedCss = "";
+    for (let index = 0; oversizedCss.length <= MAX_STYLE_CHARS; index += 1) {
+      oversizedCss += `.s${index}{opacity:.5}`;
+    }
     expect(oversizedCss.length).toBeGreaterThan(MAX_STYLE_CHARS);
 
     const result = sanitizeSvgMarkup(

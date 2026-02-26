@@ -44,6 +44,7 @@ describe("sanitizeSvgForDisplay", () => {
 
     expect(iframe.getAttribute("sandbox")).toBe("");
     expect(iframe.getAttribute("srcdoc")).toContain("@layer effects");
+    expect(iframe.getAttribute("srcdoc")).toContain("@keyframes drift");
     expect(iframe.getAttribute("srcdoc")).toContain("mix-blend-mode:screen");
     expect(iframe.getAttribute("srcdoc")).toContain("<html>");
     expect(iframe.getAttribute("srcdoc")).toContain("<svg");

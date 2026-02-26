@@ -3,6 +3,7 @@ import { AiService, createAiService, ProviderRegistry, SettingsRepository } from
 import { AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
+import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
 
 function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -54,30 +55,19 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings);
+    const capabilityContractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
     expect(prompt).toContain("avoid SMIL tags");
-    expect(prompt).toContain("<css_capability_contract>");
-    expect(prompt).toContain("<profile>sandboxed-permissive</profile>");
-    expect(prompt).toContain("<allowed_at_rules>");
-    expect(prompt).toContain("<at_rule>@layer</at_rule>");
-    expect(prompt).toContain("<property_policy>");
-    expect(prompt).toContain("Standard CSS properties and custom properties");
-    expect(prompt).toContain("<blocked_properties>behavior, -moz-binding</blocked_properties>");
-    expect(prompt).toContain("<url_policy>");
-    expect(prompt).toContain("<allowed_local_references>#id, url(#id)</allowed_local_references>");
-    expect(prompt).toContain("<style_limits>");
-    expect(prompt).toContain("<max_style_blocks>8</max_style_blocks>");
-    expect(prompt).toContain("<max_style_chars>12000</max_style_chars>");
-    expect(prompt).toContain("<max_style_attr_chars>3000</max_style_attr_chars>");
-    expect(prompt).toContain("<max_selector_length>600</max_selector_length>");
-    expect(prompt).toContain("<max_value_length>1000</max_value_length>");
-    expect(prompt).toContain("<blocked_features>");
-    expect(prompt).toContain("No &lt;script&gt; tags.");
+    expect(prompt).toContain("<css_capability_contract><![CDATA[");
+    expect(prompt).toContain(capabilityContractPayload);
+    expect(prompt).toContain('"profile":"sandboxed-permissive"');
+    expect(prompt).toContain('"allowedAtRules":["@keyframes","@media","@supports","@layer"]');
+    expect(prompt).toContain("No <script> tags.");
     expect(prompt).toContain(
-      "No SMIL animation tags: &lt;animate&gt;, &lt;animateMotion&gt;, &lt;animateTransform&gt;, &lt;set&gt;.",
+      "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
     );
-    expect(prompt).not.toContain("No <script> tags.");
     expect(prompt).toContain("<system_instructions>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');

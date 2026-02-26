@@ -7,19 +7,7 @@ import {
   DEFAULT_COLOR_PALETTE_ID,
   isColorPaletteId,
 } from "../../constants/color-palettes";
-import {
-  SVG_BLOCKED_FEATURES,
-  SVG_CSS_ALLOWED_AT_RULES,
-  SVG_CSS_BLOCKED_PROPERTIES,
-  SVG_CSS_MAX_SELECTOR_CHARS,
-  SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS,
-  SVG_CSS_MAX_STYLE_BLOCKS,
-  SVG_CSS_MAX_STYLE_CHARS,
-  SVG_CSS_MAX_VALUE_CHARS,
-  SVG_CSS_POLICY_PROFILE,
-  formatSvgCssAllowedPropertiesForPrompt,
-  SVG_CSS_URL_REFERENCE_RULE,
-} from "../../constants/svg-css-policy";
+import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -177,46 +165,7 @@ function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
 }
 
-function xmlEscape(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
 function buildSvgCssCapabilityContractXml(): string {
-  const allowedAtRulesXml = SVG_CSS_ALLOWED_AT_RULES.map(
-    (rule) => `    <at_rule>${xmlEscape(rule)}</at_rule>`,
-  ).join("\n");
-  const blockedFeaturesXml = SVG_BLOCKED_FEATURES.map(
-    (feature) => `    <feature>${xmlEscape(feature)}</feature>`,
-  ).join("\n");
-
-  return `<css_capability_contract>
-  <profile>${xmlEscape(SVG_CSS_POLICY_PROFILE)}</profile>
-  <allowed_at_rules>
-${allowedAtRulesXml}
-  </allowed_at_rules>
-  <property_policy>
-    <model>${xmlEscape(formatSvgCssAllowedPropertiesForPrompt())}</model>
-    <blocked_properties>${xmlEscape(SVG_CSS_BLOCKED_PROPERTIES.join(", "))}</blocked_properties>
-  </property_policy>
-  <url_policy>
-    <allowed_local_references>#id, url(#id)</allowed_local_references>
-    <external_urls_allowed>false</external_urls_allowed>
-    <rule>${xmlEscape(SVG_CSS_URL_REFERENCE_RULE)}</rule>
-  </url_policy>
-  <style_limits>
-    <max_style_blocks>${SVG_CSS_MAX_STYLE_BLOCKS}</max_style_blocks>
-    <max_style_chars>${SVG_CSS_MAX_STYLE_CHARS}</max_style_chars>
-    <max_style_attr_chars>${SVG_CSS_MAX_STYLE_ATTRIBUTE_CHARS}</max_style_attr_chars>
-    <max_selector_length>${SVG_CSS_MAX_SELECTOR_CHARS}</max_selector_length>
-    <max_value_length>${SVG_CSS_MAX_VALUE_CHARS}</max_value_length>
-  </style_limits>
-  <blocked_features>
-${blockedFeaturesXml}
-  </blocked_features>
-</css_capability_contract>`;
+  const contractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+  return `<css_capability_contract><![CDATA[${toCdata(contractPayload)}]]></css_capability_contract>`;
 }
