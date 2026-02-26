@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DOMParser as XmldomParser } from "@xmldom/xmldom";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
@@ -18,16 +19,24 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
 
 function buildPartialSvgVariationsPayloadSchema(_requestedCount: number) {
   return z.object({
-    svgs: z.array(z.string().min(1)).min(1),
+    svgs: z.array(z.any()).min(1),
   });
 }
 
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
 
-function parseHtmlFragment(text: string): HTMLElement | null {
-  if (typeof DOMParser === "undefined") {
-    return null;
+function parseHtmlFragment(text: string): Element | Document | null {
+  if (typeof DOMParser === "undefined" || typeof window === "undefined") {
+    try {
+      const doc = new XmldomParser({
+        locator: {},
+        errorHandler: () => {}, // Suppress console output for parsing errors
+      }).parseFromString(text, "text/xml");
+      return doc;
+    } catch {
+      return null;
+    }
   }
 
   try {
@@ -53,12 +62,14 @@ function isSingleSvgDocument(input: string): boolean {
   let topLevelSvgCount = 0;
 
   for (const node of Array.from(parsedBody.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim() !== "") {
+    if (node.nodeType === 3 && node.textContent?.trim() !== "") {
+      // Node.TEXT_NODE === 3
       return false;
     }
 
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const tagName = (node as Element).tagName.toLowerCase();
+    if (node.nodeType === 1) {
+      // Node.ELEMENT_NODE === 1
+      const tagName = (node as Element).tagName?.toLowerCase();
       if (tagName !== "svg") {
         return false;
       }
@@ -239,7 +250,10 @@ function parsePartialSvgVariationsFromText(text: string, requestedCount: number)
     return [];
   }
 
-  const normalizedSvgs = normalizeStructuredSvgArrayBestEffort(parsedPayload.data.svgs);
+  const validStringSvgs = parsedPayload.data.svgs.filter(
+    (item): item is string => typeof item === "string",
+  );
+  const normalizedSvgs = normalizeStructuredSvgArrayBestEffort(validStringSvgs);
   return normalizedSvgs.slice(0, normalizedCount);
 }
 
@@ -297,16 +311,20 @@ function extractSvgDocumentsFromText(text: string): string[] {
   const uniqueSvgs = new Set<string>();
 
   for (const node of Array.from(parsedBody.childNodes)) {
-    if (node.nodeType !== Node.ELEMENT_NODE) {
+    if (node.nodeType !== 1) {
+      // Node.ELEMENT_NODE === 1
       continue;
     }
 
     const element = node as Element;
-    if (element.tagName.toLowerCase() !== "svg") {
+    if (element.tagName?.toLowerCase() !== "svg") {
       continue;
     }
 
-    const normalized = normalizeSvgMarkup(element.outerHTML);
+    const html =
+      typeof element.outerHTML === "string" ? element.outerHTML : (element as any).toString();
+
+    const normalized = normalizeSvgMarkup(html);
     if (!normalized || uniqueSvgs.has(normalized)) {
       continue;
     }

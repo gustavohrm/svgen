@@ -44,6 +44,9 @@ interface AiGenerationService {
   ): Promise<string[]>;
 }
 
+export const SANITIZER_GUIDANCE =
+  "Avoid blocked tags (script, foreignObject, animate, animateMotion, animateTransform, set), inline on* attributes, external URLs, and blocked CSS patterns.";
+
 export class GenerateSvgUseCase {
   constructor(
     private readonly settingsRepository: SettingsRepository,
@@ -101,6 +104,7 @@ export class GenerateSvgUseCase {
       );
       const firstPassMerge = sanitizeAndMergeGeneratedSvgs(firstPassGeneratedSvgs);
       let safeResults = firstPassMerge.svgs;
+      let initialSafeCount = safeResults.length;
       let refillRequestCount = 0;
       let refillPassGeneratedSvgs: string[] = [];
       let refillPassMerge: SanitizedMergeResult = {
@@ -165,6 +169,8 @@ export class GenerateSvgUseCase {
         });
       }
 
+      const refillRecovered = safeResults.length - initialSafeCount;
+
       if (refillAttempted && safeResults.length === requestedVariations) {
         hasWarnings = true;
         this.uiAdapter.notify({
@@ -177,7 +183,7 @@ export class GenerateSvgUseCase {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `The model responses remained underfilled after one refill pass: requested ${requestedVariations} total variation(s), asked for ${refillRequestCount} more in refill, and recovered ${safeResults.length} safe SVG(s).`,
+          message: `The model responses remained underfilled after one refill pass: requested ${requestedVariations} total variation(s), asked for ${refillRequestCount} more in refill, and recovered ${refillRecovered} safe SVG(s).`,
         });
       }
 
@@ -244,9 +250,7 @@ function buildRefillPrompt(prompt: string, feedback: RefillPromptFeedback): stri
   const failureHints: string[] = [];
 
   if (normalizedBlockedCount > 0) {
-    failureHints.push(
-      "Previous candidates were blocked by sanitization. Avoid blocked tags (script, foreignObject, animate, animateMotion, animateTransform, set), inline on* attributes, external URLs, and blocked CSS patterns.",
-    );
+    failureHints.push(`Previous candidates were blocked by sanitization. ${SANITIZER_GUIDANCE}`);
   }
 
   if (normalizedDuplicateCount > 0) {
@@ -274,7 +278,7 @@ function buildRefillPrompt(prompt: string, feedback: RefillPromptFeedback): stri
   <distinctness_requirements>Each new SVG must use a clearly distinct composition, motion direction, and color direction versus prior accepted outputs and versus other refill outputs.</distinctness_requirements>
   <pairwise_difference_rule>Every pair of refill SVGs must differ on at least two axes: composition, shape language, color direction, or motion profile.</pairwise_difference_rule>
   <novelty_rule>Return only net-new variations; do not duplicate or trivially mutate previous outputs.</novelty_rule>
-  <sanitizer_compatibility>Do not use blocked tags, inline on* handlers, external URLs, or blocked CSS patterns.</sanitizer_compatibility>
+  <sanitizer_compatibility>${SANITIZER_GUIDANCE}</sanitizer_compatibility>
 </refill_request>`;
 }
 

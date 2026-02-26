@@ -254,7 +254,7 @@ describe("GenerateSvgUseCase", () => {
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",
       message:
-        "The model responses remained underfilled after one refill pass: requested 3 total variation(s), asked for 2 more in refill, and recovered 1 safe SVG(s).",
+        "The model responses remained underfilled after one refill pass: requested 3 total variation(s), asked for 2 more in refill, and recovered 0 safe SVG(s).",
     });
   });
 
