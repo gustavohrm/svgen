@@ -1,4 +1,9 @@
 import { AiProviderId } from "../../types/index";
+import {
+  DEFAULT_COLOR_PALETTE_ID,
+  isColorPaletteId,
+  type ColorPaletteId,
+} from "../../constants/color-palettes";
 import { createId } from "../../utils/id";
 
 export interface ApiKeyItem {
@@ -17,6 +22,7 @@ export interface AppSettings {
   variations: number;
   temperature: number;
   systemPrompt: string;
+  colorPaletteId: ColorPaletteId;
   lastSelectedModel?: string;
   lastSelectedProviderId?: string;
 }
@@ -27,6 +33,7 @@ const defaultSettings: AppSettings = {
   variations: 4,
   temperature: 0.7,
   systemPrompt: "",
+  colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
   lastSelectedModel: undefined,
   lastSelectedProviderId: undefined,
 };
@@ -65,6 +72,22 @@ function cloneSettings(settings: AppSettings): AppSettings {
   };
 }
 
+/**
+ * Normalize a partial settings payload into a complete, validated AppSettings object.
+ *
+ * Converts and validates each setting field, ensuring types and value ranges are correct and
+ * providing sensible defaults for missing or invalid fields.
+ *
+ * @param input - Partial settings to normalize
+ * @returns A fully populated AppSettings where:
+ *  - `apiKeys` is an array (cloned) or empty array
+ *  - `activeKeys` contains only string key IDs
+ *  - `variations` is an integer clamped to the range 1–4
+ *  - `temperature` is clamped to the range 0.0–2.0 with one-decimal precision
+ *  - `systemPrompt` is a string or the default prompt
+ *  - `colorPaletteId` is validated and falls back to the default palette ID when invalid
+ *  - `lastSelectedModel` and `lastSelectedProviderId` are strings or their default values
+ */
 function normalizeSettings(input: Partial<AppSettings>): AppSettings {
   return {
     apiKeys: Array.isArray(input.apiKeys) ? input.apiKeys.map((key) => cloneApiKeyItem(key)) : [],
@@ -83,6 +106,9 @@ function normalizeSettings(input: Partial<AppSettings>): AppSettings {
         : defaultSettings.temperature,
     systemPrompt:
       typeof input.systemPrompt === "string" ? input.systemPrompt : defaultSettings.systemPrompt,
+    colorPaletteId: isColorPaletteId(input.colorPaletteId)
+      ? input.colorPaletteId
+      : defaultSettings.colorPaletteId,
     lastSelectedModel:
       typeof input.lastSelectedModel === "string"
         ? input.lastSelectedModel
@@ -105,6 +131,7 @@ export interface SettingsRepository {
   setVariations(value: number): AppSettings;
   setTemperature(value: number): AppSettings;
   setSystemPrompt(value: string): AppSettings;
+  setColorPaletteId(value: ColorPaletteId): AppSettings;
 }
 
 export class BrowserSettingsRepository implements SettingsRepository {
@@ -302,5 +329,9 @@ export class BrowserSettingsRepository implements SettingsRepository {
 
   setSystemPrompt(value: string): AppSettings {
     return this.saveSettings({ systemPrompt: value });
+  }
+
+  setColorPaletteId(value: ColorPaletteId): AppSettings {
+    return this.saveSettings({ colorPaletteId: value });
   }
 }
