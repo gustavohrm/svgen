@@ -78,12 +78,12 @@ describe("AiService", () => {
     expect(prompt).toContain("<variation_matrix>");
     expect(prompt).toContain("<sanitizer_compatibility>");
     expect(prompt).toContain(
-      `<blocked_svg_tags>${SVG_BLOCKED_TAG_NAMES.join(", ")}</blocked_svg_tags>`,
+      `<blocked_svg_tags><![CDATA[${SVG_BLOCKED_TAG_NAMES.join(", ")}]]></blocked_svg_tags>`,
     );
     expect(prompt).toContain(
-      `<blocked_css_patterns>${SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ")}</blocked_css_patterns>`,
+      `<blocked_css_patterns><![CDATA[${SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ")}]]></blocked_css_patterns>`,
     );
-    expect(prompt).toContain(`<url_rules>${SVG_CSS_URL_REFERENCE_RULE}</url_rules>`);
+    expect(prompt).toContain(`<url_rules><![CDATA[${SVG_CSS_URL_REFERENCE_RULE}]]></url_rules>`);
     expect(prompt).toContain("<quality_rubric>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');

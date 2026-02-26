@@ -68,6 +68,21 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg]);
   });
 
+  it("extracts multiple raw svgs from a single response", () => {
+    const response = [
+      "Variation 1:",
+      validSvg,
+      "Variation 2:",
+      secondSvg,
+      "Variation 3:",
+      thirdSvg,
+    ].join("\n\n");
+
+    const result = parseSvgVariationsFromResponses([response], 3);
+
+    expect(result).toEqual([validSvg, secondSvg, thirdSvg]);
+  });
+
   it("rejects structured payloads when svgs array length does not match requestedCount", () => {
     expect(() =>
       parseSvgVariationsFromResponses(

@@ -20,6 +20,7 @@ function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
 
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
+const SVG_BLOCK_REGEX = /<svg[\s\S]*?<\/svg>/gi;
 
 /**
  * Determines whether the given string contains exactly one standalone SVG document with no other content.
@@ -245,6 +246,28 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
   return normalizedSvgs;
 }
 
+function extractSvgDocumentsFromText(text: string): string[] {
+  const matches = text.match(SVG_BLOCK_REGEX);
+  if (!matches || matches.length === 0) {
+    return [];
+  }
+
+  const normalizedSvgs: string[] = [];
+  const uniqueSvgs = new Set<string>();
+
+  for (const match of matches) {
+    const normalized = normalizeSvgMarkup(match);
+    if (!normalized || uniqueSvgs.has(normalized)) {
+      continue;
+    }
+
+    uniqueSvgs.add(normalized);
+    normalizedSvgs.push(normalized);
+  }
+
+  return normalizedSvgs;
+}
+
 /**
  * Parse and return exactly `requestedCount` normalized SVG markups from model responses.
  *
@@ -284,9 +307,20 @@ export function parseSvgVariationsFromResponses(
     const normalized = normalizeSvgMarkup(response);
     if (normalized) {
       fallbackSvgs.add(normalized);
-      if (fallbackSvgs.size >= normalizedCount) {
-        break;
+    }
+
+    if (normalizedCount > 1 && fallbackSvgs.size < normalizedCount) {
+      const extractedSvgs = extractSvgDocumentsFromText(response);
+      for (const svg of extractedSvgs) {
+        fallbackSvgs.add(svg);
+        if (fallbackSvgs.size >= normalizedCount) {
+          break;
+        }
       }
+    }
+
+    if (fallbackSvgs.size >= normalizedCount) {
+      break;
     }
   }
 

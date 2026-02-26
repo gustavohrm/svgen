@@ -99,10 +99,10 @@ function buildSanitizerCompatibilityXml(): string {
   ).join(", ");
 
   return `<sanitizer_compatibility>
-  <blocked_svg_tags>${blockedSvgTags}</blocked_svg_tags>
-  <blocked_css_patterns>${blockedCssPatterns}</blocked_css_patterns>
+  <blocked_svg_tags><![CDATA[${toCdata(blockedSvgTags)}]]></blocked_svg_tags>
+  <blocked_css_patterns><![CDATA[${toCdata(blockedCssPatterns)}]]></blocked_css_patterns>
   <blocked_attributes>Any inline on* event handlers are forbidden.</blocked_attributes>
-  <url_rules>${SVG_CSS_URL_REFERENCE_RULE}</url_rules>
+  <url_rules><![CDATA[${toCdata(SVG_CSS_URL_REFERENCE_RULE)}]]></url_rules>
 </sanitizer_compatibility>`;
 }
 
