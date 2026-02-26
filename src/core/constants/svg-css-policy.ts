@@ -82,10 +82,20 @@ export const SVG_CSS_SAFETY_RULE_HINTS = [
   'Use <style> blocks (optional type="text/css").',
 ] as const;
 
+/**
+ * Produce a prompt-friendly list of allowed SVG CSS properties with an appended guidance note.
+ *
+ * @returns A string of allowed properties joined by ", " followed by ", plus other standard CSS properties and custom properties (--tokens)."
+ */
 export function formatSvgCssAllowedPropertiesForPrompt(): string {
   return `${SVG_CSS_ALLOWED_PROPERTIES.join(", ")}, plus other standard CSS properties and custom properties (--tokens).`;
 }
 
+/**
+ * Produce a comma-separated list of allowed CSS at-rule names for prompts.
+ *
+ * @returns A string containing the allowed at-rule names joined with ", " (e.g., "@keyframes, @media, @supports").
+ */
 export function formatSvgCssAllowedAtRulesForPrompt(): string {
   return SVG_CSS_ALLOWED_AT_RULES.join(", ");
 }
