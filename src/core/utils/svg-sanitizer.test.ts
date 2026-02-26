@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { SVG_CSS_ALLOWED_PROPERTIES } from "../constants/svg-css-policy";
 import { MAX_STYLE_BLOCKS, MAX_STYLE_CHARS, sanitizeSvgMarkup } from "./svg-sanitizer";
 
 describe("sanitizeSvgMarkup", () => {
@@ -276,29 +275,39 @@ describe("sanitizeSvgMarkup", () => {
     expect(result).toContain('style="fill:#f00;opacity:.7"');
   });
 
-  it("rejects inline style when property is not in ALLOWED_CSS_PROPERTIES (position)", () => {
-    expect(SVG_CSS_ALLOWED_PROPERTIES).not.toContain("position");
-
+  it("keeps safe inline style attributes with broader standard properties", () => {
     const result = sanitizeSvgMarkup(
-      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="position:fixed"/></svg>',
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="position:relative;left:0;z-index:1"/></svg>',
     );
 
-    expect(result).toBeNull();
+    expect(result).toContain('style="position:relative;left:0;z-index:1"');
   });
 
-  it("rejects inline style when property is not in ALLOWED_CSS_PROPERTIES (left)", () => {
-    expect(SVG_CSS_ALLOWED_PROPERTIES).not.toContain("left");
-
+  it("keeps safe nested CSS rules using @media and @supports", () => {
     const result = sanitizeSvgMarkup(
-      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="left:0"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@media (prefers-reduced-motion: reduce){.shape{animation:none}}@supports (display:grid){.shape{display:grid}} .shape{animation:spin 1s linear infinite}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
     );
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result).toContain("@media");
+    expect(result).toContain("@supports");
+  });
+
+  it("rejects legacy executable CSS properties", () => {
+    const behaviorResult = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><rect x="1" y="1" width="8" height="8" style="behavior:url(#legacy)"/></svg>',
+    );
+    const mozBindingResult = sanitizeSvgMarkup(
+      '<svg viewBox="0 0 10 10"><style>.shape{-moz-binding:url(#legacy)}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+    );
+
+    expect(behaviorResult).toBeNull();
+    expect(mozBindingResult).toBeNull();
   });
 
   it("rejects unsupported CSS at-rules", () => {
     const result = sanitizeSvgMarkup(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@media (prefers-reduced-motion: reduce){.shape{animation:none}} .shape{animation:spin 1s linear infinite}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@document url("https://example.com"){.shape{opacity:.5}}</style><rect class="shape" x="1" y="1" width="8" height="8"/></svg>',
     );
 
     expect(result).toBeNull();

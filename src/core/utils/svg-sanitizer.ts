@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { SVG_CSS_ALLOWED_PROPERTIES, SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
+import { SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
 
 const ALLOWED_SVG_TAGS = [
   "svg",
@@ -190,12 +190,13 @@ const URL_REFERENCE_ATTR_NAMES = new Set<string>([
 const LOCAL_FRAGMENT_REFERENCE_PATTERN = /^#[-\w:.]+$/;
 const LOCAL_FRAGMENT_URL_REFERENCE_PATTERN = /^url\s*\(\s*(['"]?)#[-\w:.]+\1\s*\)$/i;
 
-const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
 const ALLOWED_CSS_AT_RULES = new Set<string>(
   SVG_CSS_ALLOWED_AT_RULES.map((rule) => normalizeCssAtRule(rule)).filter(
     (rule) => rule.length > 0,
   ),
 );
+const CSS_NESTED_RULE_AT_RULES = new Set<string>(["media", "supports"]);
+const BLOCKED_CSS_PROPERTIES = new Set<string>(["behavior", "-moz-binding"]);
 
 interface NodeCryptoModule {
   webcrypto?: Crypto;
@@ -540,23 +541,16 @@ function isSafeCssStylesheet(css: string): boolean {
         return false;
       }
 
-      if (atRuleName !== "keyframes") {
+      const openBraceIndex = findTopLevelCharacter(css, "{", index);
+      if (openBraceIndex === -1) {
         return false;
       }
-
-      const keyframesMatch = css.slice(index).match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*\{/i);
-      if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
-        return false;
-      }
-
-      const openBraceIndex = index + keyframesMatch[0].length - 1;
       const closeBraceIndex = findMatchingBrace(css, openBraceIndex);
       if (closeBraceIndex === -1) {
         return false;
       }
 
-      const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
-      if (!isSafeKeyframesBody(keyframesBody)) {
+      if (!isSafeAtRuleBody(css, index, openBraceIndex, closeBraceIndex, atRuleName)) {
         return false;
       }
 
@@ -588,6 +582,58 @@ function isSafeCssStylesheet(css: string): boolean {
   }
 
   return true;
+}
+
+function isSafeAtRuleBody(
+  css: string,
+  atRuleStartIndex: number,
+  openBraceIndex: number,
+  closeBraceIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName === "keyframes") {
+    const keyframesPrelude = css.slice(atRuleStartIndex, openBraceIndex);
+    const keyframesMatch = keyframesPrelude.match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*$/i);
+    if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
+      return false;
+    }
+
+    const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
+    return isSafeKeyframesBody(keyframesBody);
+  }
+
+  if (!CSS_NESTED_RULE_AT_RULES.has(atRuleName)) {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, openBraceIndex);
+  if (!isSafeAtRulePrelude(atRulePrelude, atRuleName)) {
+    return false;
+  }
+
+  const nestedStylesheet = css.slice(openBraceIndex + 1, closeBraceIndex);
+  return isSafeCssStylesheet(nestedStylesheet);
+}
+
+function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
+  const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
+  if (!normalizedPrelude) {
+    return false;
+  }
+
+  if (!/^[,.:()'"\/%+\-<>=\s\w]*$/.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (atRuleName === "media") {
+    return /\(|\b(?:all|print|screen|speech)\b/i.test(normalizedPrelude);
+  }
+
+  if (atRuleName === "supports") {
+    return normalizedPrelude.includes("(");
+  }
+
+  return false;
 }
 
 function isSafeKeyframesName(name: string): boolean {
@@ -667,7 +713,7 @@ function isSafeCssSelector(selector: string): boolean {
     return false;
   }
 
-  return /^[#.:\[\]="'()*+,>~\s\w-]+$/.test(selector);
+  return /^[#.:\[\]="'()*+,>~|^$\s\w-]+$/.test(selector);
 }
 
 function isSafeCssDeclarations(block: string): boolean {
@@ -689,12 +735,7 @@ function isSafeCssDeclarations(block: string): boolean {
     const property = declaration.slice(0, colonIndex).trim().toLowerCase();
     const value = declaration.slice(colonIndex + 1).trim();
 
-    if (!isSafeCssPropertyName(property)) {
-      return false;
-    }
-
-    // Custom properties are intentionally allowed for SVG-local theming variables.
-    if (!ALLOWED_CSS_PROPERTIES.has(property) && !isAllowedCustomProperty(property)) {
+    if (!isAllowedCssProperty(property)) {
       return false;
     }
 
@@ -704,6 +745,18 @@ function isSafeCssDeclarations(block: string): boolean {
   }
 
   return true;
+}
+
+function isAllowedCssProperty(property: string): boolean {
+  if (!isSafeCssPropertyName(property)) {
+    return false;
+  }
+
+  if (isAllowedCustomProperty(property)) {
+    return true;
+  }
+
+  return !BLOCKED_CSS_PROPERTIES.has(property);
 }
 
 function splitCssDeclarations(block: string): string[] | null {
@@ -811,6 +864,51 @@ function findTopLevelColon(input: string): number {
   return -1;
 }
 
+function findTopLevelCharacter(input: string, targetCharacter: string, startIndex = 0): number {
+  let parenDepth = 0;
+  let quote: '"' | "'" | null = null;
+
+  for (let index = startIndex; index < input.length; index++) {
+    const char = input[index];
+
+    if (quote) {
+      if (char === "\\") {
+        index += 1;
+        continue;
+      }
+
+      if (char === quote) {
+        quote = null;
+      }
+
+      continue;
+    }
+
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (char === "(") {
+      parenDepth += 1;
+      continue;
+    }
+
+    if (char === ")") {
+      if (parenDepth > 0) {
+        parenDepth -= 1;
+      }
+      continue;
+    }
+
+    if (char === targetCharacter && parenDepth === 0) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
 function isSafeCssValue(value: string): boolean {
   if (!value || value.length > 300) {
     return false;
@@ -832,7 +930,7 @@ function isSafeCssValue(value: string): boolean {
     return false;
   }
 
-  return /^[#(),.%/\s+\-!"'\w:]*$/.test(value);
+  return /^[#(),.%/\s+\-!"'\w:*\[\]?|=]*$/.test(value);
 }
 
 function sanitizeStyleAttribute(styleValue: string): string | null {

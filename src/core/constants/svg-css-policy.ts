@@ -1,6 +1,6 @@
-export const SVG_CSS_POLICY_PROFILE = "permissive" as const;
+export const SVG_CSS_POLICY_PROFILE = "sandboxed-permissive" as const;
 
-export const SVG_CSS_ALLOWED_AT_RULES = ["@keyframes"] as const;
+export const SVG_CSS_ALLOWED_AT_RULES = ["@keyframes", "@media", "@supports"] as const;
 
 export const SVG_CSS_ALLOWED_PROPERTIES = [
   "animation",
@@ -70,19 +70,20 @@ export const SVG_CSS_ALLOWED_SELECTOR_HINTS = [
   "#id",
   "descendant",
   "comma-separated",
-  "simple pseudo-classes",
+  "pseudo-classes",
+  "attribute selectors",
 ] as const;
 
 export const SVG_CSS_SAFETY_RULE_HINTS = [
   "No @import.",
   "No javascript: URLs.",
-  "No expression() or browser-specific executable bindings.",
+  "No expression() or executable legacy bindings.",
   "Only local fragment URLs in url(...), e.g. url(#gradient).",
   'Use <style> blocks (optional type="text/css").',
 ] as const;
 
 export function formatSvgCssAllowedPropertiesForPrompt(): string {
-  return SVG_CSS_ALLOWED_PROPERTIES.join(", ");
+  return `${SVG_CSS_ALLOWED_PROPERTIES.join(", ")}, plus other standard CSS properties and custom properties (--tokens).`;
 }
 
 export function formatSvgCssAllowedAtRulesForPrompt(): string {

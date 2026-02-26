@@ -58,7 +58,7 @@ describe("AiService", () => {
     expect(prompt).toContain("Prefer named SVG primitives");
     expect(prompt).toContain("avoid SMIL tags");
     expect(prompt).toContain("<css_animation_profile>");
-    expect(prompt).toContain("<profile>permissive</profile>");
+    expect(prompt).toContain("<profile>sandboxed-permissive</profile>");
     expect(prompt).toContain("<allowed_css_properties>");
     expect(prompt).toContain("animation-duration");
     expect(prompt).toContain("<safety_rules>");
