@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { canonicalizeSvg } from "../../../test-utils";
 import {
   buildGcpSvgVariationsSchema,
   buildSvgVariationsJsonSchema,
@@ -32,12 +33,6 @@ describe("parseSvgVariationsFromResponses", () => {
   const validSvg = "<svg viewBox='0 0 10 10'><circle cx='5' cy='5' r='4'/></svg>";
   const secondSvg = "<svg viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8'/></svg>";
   const thirdSvg = "<svg viewBox='0 0 10 10'><path d='M1 1 L9 9'/></svg>";
-
-  function canonicalizeSvg(svg: string): string {
-    const parsed = new DOMParser().parseFromString(svg, "text/html");
-    const svgNode = parsed.getElementsByTagName("svg")[0];
-    return svgNode ? svgNode.outerHTML : parsed.documentElement.outerHTML;
-  }
 
   it("parses valid structured payloads", () => {
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 1);

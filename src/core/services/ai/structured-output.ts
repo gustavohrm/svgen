@@ -82,12 +82,12 @@ function isSingleSvgDocument(input: string): boolean {
   let topLevelSvgCount = 0;
 
   for (const node of Array.from(parsedBody.childNodes)) {
-    if (node.nodeType === 3 && node.textContent?.trim() !== "") {
+    if (node.nodeType === 3) {
       // Node.TEXT_NODE === 3
-      return false;
-    }
-
-    if (node.nodeType === 1) {
+      if (node.textContent?.trim() !== "") {
+        return false;
+      }
+    } else if (node.nodeType === 1) {
       // Node.ELEMENT_NODE === 1
       const tagName = (node as Element).tagName?.toLowerCase();
       if (tagName !== "svg") {
@@ -95,6 +95,8 @@ function isSingleSvgDocument(input: string): boolean {
       }
 
       topLevelSvgCount += 1;
+    } else {
+      return false;
     }
   }
 
