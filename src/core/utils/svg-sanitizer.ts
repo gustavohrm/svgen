@@ -839,54 +839,32 @@ function splitCssDeclarations(block: string): string[] | null {
   return declarations;
 }
 
-function findTopLevelColon(input: string): number {
-  let parenDepth = 0;
-  let quote: '"' | "'" | null = null;
+type QuoteCharacter = '"' | "'";
 
-  for (let index = 0; index < input.length; index++) {
-    const char = input[index];
-
-    if (quote) {
-      if (char === "\\") {
-        index += 1;
-        continue;
-      }
-
-      if (char === quote) {
-        quote = null;
-      }
-
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-
-    if (char === "(") {
-      parenDepth += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      if (parenDepth > 0) {
-        parenDepth -= 1;
-      }
-      continue;
-    }
-
-    if (char === ":" && parenDepth === 0) {
-      return index;
-    }
-  }
-
-  return -1;
+interface TopLevelCharacterContext {
+  index: number;
+  char: string;
+  parenDepth: number;
 }
 
-function findTopLevelCharacter(input: string, targetCharacter: string, startIndex = 0): number {
+interface TopLevelCharacterTraversalOptions {
+  startIndex?: number;
+  canParenDepthBeNegative?: boolean;
+  shouldStop?: (context: TopLevelCharacterContext) => boolean;
+}
+
+interface TopLevelCharacterTraversalResult {
+  parenDepth: number;
+  quote: QuoteCharacter | null;
+}
+
+function iterateTopLevelChars(
+  input: string,
+  options: TopLevelCharacterTraversalOptions = {},
+): TopLevelCharacterTraversalResult {
+  const { startIndex = 0, canParenDepthBeNegative = false, shouldStop } = options;
   let parenDepth = 0;
-  let quote: '"' | "'" | null = null;
+  let quote: QuoteCharacter | null = null;
 
   for (let index = startIndex; index < input.length; index++) {
     const char = input[index];
@@ -911,22 +889,65 @@ function findTopLevelCharacter(input: string, targetCharacter: string, startInde
 
     if (char === "(") {
       parenDepth += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      if (parenDepth > 0) {
+    } else if (char === ")") {
+      if (canParenDepthBeNegative || parenDepth > 0) {
         parenDepth -= 1;
       }
-      continue;
     }
 
-    if (char === targetCharacter && parenDepth === 0) {
-      return index;
+    if (
+      shouldStop?.({
+        index,
+        char,
+        parenDepth,
+      })
+    ) {
+      return {
+        parenDepth,
+        quote,
+      };
     }
   }
 
-  return -1;
+  return {
+    parenDepth,
+    quote,
+  };
+}
+
+function findTopLevelColon(input: string): number {
+  let colonIndex = -1;
+
+  iterateTopLevelChars(input, {
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === ":" && parenDepth === 0) {
+        colonIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return colonIndex;
+}
+
+function findTopLevelCharacter(input: string, targetCharacter: string, startIndex = 0): number {
+  let characterIndex = -1;
+
+  iterateTopLevelChars(input, {
+    startIndex,
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === targetCharacter && parenDepth === 0) {
+        characterIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return characterIndex;
 }
 
 function isSafeCssValue(value: string): boolean {
@@ -983,44 +1004,24 @@ function isAllowedCustomProperty(property: string): boolean {
 }
 
 function hasBalancedParentheses(input: string): boolean {
-  let depth = 0;
-  let quote: '"' | "'" | null = null;
-
-  for (let index = 0; index < input.length; index++) {
-    const char = input[index];
-
-    if (quote) {
-      if (char === "\\") {
-        index += 1;
-        continue;
+  let hasUnbalancedClosingParenthesis = false;
+  const traversalResult = iterateTopLevelChars(input, {
+    canParenDepthBeNegative: true,
+    shouldStop: ({ char, parenDepth }) => {
+      if (char === ")" && parenDepth < 0) {
+        hasUnbalancedClosingParenthesis = true;
+        return true;
       }
 
-      if (char === quote) {
-        quote = null;
-      }
+      return false;
+    },
+  });
 
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-
-    if (char === "(") {
-      depth += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      depth -= 1;
-      if (depth < 0) {
-        return false;
-      }
-    }
+  if (hasUnbalancedClosingParenthesis) {
+    return false;
   }
 
-  return depth === 0 && quote === null;
+  return traversalResult.parenDepth === 0 && traversalResult.quote === null;
 }
 
 function containsOnlyLocalFragmentUrls(value: string): boolean {
