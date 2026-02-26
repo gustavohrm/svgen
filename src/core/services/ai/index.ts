@@ -94,9 +94,7 @@ function buildVariationMatrixXml(): string {
 
 function buildSanitizerCompatibilityXml(): string {
   const blockedSvgTags = SVG_BLOCKED_TAG_NAMES.join(", ");
-  const blockedCssPatterns = SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) =>
-    source.replace(/\\\//g, "/"),
-  ).join(", ");
+  const blockedCssPatterns = buildBlockedCssPatternsDisplayText();
 
   return `<sanitizer_compatibility>
   <blocked_svg_tags><![CDATA[${toCdata(blockedSvgTags)}]]></blocked_svg_tags>
@@ -115,6 +113,7 @@ function buildSanitizerCompatibilityXml(): string {
 function buildSystemPromptGuardrails(variationCount: number): string {
   const normalizedVariationCount = normalizePositiveInt(variationCount);
   const variationsSchema = buildSvgVariationsJsonSchema(normalizedVariationCount);
+  const blockedCssPatternsForPrompt = escapeXmlText(buildBlockedCssPatternsDisplayText());
 
   return `
 <generation_rules>
@@ -129,7 +128,7 @@ function buildSystemPromptGuardrails(variationCount: number): string {
   <rule>Never use blocked tags: script, foreignObject, animate, animateMotion, animateTransform, set.</rule>
   <rule>Never use inline event handler attributes (on*).</rule>
   <rule>Only local URL references are allowed: #id and url(#id).</rule>
-  <rule>Never use blocked CSS patterns: @import, javascript:, expression(), behavior:, -moz-binding.</rule>
+  <rule>Never use blocked CSS patterns: ${blockedCssPatternsForPrompt}.</rule>
   <rule>Prefer named SVG primitives over paths when equivalent.</rule>
   <rule>If animation is requested, use inline CSS animation and avoid SMIL tags such as &lt;animate&gt;, &lt;animateTransform&gt;, &lt;animateMotion&gt;, and &lt;set&gt;.</rule>
   <rule>Prefer viewBox-based responsive coordinates.</rule>
@@ -281,6 +280,14 @@ export function createAiService(
  */
 function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
+}
+
+function buildBlockedCssPatternsDisplayText(): string {
+  return SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ");
+}
+
+function escapeXmlText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**

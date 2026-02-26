@@ -33,6 +33,11 @@ describe("parseSvgVariationsFromResponses", () => {
   const secondSvg = "<svg viewBox='0 0 10 10'><rect x='1' y='1' width='8' height='8'/></svg>";
   const thirdSvg = "<svg viewBox='0 0 10 10'><path d='M1 1 L9 9'/></svg>";
 
+  function canonicalizeSvg(svg: string): string {
+    const parsed = new DOMParser().parseFromString(svg, "image/svg+xml");
+    return parsed.documentElement.outerHTML;
+  }
+
   it("parses valid structured payloads", () => {
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 1);
 
@@ -80,7 +85,21 @@ describe("parseSvgVariationsFromResponses", () => {
 
     const result = parseSvgVariationsFromResponses([response], 3);
 
-    expect(result).toEqual([validSvg, secondSvg, thirdSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual(
+      [validSvg, secondSvg, thirdSvg].map(canonicalizeSvg),
+    );
+  });
+
+  it("preserves nested svg content when extracting raw responses", () => {
+    const nestedSvg =
+      "<svg viewBox='0 0 20 20'><svg x='2' y='2' width='8' height='8' viewBox='0 0 8 8'><circle cx='4' cy='4' r='3'/></svg></svg>";
+
+    const result = parseSvgVariationsFromResponses([nestedSvg], 1);
+
+    expect(result).toHaveLength(1);
+    expect((result[0].match(/<svg/gi) ?? []).length).toBe(2);
+    expect(result[0]).toContain("<circle");
+    expect(result[0]).toContain("</svg>");
   });
 
   it("rejects structured payloads when svgs array length does not match requestedCount", () => {

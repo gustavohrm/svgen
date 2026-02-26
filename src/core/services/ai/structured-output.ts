@@ -20,7 +20,19 @@ function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
 
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
-const SVG_BLOCK_REGEX = /<svg[\s\S]*?<\/svg>/gi;
+
+function parseHtmlFragment(text: string): HTMLElement | null {
+  if (typeof DOMParser === "undefined") {
+    return null;
+  }
+
+  try {
+    const parsed = new DOMParser().parseFromString(text, "text/html");
+    return parsed.body;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Determines whether the given string contains exactly one standalone SVG document with no other content.
@@ -29,29 +41,29 @@ const SVG_BLOCK_REGEX = /<svg[\s\S]*?<\/svg>/gi;
  * @returns `true` if `input` contains one `<svg>...</svg>` block and no non-whitespace characters before or after it, `false` otherwise
  */
 function isSingleSvgDocument(input: string): boolean {
-  const lowered = input.toLowerCase();
-  const firstSvgIndex = lowered.indexOf("<svg");
-  const lastSvgIndex = lowered.lastIndexOf("<svg");
-  const firstClosingSvgIndex = lowered.indexOf("</svg>");
-  const lastClosingSvgIndex = lowered.lastIndexOf("</svg>");
-
-  if (firstSvgIndex === -1 || firstClosingSvgIndex === -1) {
+  const parsedBody = parseHtmlFragment(input);
+  if (!parsedBody) {
     return false;
   }
 
-  if (firstSvgIndex !== lastSvgIndex || firstClosingSvgIndex !== lastClosingSvgIndex) {
-    return false;
+  let topLevelSvgCount = 0;
+
+  for (const node of Array.from(parsedBody.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim() !== "") {
+      return false;
+    }
+
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tagName = (node as Element).tagName.toLowerCase();
+      if (tagName !== "svg") {
+        return false;
+      }
+
+      topLevelSvgCount += 1;
+    }
   }
 
-  if (input.slice(0, firstSvgIndex).trim() !== "") {
-    return false;
-  }
-
-  if (input.slice(lastClosingSvgIndex + "</svg>".length).trim() !== "") {
-    return false;
-  }
-
-  return true;
+  return topLevelSvgCount === 1;
 }
 
 /**
@@ -247,16 +259,25 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
 }
 
 function extractSvgDocumentsFromText(text: string): string[] {
-  const matches = text.match(SVG_BLOCK_REGEX);
-  if (!matches || matches.length === 0) {
+  const parsedBody = parseHtmlFragment(text);
+  if (!parsedBody) {
     return [];
   }
 
   const normalizedSvgs: string[] = [];
   const uniqueSvgs = new Set<string>();
 
-  for (const match of matches) {
-    const normalized = normalizeSvgMarkup(match);
+  for (const node of Array.from(parsedBody.childNodes)) {
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      continue;
+    }
+
+    const element = node as Element;
+    if (element.tagName.toLowerCase() !== "svg") {
+      continue;
+    }
+
+    const normalized = normalizeSvgMarkup(element.outerHTML);
     if (!normalized || uniqueSvgs.has(normalized)) {
       continue;
     }

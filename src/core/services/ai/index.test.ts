@@ -61,6 +61,13 @@ describe("AiService", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings);
     const capabilityContractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+    const blockedCssPatternsDisplay = SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) =>
+      source.replace(/\\\//g, "/"),
+    ).join(", ");
+    const escapedBlockedCssPatternsDisplay = blockedCssPatternsDisplay
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
@@ -82,6 +89,9 @@ describe("AiService", () => {
     );
     expect(prompt).toContain(
       `<blocked_css_patterns><![CDATA[${SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ")}]]></blocked_css_patterns>`,
+    );
+    expect(prompt).toContain(
+      `<rule>Never use blocked CSS patterns: ${escapedBlockedCssPatternsDisplay}.</rule>`,
     );
     expect(prompt).toContain(`<url_rules><![CDATA[${SVG_CSS_URL_REFERENCE_RULE}]]></url_rules>`);
     expect(prompt).toContain("<quality_rubric>");
