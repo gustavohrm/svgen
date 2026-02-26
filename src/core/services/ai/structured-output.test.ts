@@ -60,6 +60,14 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg]);
   });
 
+  it("falls back to raw svg wrapped in markdown fences", () => {
+    const wrappedSvg = ["```svg", validSvg, "```"].join("\n");
+
+    const result = parseSvgVariationsFromResponses([wrappedSvg], 1);
+
+    expect(result).toEqual([validSvg]);
+  });
+
   it("rejects structured payloads when svgs array length does not match requestedCount", () => {
     expect(() =>
       parseSvgVariationsFromResponses(
@@ -79,6 +87,14 @@ describe("parseSvgVariationsFromResponses", () => {
     ].join("\n");
 
     const result = parseSvgVariationsFromResponses([response], 1);
+
+    expect(result).toEqual([validSvg]);
+  });
+
+  it("normalizes structured svg strings with surrounding text", () => {
+    const wrappedSvg = ["Here is your SVG:", validSvg, "Thanks!"].join("\n");
+
+    const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [wrappedSvg] })], 1);
 
     expect(result).toEqual([validSvg]);
   });

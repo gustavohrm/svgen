@@ -3,7 +3,12 @@ import { AiService, createAiService, ProviderRegistry, SettingsRepository } from
 import { AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
-import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
+import {
+  SVG_BLOCKED_TAG_NAMES,
+  SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  SVG_CSS_CAPABILITY_CONTRACT,
+  SVG_CSS_URL_REFERENCE_RULE,
+} from "../../constants/svg-css-policy";
 
 function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -72,7 +77,13 @@ describe("AiService", () => {
     expect(prompt).toContain('<complexity_policy mode="single-craft">');
     expect(prompt).toContain("<variation_matrix>");
     expect(prompt).toContain("<sanitizer_compatibility>");
-    expect(prompt).toContain("blocked tags: script, foreignObject, animate, animateMotion");
+    expect(prompt).toContain(
+      `<blocked_svg_tags>${SVG_BLOCKED_TAG_NAMES.join(", ")}</blocked_svg_tags>`,
+    );
+    expect(prompt).toContain(
+      `<blocked_css_patterns>${SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ")}</blocked_css_patterns>`,
+    );
+    expect(prompt).toContain(`<url_rules>${SVG_CSS_URL_REFERENCE_RULE}</url_rules>`);
     expect(prompt).toContain("<quality_rubric>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');

@@ -117,7 +117,7 @@ function normalizeSvgMarkup(svg: string): string | null {
   const trimmedInput = svg.trim();
   const extracted = extractSvgFromResult(trimmedInput).trim();
 
-  if (!isSingleSvgDocument(trimmedInput) || !isSingleSvgDocument(extracted)) {
+  if (!isSingleSvgDocument(extracted)) {
     return null;
   }
 

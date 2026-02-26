@@ -7,7 +7,12 @@ import {
   DEFAULT_COLOR_PALETTE_ID,
   isColorPaletteId,
 } from "../../constants/color-palettes";
-import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
+import {
+  SVG_BLOCKED_TAG_NAMES,
+  SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  SVG_CSS_CAPABILITY_CONTRACT,
+  SVG_CSS_URL_REFERENCE_RULE,
+} from "../../constants/svg-css-policy";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -88,11 +93,16 @@ function buildVariationMatrixXml(): string {
 }
 
 function buildSanitizerCompatibilityXml(): string {
+  const blockedSvgTags = SVG_BLOCKED_TAG_NAMES.join(", ");
+  const blockedCssPatterns = SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) =>
+    source.replace(/\\\//g, "/"),
+  ).join(", ");
+
   return `<sanitizer_compatibility>
-  <blocked_svg_tags>script, foreignObject, animate, animateMotion, animateTransform, set</blocked_svg_tags>
-  <blocked_css_patterns>@import, javascript:, expression(), behavior:, -moz-binding</blocked_css_patterns>
+  <blocked_svg_tags>${blockedSvgTags}</blocked_svg_tags>
+  <blocked_css_patterns>${blockedCssPatterns}</blocked_css_patterns>
   <blocked_attributes>Any inline on* event handlers are forbidden.</blocked_attributes>
-  <url_rules>Only local references are allowed: #id and url(#id). External or absolute URLs are forbidden.</url_rules>
+  <url_rules>${SVG_CSS_URL_REFERENCE_RULE}</url_rules>
 </sanitizer_compatibility>`;
 }
 
