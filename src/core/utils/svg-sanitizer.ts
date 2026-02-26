@@ -1101,7 +1101,8 @@ function isSafeCssValue(value: string): boolean {
     return false;
   }
 
-  if (DISALLOWED_CSS_PATTERN.test(value)) {
+  const normalizedValue = value.replace(/\/\*[\s\S]*?\*\//g, "");
+  if (DISALLOWED_CSS_PATTERN.test(normalizedValue)) {
     return false;
   }
 
@@ -1132,10 +1133,12 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
     return "";
   }
 
+  const normalizedTrimmed = trimmed.replace(/\/\*[\s\S]*?\*\//g, "");
+
   if (
     trimmed.length > MAX_STYLE_ATTR_CHARS ||
     trimmed.includes("@") ||
-    DISALLOWED_CSS_PATTERN.test(trimmed)
+    DISALLOWED_CSS_PATTERN.test(normalizedTrimmed)
   ) {
     return null;
   }
