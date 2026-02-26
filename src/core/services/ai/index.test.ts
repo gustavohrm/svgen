@@ -3,6 +3,7 @@ import { AiService, createAiService, ProviderRegistry, SettingsRepository } from
 import { AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
+import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
 
 function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -54,16 +55,19 @@ describe("AiService", () => {
   it("should build correct system prompt", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings);
+    const capabilityContractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
     expect(prompt).toContain("avoid SMIL tags");
-    expect(prompt).toContain("<css_animation_profile>");
-    expect(prompt).toContain("<profile>sandboxed-permissive</profile>");
-    expect(prompt).toContain("<allowed_css_properties>");
-    expect(prompt).toContain("animation-duration");
-    expect(prompt).toContain("<safety_rules>");
-    expect(prompt).toContain("Use &lt;style&gt; blocks");
-    expect(prompt).not.toContain('Use <style> blocks (optional type="text/css").');
+    expect(prompt).toContain("<css_capability_contract><![CDATA[");
+    expect(prompt).toContain(capabilityContractPayload);
+    expect(prompt).toContain('"profile":"sandboxed-permissive"');
+    expect(prompt).toContain('"allowedAtRules":["@keyframes","@media","@supports","@layer"]');
+    expect(prompt).toContain("No <script> tags.");
+    expect(prompt).toContain(
+      "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
+    );
     expect(prompt).toContain("<system_instructions>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');

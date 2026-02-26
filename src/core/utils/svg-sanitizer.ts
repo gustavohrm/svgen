@@ -517,22 +517,10 @@ function sanitizeInlineSvgCss(cssRaw: string): string | null {
   return css;
 }
 
-/**
- * Removes all C-style block comments (/* ... *\/) from the provided CSS text.
- *
- * @param input - CSS text that may contain block comments
- * @returns The input string with all `/* ... */` comment sequences removed
- */
 function stripCssComments(input: string): string {
   return input.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-/**
- * Determines whether a CSS string contains an opening `/*` comment without a matching `*/`.
- *
- * @param css - The CSS text to inspect
- * @returns `true` if there is at least one unterminated comment (`/*` with no subsequent `*/`), `false` otherwise.
- */
 function hasUnterminatedCssComment(css: string): boolean {
   let searchStart = 0;
 
@@ -674,6 +662,25 @@ function isSafeAtRuleBody(
   return isSafeCssStylesheet(nestedStylesheet);
 }
 
+function isSafeAtRuleStatement(
+  css: string,
+  atRuleStartIndex: number,
+  statementTerminatorIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName !== "layer") {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, statementTerminatorIndex);
+  const normalizedPrelude = atRulePrelude.replace(/^@[a-z-]+/i, "").trim();
+  if (normalizedPrelude.length === 0) {
+    return true;
+  }
+
+  return isSafeAtRulePrelude(atRulePrelude, atRuleName, false);
+}
+
 /**
  * Validate a semicolon-terminated at-rule statement (non-block form) against the CSS policy.
  *
@@ -749,6 +756,12 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: 
   }
 
   return false;
+}
+
+function isSafeLayerPrelude(prelude: string): boolean {
+  return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
+    prelude,
+  );
 }
 
 /**

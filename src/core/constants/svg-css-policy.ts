@@ -76,6 +76,9 @@ export const SVG_CSS_CAPABILITY_CONTRACT = {
  * Produce a prompt-friendly description of allowed CSS properties for use in prompts.
  *
  * @returns A string stating that standard CSS properties and custom properties (`--tokens`) are allowed, followed by the comma-separated list of blocked properties.
+ * Produce a prompt-friendly statement for CSS property capability.
+ *
+ * @returns A statement describing standard CSS and custom property support with blocked-property exceptions.
  */
 export function formatSvgCssAllowedPropertiesForPrompt(): string {
   return `Standard CSS properties and custom properties (--tokens), except blocked properties: ${SVG_CSS_BLOCKED_PROPERTIES.join(", ")}.`;
