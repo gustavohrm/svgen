@@ -34,7 +34,16 @@ export class GoogleCloudProvider implements AiProvider {
   }
 
   async generate(options: ProviderGenerateOptions): Promise<string[]> {
-    const { prompt, systemPrompt, model, apiKey, count = 1, temperature } = options;
+    const {
+      prompt,
+      systemPrompt,
+      model,
+      apiKey,
+      count = 1,
+      temperature,
+      topP,
+      maxOutputTokens,
+    } = options;
 
     if (!apiKey) {
       throw new Error("GCP (Gemini) API key is required");
@@ -46,6 +55,9 @@ export class GoogleCloudProvider implements AiProvider {
       model,
       apiKey,
       temperature,
+      count,
+      topP,
+      maxOutputTokens,
     });
 
     return parseSvgVariationsFromResponses(responses, count);

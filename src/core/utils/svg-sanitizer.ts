@@ -662,25 +662,6 @@ function isSafeAtRuleBody(
   return isSafeCssStylesheet(nestedStylesheet);
 }
 
-function isSafeAtRuleStatement(
-  css: string,
-  atRuleStartIndex: number,
-  statementTerminatorIndex: number,
-  atRuleName: string,
-): boolean {
-  if (atRuleName !== "layer") {
-    return false;
-  }
-
-  const atRulePrelude = css.slice(atRuleStartIndex, statementTerminatorIndex);
-  const normalizedPrelude = atRulePrelude.replace(/^@[a-z-]+/i, "").trim();
-  if (normalizedPrelude.length === 0) {
-    return true;
-  }
-
-  return isSafeAtRulePrelude(atRulePrelude, atRuleName, false);
-}
-
 /**
  * Validate a semicolon-terminated at-rule statement (non-block form) against the CSS policy.
  *
@@ -756,12 +737,6 @@ function isSafeAtRulePrelude(prelude: string, atRuleName: string, hasBlockBody: 
   }
 
   return false;
-}
-
-function isSafeLayerPrelude(prelude: string): boolean {
-  return /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*(?:\s*,\s*[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*)*$/.test(
-    prelude,
-  );
 }
 
 /**

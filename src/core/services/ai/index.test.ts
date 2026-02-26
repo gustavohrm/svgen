@@ -69,10 +69,13 @@ describe("AiService", () => {
       "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
     );
     expect(prompt).toContain("<system_instructions>");
+    expect(prompt).toContain("<quality_rubric>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
-    expect(prompt).toContain('<color_palette_policy mode="strict">');
-    expect(prompt).toContain("<allowed_hex_colors>");
+    expect(prompt).toContain('"minItems":1');
+    expect(prompt).toContain('"maxItems":1');
+    expect(prompt).toContain('<color_palette_policy mode="adaptive">');
+    expect(prompt).not.toContain("<allowed_hex_colors>");
     expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
   });
 
@@ -102,7 +105,7 @@ describe("AiService", () => {
       const settings = mockSettingsRepository.getSettings();
       const prompt = service.buildSystemPrompt(settings);
 
-      expect(prompt).toContain('<color_palette_policy mode="strict">');
+      expect(prompt).toContain('<color_palette_policy mode="adaptive">');
       expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
     },
   );
@@ -115,9 +118,12 @@ describe("AiService", () => {
     expect(prompt).toContain("<svg>ref</svg>");
   });
 
-  it("should use custom system prompt when provided", () => {
+  it("should compose default prompt with additive custom directives", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings, [], "Always prefer monochrome icon style.");
+
+    expect(prompt).toContain("expert SVG designer");
+    expect(prompt).toContain("<additive_directives><![CDATA[");
     expect(prompt).toContain("Always prefer monochrome icon style.");
     expect(prompt).toContain("<response_contract>");
   });
@@ -135,12 +141,23 @@ describe("AiService", () => {
     expect(prompt).toContain("<response_contract>");
   });
 
+  it("should embed exact-count schema in system prompt contract", () => {
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, [], undefined, 3);
+
+    expect(prompt).toContain("Generate exactly 3 distinct SVG variations.");
+    expect(prompt).toContain('Return exactly 3 SVG strings under the "svgs" key');
+    expect(prompt).toContain('"minItems":3');
+    expect(prompt).toContain('"maxItems":3');
+  });
+
   it("should build XML-scoped user prompt for generation", () => {
     const prompt = service.buildUserPrompt("draw an orbit icon", 3);
 
     expect(prompt).toContain("<generation_request>");
     expect(prompt).toContain("<variation_count>3</variation_count>");
     expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
+    expect(prompt).toContain('Return exactly 3 SVG strings in "svgs".');
   });
 
   it("should keep XML well-formed when user prompt contains CDATA terminator", () => {
@@ -168,6 +185,8 @@ describe("AiService", () => {
       expect.objectContaining({
         apiKey: "test-key",
         temperature: 0.7,
+        topP: 0.85,
+        maxOutputTokens: 2048,
       }),
     );
 
@@ -193,6 +212,8 @@ describe("AiService", () => {
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({
         count: 2,
+        topP: 0.85,
+        maxOutputTokens: 2800,
         prompt: expect.stringContaining("<variation_count>2</variation_count>"),
       }),
     );

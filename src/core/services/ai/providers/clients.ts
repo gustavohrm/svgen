@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { GCP_SVG_VARIATIONS_SCHEMA, SVG_VARIATIONS_JSON_SCHEMA } from "../structured-output";
+import { buildGcpSvgVariationsSchema, buildSvgVariationsJsonSchema } from "../structured-output";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -333,6 +333,14 @@ function parseOpenRouterMessageContent(
   return "";
 }
 
+function normalizeSchemaCount(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
+    return 1;
+  }
+
+  return Math.floor(value);
+}
+
 export interface OpenRouterClient {
   fetchModels(apiKey: string): Promise<string[]>;
   generate(options: {
@@ -340,7 +348,10 @@ export interface OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
+    count?: number;
     temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
     appOrigin: string;
     appName: string;
   }): Promise<string[]>;
@@ -353,7 +364,10 @@ export interface GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
+    count?: number;
     temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
   }): Promise<string[]>;
 }
 
@@ -446,7 +460,10 @@ export class FetchOpenRouterClient implements OpenRouterClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
+    count?: number;
     temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
     appOrigin: string;
     appName: string;
   }): Promise<string[]> {
@@ -465,7 +482,11 @@ export class FetchOpenRouterClient implements OpenRouterClient {
         { role: "user", content: options.prompt },
       ],
       temperature: options.temperature,
+      top_p: options.topP,
+      max_tokens: options.maxOutputTokens,
     };
+
+    const variationsSchema = buildSvgVariationsJsonSchema(normalizeSchemaCount(options.count));
 
     const structuredBody = {
       ...baseBody,
@@ -474,7 +495,7 @@ export class FetchOpenRouterClient implements OpenRouterClient {
         json_schema: {
           name: "svg_variations",
           strict: true,
-          schema: SVG_VARIATIONS_JSON_SCHEMA,
+          schema: variationsSchema,
         },
       },
     };
@@ -566,12 +587,18 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     systemPrompt: string;
     model: string;
     apiKey: string;
+    count?: number;
     temperature?: number;
+    topP?: number;
+    maxOutputTokens?: number;
   }): Promise<string[]> {
     const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`;
+    const variationsSchema = buildGcpSvgVariationsSchema(normalizeSchemaCount(options.count));
 
     const baseGenerationConfig = {
       temperature: options.temperature,
+      topP: options.topP,
+      maxOutputTokens: options.maxOutputTokens,
     };
 
     const structuredPayload = {
@@ -587,7 +614,7 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
       generationConfig: {
         ...baseGenerationConfig,
         responseMimeType: "application/json",
-        responseSchema: GCP_SVG_VARIATIONS_SCHEMA,
+        responseSchema: variationsSchema,
       },
     };
 

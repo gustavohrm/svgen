@@ -7,6 +7,8 @@ export interface ProviderGenerateOptions {
   apiKey: string;
   count?: number;
   temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
 }
 
 export interface ProviderConfigField {

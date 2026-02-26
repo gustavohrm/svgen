@@ -41,7 +41,16 @@ export class OpenRouterProvider implements AiProvider {
   }
 
   async generate(options: ProviderGenerateOptions): Promise<string[]> {
-    const { prompt, systemPrompt, model, apiKey, count = 1, temperature } = options;
+    const {
+      prompt,
+      systemPrompt,
+      model,
+      apiKey,
+      count = 1,
+      temperature,
+      topP,
+      maxOutputTokens,
+    } = options;
 
     if (!apiKey) {
       throw new Error("OpenRouter API key is required");
@@ -53,6 +62,9 @@ export class OpenRouterProvider implements AiProvider {
       model,
       apiKey,
       temperature,
+      count,
+      topP,
+      maxOutputTokens,
       appOrigin: typeof window === "undefined" ? "http://localhost" : window.location.origin,
       appName: "SVGen",
     });

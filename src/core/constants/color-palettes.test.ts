@@ -8,8 +8,8 @@ import {
 } from "./color-palettes";
 
 describe("color palettes", () => {
-  it("uses monochrome as default palette id", () => {
-    expect(DEFAULT_COLOR_PALETTE_ID).toBe("monochrome");
+  it("uses ai-choice as default palette id", () => {
+    expect(DEFAULT_COLOR_PALETTE_ID).toBe("ai-choice");
   });
 
   it("recognizes valid palette ids", () => {

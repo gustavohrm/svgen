@@ -19,6 +19,7 @@ describe("BrowserSettingsRepository", () => {
     expect(settings.temperature).toBe(0.7);
     expect(settings.systemPrompt).toBe("");
     expect(settings.colorPaletteId).toBe(DEFAULT_COLOR_PALETTE_ID);
+    expect(settings.colorPaletteId).toBe("ai-choice");
   });
 
   it("saves and retrieves settings", () => {

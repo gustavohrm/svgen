@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { parseSvgVariationsFromResponses } from "./structured-output";
+import {
+  buildGcpSvgVariationsSchema,
+  buildSvgVariationsJsonSchema,
+  parseSvgVariationsFromResponses,
+} from "./structured-output";
+
+describe("structured output schemas", () => {
+  it("builds dynamic JSON schema with exact requested count", () => {
+    const schema = buildSvgVariationsJsonSchema(3);
+
+    expect(schema.properties.svgs.minItems).toBe(3);
+    expect(schema.properties.svgs.maxItems).toBe(3);
+  });
+
+  it("builds dynamic GCP schema with exact requested count", () => {
+    const schema = buildGcpSvgVariationsSchema(2);
+
+    expect(schema.properties.svgs.minItems).toBe(2);
+    expect(schema.properties.svgs.maxItems).toBe(2);
+  });
+
+  it("normalizes invalid requested counts to one", () => {
+    const schema = buildSvgVariationsJsonSchema(0);
+
+    expect(schema.properties.svgs.minItems).toBe(1);
+    expect(schema.properties.svgs.maxItems).toBe(1);
+  });
+});
 
 describe("parseSvgVariationsFromResponses", () => {
   const validSvg = "<svg viewBox='0 0 10 10'><circle cx='5' cy='5' r='4'/></svg>";

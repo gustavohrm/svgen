@@ -35,34 +35,47 @@ function isSingleSvgDocument(input: string): boolean {
   return true;
 }
 
-export const SVG_VARIATIONS_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["svgs"],
-  properties: {
-    svgs: {
-      type: "array",
-      minItems: 1,
-      items: {
-        type: "string",
-      },
-    },
-  },
-} as const;
+export function buildSvgVariationsJsonSchema(requestedCount: number) {
+  const normalizedCount = normalizePositiveInt(requestedCount);
 
-export const GCP_SVG_VARIATIONS_SCHEMA = {
-  type: "OBJECT",
-  required: ["svgs"],
-  properties: {
-    svgs: {
-      type: "ARRAY",
-      minItems: 1,
-      items: {
-        type: "STRING",
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["svgs"],
+    properties: {
+      svgs: {
+        type: "array",
+        minItems: normalizedCount,
+        maxItems: normalizedCount,
+        items: {
+          type: "string",
+        },
       },
     },
-  },
-} as const;
+  } as const;
+}
+
+export function buildGcpSvgVariationsSchema(requestedCount: number) {
+  const normalizedCount = normalizePositiveInt(requestedCount);
+
+  return {
+    type: "OBJECT",
+    required: ["svgs"],
+    properties: {
+      svgs: {
+        type: "ARRAY",
+        minItems: normalizedCount,
+        maxItems: normalizedCount,
+        items: {
+          type: "STRING",
+        },
+      },
+    },
+  } as const;
+}
+
+export const SVG_VARIATIONS_JSON_SCHEMA = buildSvgVariationsJsonSchema(1);
+export const GCP_SVG_VARIATIONS_SCHEMA = buildGcpSvgVariationsSchema(1);
 
 /**
  * Extracts and validates SVG markup from an input string.

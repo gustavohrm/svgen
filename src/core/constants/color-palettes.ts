@@ -8,7 +8,7 @@ export interface ColorPaletteOption {
   promptDirective: string;
 }
 
-export const DEFAULT_COLOR_PALETTE_ID: ColorPaletteId = "monochrome";
+export const DEFAULT_COLOR_PALETTE_ID: ColorPaletteId = "ai-choice";
 
 export const COLOR_PALETTE_OPTIONS: readonly ColorPaletteOption[] = [
   {
