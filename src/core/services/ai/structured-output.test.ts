@@ -34,8 +34,9 @@ describe("parseSvgVariationsFromResponses", () => {
   const thirdSvg = "<svg viewBox='0 0 10 10'><path d='M1 1 L9 9'/></svg>";
 
   function canonicalizeSvg(svg: string): string {
-    const parsed = new DOMParser().parseFromString(svg, "image/svg+xml");
-    return parsed.documentElement.outerHTML;
+    const parsed = new DOMParser().parseFromString(svg, "text/html");
+    const svgNode = parsed.getElementsByTagName("svg")[0];
+    return svgNode ? svgNode.outerHTML : parsed.documentElement.outerHTML;
   }
 
   it("parses valid structured payloads", () => {

@@ -26,13 +26,18 @@ function buildPartialSvgVariationsPayloadSchema() {
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
 
+/**
+ * Note: When parsing with "text/html", xmldom places elements in the XHTML namespace
+ * (http://www.w3.org/1999/xhtml). Downstream namespace-sensitive code or XPath queries
+ * may need to account for this.
+ */
 function parseHtmlFragment(text: string): Element | Document | null {
   if (typeof DOMParser === "undefined" || typeof window === "undefined") {
     try {
       const doc = new XmldomParser({
         locator: {},
         errorHandler: () => {}, // Suppress console output for parsing errors
-      }).parseFromString(text, "text/xml");
+      }).parseFromString(text, "text/html");
       return doc;
     } catch {
       return null;
@@ -313,6 +318,21 @@ function extractSvgDocumentsFromText(text: string): string[] {
 
   for (const node of svgElements) {
     const element = node as Element;
+
+    let isNested = false;
+    let parent = element.parentNode;
+    while (parent && parent.nodeType === 1) {
+      // Node.ELEMENT_NODE
+      if ((parent as Element).tagName?.toLowerCase() === "svg") {
+        isNested = true;
+        break;
+      }
+      parent = parent.parentNode;
+    }
+    if (isNested) {
+      continue;
+    }
+
     const html =
       typeof element.outerHTML === "string"
         ? element.outerHTML
