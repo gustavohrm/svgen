@@ -57,6 +57,7 @@ describe("GenerateSvgUseCase", () => {
         variations: 4,
         temperature: 0.7,
         systemPrompt: "",
+        colorPaletteId: "monochrome",
       }),
     };
 
@@ -127,6 +128,7 @@ describe("GenerateSvgUseCase", () => {
       variations: 4,
       temperature: 0.7,
       systemPrompt: "",
+      colorPaletteId: "monochrome",
     });
 
     const result = await useCase.execute({
@@ -212,6 +214,7 @@ describe("GenerateSvgUseCase", () => {
       variations: 4,
       temperature: 0.7,
       systemPrompt: "",
+      colorPaletteId: "monochrome",
     });
 
     generateMultipleMock.mockRejectedValue(

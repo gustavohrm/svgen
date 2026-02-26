@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { BrowserSettingsRepository } from "./index";
+import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
 
 describe("BrowserSettingsRepository", () => {
   let repository: BrowserSettingsRepository;
@@ -17,6 +18,7 @@ describe("BrowserSettingsRepository", () => {
     expect(settings.variations).toBe(4);
     expect(settings.temperature).toBe(0.7);
     expect(settings.systemPrompt).toBe("");
+    expect(settings.colorPaletteId).toBe(DEFAULT_COLOR_PALETTE_ID);
   });
 
   it("saves and retrieves settings", () => {
@@ -54,6 +56,10 @@ describe("BrowserSettingsRepository", () => {
     repository.saveSettings({ systemPrompt: "Custom prompt" });
     settings = repository.getSettings();
     expect(settings.systemPrompt).toBe("Custom prompt");
+
+    repository.setColorPaletteId("sunset");
+    settings = repository.getSettings();
+    expect(settings.colorPaletteId).toBe("sunset");
 
     repository.saveSettings({ activeKeys: { gcp: "some-id" } });
     settings = repository.getSettings();
@@ -113,6 +119,7 @@ describe("BrowserSettingsRepository", () => {
     repository.setVariations(10);
     repository.setTemperature(-1);
     repository.setSystemPrompt("custom");
+    repository.setColorPaletteId("ocean");
     repository.toggleModelSelection("k1", "m1", true);
     repository.toggleModelSelection("k1", "m1", false);
     repository.toggleModelSelections([
@@ -125,6 +132,7 @@ describe("BrowserSettingsRepository", () => {
     expect(settings.variations).toBe(4);
     expect(settings.temperature).toBe(0);
     expect(settings.systemPrompt).toBe("custom");
+    expect(settings.colorPaletteId).toBe("ocean");
     expect(settings.apiKeys[0].selectedModels).toEqual(["m2", "m3"]);
     expect(settings.activeKeys["open-router"]).toBe("k1");
   });
@@ -165,6 +173,7 @@ describe("BrowserSettingsRepository", () => {
       variations: 4,
       temperature: 0.7,
       systemPrompt: "",
+      colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
     });
     expect(warnSpy).toHaveBeenCalled();
 

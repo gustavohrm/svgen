@@ -1,6 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AiService, createAiService, ProviderRegistry, SettingsRepository } from "./index";
 import { AiProvider, GenerateOptions } from "../../types/index";
+import { AppSettings } from "../../modules/db/index";
+import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
+
+function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
+  return {
+    apiKeys: [
+      {
+        id: "key1",
+        providerId: "gcp",
+        name: "Primary GCP key",
+        value: "test-key",
+        createdAt: Date.now(),
+        selectedModels: [],
+      },
+    ],
+    activeKeys: { gcp: "key1" },
+    variations: 1,
+    temperature: 0.7,
+    systemPrompt: "",
+    colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
+    ...overrides,
+  };
+}
 
 describe("AiService", () => {
   let mockSettingsRepository: SettingsRepository;
@@ -18,13 +41,7 @@ describe("AiService", () => {
     } as any;
 
     mockSettingsRepository = {
-      getSettings: vi.fn().mockReturnValue({
-        apiKeys: [{ id: "key1", providerId: "gcp", value: "test-key" }],
-        activeKeys: { gcp: "key1" },
-        variations: 1,
-        temperature: 0.7,
-        systemPrompt: "",
-      }),
+      getSettings: vi.fn().mockReturnValue(makeTestSettings()),
     };
 
     mockProviderRegistry = {
@@ -35,7 +52,8 @@ describe("AiService", () => {
   });
 
   it("should build correct system prompt", () => {
-    const prompt = service.buildSystemPrompt();
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings);
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
     expect(prompt).toContain("avoid SMIL tags");
@@ -49,24 +67,61 @@ describe("AiService", () => {
     expect(prompt).toContain("<system_instructions>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
+    expect(prompt).toContain('<color_palette_policy mode="strict">');
+    expect(prompt).toContain("<allowed_hex_colors>");
+    expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
   });
 
+  it("should use adaptive color policy when palette is AI choice", () => {
+    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue(
+      makeTestSettings({ colorPaletteId: "ai-choice" }),
+    );
+
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings);
+
+    expect(prompt).toContain('<color_palette_policy mode="adaptive">');
+    expect(prompt).toContain('id="ai-choice"');
+  });
+
+  it.each([
+    { caseName: "invalid", colorPaletteId: "not-a-valid-palette" as any },
+    { caseName: "null", colorPaletteId: null as any },
+    { caseName: "undefined", colorPaletteId: undefined as any },
+  ])(
+    "should fall back to default palette when colorPaletteId is $caseName",
+    ({ colorPaletteId }) => {
+      vi.mocked(mockSettingsRepository.getSettings).mockReturnValue(
+        makeTestSettings({ colorPaletteId } as Partial<AppSettings>),
+      );
+
+      const settings = mockSettingsRepository.getSettings();
+      const prompt = service.buildSystemPrompt(settings);
+
+      expect(prompt).toContain('<color_palette_policy mode="strict">');
+      expect(prompt).toContain(`id="${DEFAULT_COLOR_PALETTE_ID}"`);
+    },
+  );
+
   it("should build system prompt with references", () => {
-    const prompt = service.buildSystemPrompt(["<svg>ref</svg>"]);
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, ["<svg>ref</svg>"]);
     expect(prompt).toContain("<reference_svgs>");
     expect(prompt).toContain('<reference index="1">');
     expect(prompt).toContain("<svg>ref</svg>");
   });
 
   it("should use custom system prompt when provided", () => {
-    const prompt = service.buildSystemPrompt([], "Always prefer monochrome icon style.");
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, [], "Always prefer monochrome icon style.");
     expect(prompt).toContain("Always prefer monochrome icon style.");
     expect(prompt).toContain("<response_contract>");
   });
 
   it("should keep XML well-formed when custom system prompt contains CDATA terminator", () => {
     const customPrompt = "Always prefer monochrome icon style ]]> with bold geometry.";
-    const prompt = service.buildSystemPrompt([], customPrompt);
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings, [], customPrompt);
 
     expect(prompt).toContain("<system_instructions><![CDATA[");
     expect(prompt).toContain(
@@ -154,10 +209,12 @@ describe("AiService", () => {
   });
 
   it("should throw error if no active key", async () => {
-    (mockSettingsRepository.getSettings as any).mockReturnValue({
-      apiKeys: [],
-      activeKeys: {},
-    });
+    (mockSettingsRepository.getSettings as any).mockReturnValue(
+      makeTestSettings({
+        apiKeys: [],
+        activeKeys: {},
+      }),
+    );
 
     await expect(
       service.generate({ prompt: "test", model: "test", providerId: "gcp" }),
