@@ -18,6 +18,8 @@ import {
   showPanel,
   togglePanel,
 } from "./generator-controls.settings";
+import { isColorPaletteId } from "../../core/constants/color-palettes";
+import { updatePaletteSelectionUi } from "./generator-controls.palette";
 
 const settingsRepository = appComposition.settingsRepository;
 
@@ -27,8 +29,19 @@ export class GeneratorControls extends HTMLElement {
   private attachmentsRenderToken = 0;
 
   private handleDocumentClick = (e: Event) => {
+    const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
+    const colorPaletteMenu = this.querySelector("#color-palette-menu") as HTMLDivElement | null;
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement | null;
     const settingsMenu = this.querySelector("#settings-menu") as HTMLDivElement | null;
+
+    if (
+      colorPaletteBtn &&
+      colorPaletteMenu &&
+      !colorPaletteBtn.contains(e.target as Node) &&
+      !colorPaletteMenu.contains(e.target as Node)
+    ) {
+      hidePanel(colorPaletteMenu);
+    }
 
     if (
       settingsBtn &&
@@ -123,6 +136,11 @@ export class GeneratorControls extends HTMLElement {
 
   private attachEvents() {
     // Component level events
+    const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
+    const colorPaletteMenu = this.querySelector("#color-palette-menu") as HTMLDivElement | null;
+    const colorPaletteOptions = this.querySelectorAll<HTMLButtonElement>(
+      "button[data-color-palette-id]",
+    );
     const referenceInput = this.querySelector("#reference-input") as HTMLInputElement;
     const attachmentsContainer = this.querySelector("#attachments-container") as HTMLDivElement;
     const settingsBtn = this.querySelector("#settings-btn") as HTMLButtonElement;
@@ -149,9 +167,42 @@ export class GeneratorControls extends HTMLElement {
       }
     };
 
+    colorPaletteBtn?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (colorPaletteMenu) {
+        if (settingsMenu) {
+          hidePanel(settingsMenu);
+        }
+        togglePanel(colorPaletteMenu);
+      }
+    });
+
+    colorPaletteOptions.forEach((option) => {
+      option.addEventListener("click", () => {
+        const paletteId = option.dataset.colorPaletteId;
+        if (!isColorPaletteId(paletteId)) {
+          return;
+        }
+
+        settingsRepository.setColorPaletteId(paletteId);
+        updatePaletteSelectionUi({
+          paletteId,
+          previewNode: colorPaletteBtn,
+          optionNodes: colorPaletteOptions,
+        });
+
+        if (colorPaletteMenu) {
+          hidePanel(colorPaletteMenu);
+        }
+      });
+    });
+
     settingsBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       if (settingsMenu) {
+        if (colorPaletteMenu) {
+          hidePanel(colorPaletteMenu);
+        }
         togglePanel(settingsMenu);
       }
     });

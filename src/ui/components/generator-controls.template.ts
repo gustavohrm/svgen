@@ -1,4 +1,9 @@
 import type { AppSettings } from "../../core/modules/db";
+import {
+  COLOR_PALETTE_OPTIONS,
+  getColorPaletteOptionButtonClass,
+  getColorPalettePreviewStyle,
+} from "../../core/constants/color-palettes";
 
 const GENERATE_ICON = `
   <svg
@@ -27,6 +32,9 @@ const GENERATE_LOADING_ICON = `
  * @returns An HTML string containing the generator controls markup, including the prompt textarea, model selector, reference SVG input, settings menu (variations and temperature), generate button, attachments container, and system prompt modal
  */
 export function renderGeneratorControls(settings: AppSettings): string {
+  const selectedPaletteId = settings.colorPaletteId;
+  const selectedPaletteStyle = getColorPalettePreviewStyle(selectedPaletteId);
+
   return `
     <div id="generator-controls-container" class="max-w-5xl mx-auto w-full py-0">
       <div
@@ -64,7 +72,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
               <input type="file" id="reference-input" accept=".svg" multiple class="hidden" />
             </label>
 
-            <div class="relative flex items-center" id="settings-container">
+            <div class="relative flex items-center gap-4" id="settings-container">
               <button
                 id="settings-btn"
                 class="cursor-pointer text-text-secondary hover:text-text transition duration-400 flex items-center"
@@ -84,6 +92,38 @@ export function renderGeneratorControls(settings: AppSettings): string {
                   <circle cx="7" cy="7" r="3"/>
                 </svg>
               </button>
+
+              <div class="relative flex items-center" id="color-palette-container">
+                <button
+                  id="color-palette-btn"
+                  class="size-7 rounded-lg border border-border/80 hover:border-border-bright transition duration-300 overflow-hidden"
+                  title="Color palette"
+                  aria-label="Choose color palette"
+                  style="${selectedPaletteStyle}"
+                ></button>
+                <div
+                  id="color-palette-menu"
+                  class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden p-2 shadow-2xl z-50 duration-200"
+                >
+                  <div class="grid grid-cols-3 gap-2 w-28">
+                    ${COLOR_PALETTE_OPTIONS.map((palette) => {
+                      const isSelected = palette.id === selectedPaletteId;
+                      const paletteStyle = getColorPalettePreviewStyle(palette.id);
+                      const tooltip = `${palette.label}: ${palette.description}`;
+
+                      return `<button
+                        type="button"
+                        data-color-palette-id="${palette.id}"
+                        class="${getColorPaletteOptionButtonClass(isSelected)}"
+                        style="${paletteStyle}"
+                        title="${tooltip}"
+                        aria-label="${tooltip}"
+                      ></button>`;
+                    }).join("")}
+                  </div>
+                </div>
+              </div>
+
               <div
                 id="settings-menu"
                 class="absolute left-1/2 -top-4 -translate-x-1/2 -translate-y-full bg-surface border border-border rounded-xl hidden flex-col gap-3 p-3 shadow-2xl z-50 min-w-3xs duration-200"
