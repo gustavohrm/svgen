@@ -10,6 +10,14 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
   });
 }
 
+function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
+  const normalizedCount = normalizePositiveInt(requestedCount);
+
+  return z.strictObject({
+    svgs: z.array(z.string().min(1)).min(1).max(normalizedCount),
+  });
+}
+
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
 
@@ -184,18 +192,54 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
     return [];
   }
 
-  const normalizedSvgs: string[] = [];
-  for (const svg of parsedPayload.data.svgs) {
-    const normalized = normalizeSvgMarkup(svg);
-    if (!normalized) {
-      return [];
-    }
-
-    normalizedSvgs.push(normalized);
+  const normalizedSvgs = normalizeStructuredSvgArray(parsedPayload.data.svgs);
+  if (!normalizedSvgs || normalizedSvgs.length !== normalizedCount) {
+    return [];
   }
 
-  if (new Set(normalizedSvgs).size !== normalizedCount) {
+  return normalizedSvgs;
+}
+
+/**
+ * Extracts normalized SVG markup strings from a structured JSON payload that may contain a partial subset of requested variations.
+ *
+ * @param text - Text that may contain a JSON payload with an `svgs` array.
+ * @param requestedCount - Maximum number of SVG strings allowed in the payload.
+ * @returns A normalized, deduplicated SVG array, or an empty array if validation fails.
+ */
+function parsePartialSvgVariationsFromText(text: string, requestedCount: number): string[] {
+  const normalizedCount = normalizePositiveInt(requestedCount);
+  const parsedJson = parseJsonCandidate(text);
+  if (parsedJson === undefined) {
     return [];
+  }
+
+  const parsedPayload =
+    buildPartialSvgVariationsPayloadSchema(normalizedCount).safeParse(parsedJson);
+  if (!parsedPayload.success) {
+    return [];
+  }
+
+  const normalizedSvgs = normalizeStructuredSvgArray(parsedPayload.data.svgs);
+  return normalizedSvgs ?? [];
+}
+
+function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
+  const normalizedSvgs: string[] = [];
+  const uniqueSvgs = new Set<string>();
+
+  for (const svg of svgs) {
+    const normalized = normalizeSvgMarkup(svg);
+    if (!normalized) {
+      return null;
+    }
+
+    if (uniqueSvgs.has(normalized)) {
+      continue;
+    }
+
+    uniqueSvgs.add(normalized);
+    normalizedSvgs.push(normalized);
   }
 
   return normalizedSvgs;
@@ -204,7 +248,7 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
 /**
  * Parse and return exactly `requestedCount` normalized SVG markups from model responses.
  *
- * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no structured response satisfies the exact-count contract, falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback also reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
+ * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no single response satisfies the exact-count contract, it attempts to accumulate partial structured payloads across responses until the requested unique count is met. If structured parsing cannot satisfy the contract, it falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
  *
  * @param responses - Array of textual model responses to search for SVG variations
  * @param requestedCount - Exact number of SVGs to require; coerced to a positive integer
@@ -221,6 +265,17 @@ export function parseSvgVariationsFromResponses(
     const parsed = parseSvgVariationsFromText(response, normalizedCount);
     if (parsed.length === normalizedCount) {
       return parsed;
+    }
+  }
+
+  const accumulatedStructuredSvgs = new Set<string>();
+  for (const response of responses) {
+    const parsedPartial = parsePartialSvgVariationsFromText(response, normalizedCount);
+    for (const svg of parsedPartial) {
+      accumulatedStructuredSvgs.add(svg);
+      if (accumulatedStructuredSvgs.size >= normalizedCount) {
+        return [...accumulatedStructuredSvgs].slice(0, normalizedCount);
+      }
     }
   }
 
