@@ -190,12 +190,14 @@ const URL_REFERENCE_ATTR_NAMES = new Set<string>([
 const LOCAL_FRAGMENT_REFERENCE_PATTERN = /^#[-\w:.]+$/;
 const LOCAL_FRAGMENT_URL_REFERENCE_PATTERN = /^url\s*\(\s*(['"]?)#[-\w:.]+\1\s*\)$/i;
 
-const ALLOWED_CSS_AT_RULES = new Set<string>(
-  SVG_CSS_ALLOWED_AT_RULES.map((rule) => normalizeCssAtRule(rule)).filter(
-    (rule) => rule.length > 0,
-  ),
+const NORMALIZED_ALLOWED_CSS_AT_RULES = SVG_CSS_ALLOWED_AT_RULES.map((rule) =>
+  normalizeCssAtRule(rule),
+).filter((rule) => rule.length > 0);
+const ALLOWED_CSS_AT_RULES = new Set<string>(NORMALIZED_ALLOWED_CSS_AT_RULES);
+const CSS_NESTED_RULE_NAME_CANDIDATES = new Set<string>(["media", "supports"]);
+const CSS_NESTED_RULE_AT_RULES = new Set<string>(
+  NORMALIZED_ALLOWED_CSS_AT_RULES.filter((rule) => CSS_NESTED_RULE_NAME_CANDIDATES.has(rule)),
 );
-const CSS_NESTED_RULE_AT_RULES = new Set<string>(["media", "supports"]);
 const BLOCKED_CSS_PROPERTIES = new Set<string>(["behavior", "-moz-binding"]);
 
 interface NodeCryptoModule {
