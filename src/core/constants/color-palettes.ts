@@ -51,22 +51,45 @@ export const COLOR_PALETTE_OPTIONS: readonly ColorPaletteOption[] = [
   },
 ] as const;
 
+/**
+ * Checks whether a value is a valid ColorPaletteId.
+ *
+ * @param value - The value to test
+ * @returns `true` if `value` matches one of the known `ColorPaletteId` literals, `false` otherwise.
+ */
 export function isColorPaletteId(value: unknown): value is ColorPaletteId {
   return COLOR_PALETTE_OPTIONS.some((palette) => palette.id === value);
 }
 
+/**
+ * Retrieve the color palette option that corresponds to the given palette id.
+ *
+ * @returns The matching ColorPaletteOption; if no palette matches `paletteId`, returns the first entry in `COLOR_PALETTE_OPTIONS` as a fallback.
+ */
 export function getColorPaletteById(paletteId: ColorPaletteId): ColorPaletteOption {
   return (
     COLOR_PALETTE_OPTIONS.find((palette) => palette.id === paletteId) || COLOR_PALETTE_OPTIONS[0]
   );
 }
 
+/**
+ * Builds a CSS background style string that previews the palette as a 135-degree linear gradient.
+ *
+ * @param paletteId - The color palette id used to select swatches for the gradient
+ * @returns A CSS `background` style string containing a `linear-gradient(135deg, ...)` across the palette's first four hex color swatches
+ */
 export function getColorPalettePreviewStyle(paletteId: ColorPaletteId): string {
   const palette = getColorPaletteById(paletteId);
   const [first, second, third, fourth] = palette.swatches;
   return `background: linear-gradient(135deg, ${first} 0%, ${second} 36%, ${third} 68%, ${fourth} 100%);`;
 }
 
+/**
+ * Builds the CSS class string for a color-palette option button.
+ *
+ * @param isSelected - Whether the palette option is currently selected
+ * @returns The composed CSS class string; when `isSelected` is `true` the string includes a bright border class, otherwise it includes a semi-transparent border and a brighter hover border
+ */
 export function getColorPaletteOptionButtonClass(isSelected: boolean): string {
   const baseClass =
     "w-full aspect-square rounded-md border transition-all duration-200 hover:scale-102 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-bright";
@@ -78,6 +101,12 @@ export function getColorPaletteOptionButtonClass(isSelected: boolean): string {
   return `${baseClass} border-border/70 hover:border-border-bright/80`;
 }
 
+/**
+ * Produce an XML policy describing rules and metadata for the specified color palette.
+ *
+ * @param paletteId - The color palette id to generate the policy for
+ * @returns An XML string that describes the selected palette and its rules; for `ai-choice` the policy is in "adaptive" mode (rules only), for other palettes the policy is in "strict" mode and includes an `allowed_hex_colors` element and an explicit exception rule for user-requested color changes
+ */
 export function buildColorPalettePolicyXml(paletteId: ColorPaletteId): string {
   const palette = getColorPaletteById(paletteId);
 

@@ -10,6 +10,13 @@ interface UpdatePaletteSelectionUiInput {
   optionNodes: NodeListOf<HTMLButtonElement>;
 }
 
+/**
+ * Update the palette preview element and option buttons to reflect the active palette.
+ *
+ * @param paletteId - The id of the currently selected color palette to apply
+ * @param previewNode - Optional preview element whose inline style will be set to match `paletteId`; ignored if `null`
+ * @param optionNodes - Button elements representing palette options; each button's class will be updated based on whether its `data-color-palette-id` matches `paletteId`
+ */
 export function updatePaletteSelectionUi({
   paletteId,
   previewNode,

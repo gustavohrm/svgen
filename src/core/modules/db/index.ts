@@ -72,6 +72,22 @@ function cloneSettings(settings: AppSettings): AppSettings {
   };
 }
 
+/**
+ * Normalize a partial settings payload into a complete, validated AppSettings object.
+ *
+ * Converts and validates each setting field, ensuring types and value ranges are correct and
+ * providing sensible defaults for missing or invalid fields.
+ *
+ * @param input - Partial settings to normalize
+ * @returns A fully populated AppSettings where:
+ *  - `apiKeys` is an array (cloned) or empty array
+ *  - `activeKeys` contains only string key IDs
+ *  - `variations` is an integer clamped to the range 1–4
+ *  - `temperature` is clamped to the range 0.0–2.0 with one-decimal precision
+ *  - `systemPrompt` is a string or the default prompt
+ *  - `colorPaletteId` is validated and falls back to the default palette ID when invalid
+ *  - `lastSelectedModel` and `lastSelectedProviderId` are strings or their default values
+ */
 function normalizeSettings(input: Partial<AppSettings>): AppSettings {
   return {
     apiKeys: Array.isArray(input.apiKeys) ? input.apiKeys.map((key) => cloneApiKeyItem(key)) : [],
