@@ -9,6 +9,12 @@ const svgVariationsPayloadSchema = z.strictObject({
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
 
+/**
+ * Determines whether the given string contains exactly one standalone SVG document with no other content.
+ *
+ * @param input - The text to inspect for a single SVG document
+ * @returns `true` if `input` contains one `<svg>...</svg>` block and no non-whitespace characters before or after it, `false` otherwise
+ */
 function isSingleSvgDocument(input: string): boolean {
   const lowered = input.toLowerCase();
   const firstSvgIndex = lowered.indexOf("<svg");
@@ -35,6 +41,12 @@ function isSingleSvgDocument(input: string): boolean {
   return true;
 }
 
+/**
+ * Builds a JSON Schema that requires an object containing an `svgs` array with exactly the requested number of SVG strings.
+ *
+ * @param requestedCount - Desired number of SVG variations; will be normalized to a positive integer
+ * @returns A JSON Schema object that enforces an object with a `svgs` property: an array of strings with `minItems` and `maxItems` equal to the normalized count, and no additional properties
+ */
 export function buildSvgVariationsJsonSchema(requestedCount: number) {
   const normalizedCount = normalizePositiveInt(requestedCount);
 
@@ -55,6 +67,12 @@ export function buildSvgVariationsJsonSchema(requestedCount: number) {
   } as const;
 }
 
+/**
+ * Build a GCP-style JSON schema that requires an object with a fixed-length `svgs` array.
+ *
+ * @param requestedCount - Desired number of SVG entries; will be normalized to an integer >= 1
+ * @returns A schema object (GCP/Discovery-style) whose `svgs` property is an array of strings with both minItems and maxItems equal to the normalized count
+ */
 export function buildGcpSvgVariationsSchema(requestedCount: number) {
   const normalizedCount = normalizePositiveInt(requestedCount);
 

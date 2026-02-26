@@ -316,6 +316,12 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Extract the textual content from an OpenRouter message payload.
+ *
+ * @param content - A string, an array of message parts each optionally containing `text`, or `undefined`.
+ * @returns The concatenated text: if `content` is a string it is returned unchanged; if it's an array, all defined `text` fields are joined with `\n`; returns an empty string if `content` is `undefined` or contains no text.
+ */
 function parseOpenRouterMessageContent(
   content: string | Array<{ text?: string }> | undefined,
 ): string {
@@ -333,6 +339,12 @@ function parseOpenRouterMessageContent(
   return "";
 }
 
+/**
+ * Normalizes a requested schema count into a valid integer to use for variations.
+ *
+ * @param value - Desired count of schema variations, which may be undefined or an arbitrary number.
+ * @returns The integer count to use: `1` if `value` is undefined, non-finite, or less than `1`; otherwise `Math.floor(value)`.
+ */
 function normalizeSchemaCount(value: number | undefined): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
     return 1;

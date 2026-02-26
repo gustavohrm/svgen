@@ -36,12 +36,24 @@ const MAX_OUTPUT_TOKENS_PER_VARIATION = 1400;
 const MAX_OUTPUT_TOKENS_FLOOR = 2048;
 const MAX_OUTPUT_TOKENS_CEILING = 8192;
 
+/**
+ * Compute the token budget for a requested number of variations, clamped to allowed limits.
+ *
+ * @param variationCount - The desired number of SVG variations
+ * @returns The total allowed output tokens for the request, clamped between the configured floor and ceiling
+ */
 function calculateMaxOutputTokens(variationCount: number): number {
   const normalizedVariationCount = normalizePositiveInt(variationCount);
   const computed = normalizedVariationCount * MAX_OUTPUT_TOKENS_PER_VARIATION;
   return Math.max(MAX_OUTPUT_TOKENS_FLOOR, Math.min(MAX_OUTPUT_TOKENS_CEILING, computed));
 }
 
+/**
+ * Produce an XML fragment of guardrails that enforce generation rules, quality criteria, the SVG CSS capability contract, and a response schema for a set of SVG variations.
+ *
+ * @param variationCount - The desired number of SVG variations; normalized to a positive integer and used to require exactly that many outputs.
+ * @returns An XML string containing <generation_rules>, <quality_rubric>, an embedded CSS capability contract, and a <response_contract> whose schema requires exactly the specified number of SVGs under the "svgs" key.
+ */
 function buildSystemPromptGuardrails(variationCount: number): string {
   const normalizedVariationCount = normalizePositiveInt(variationCount);
   const variationsSchema = buildSvgVariationsJsonSchema(normalizedVariationCount);
