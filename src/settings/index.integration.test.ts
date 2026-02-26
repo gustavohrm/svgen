@@ -14,12 +14,12 @@ vi.mock("../core/app/composition-root", () => ({
   appComposition: {
     providerRegistry: {
       getAllProviders: () => [
-        { id: "gcp", name: "Google Cloud", icon: "gcp.svg" },
+        { id: "gcp", name: "Google", icon: "gcp.svg" },
         { id: "open-router", name: "OpenRouter", icon: "or.svg" },
       ],
       getProvider: (id: string) =>
         id === "gcp"
-          ? { id: "gcp", name: "Google Cloud", icon: "gcp.svg" }
+          ? { id: "gcp", name: "Google", icon: "gcp.svg" }
           : { id: "open-router", name: "OpenRouter", icon: "or.svg" },
     },
     settingsRepository: {

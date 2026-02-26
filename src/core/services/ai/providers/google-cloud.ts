@@ -11,7 +11,7 @@ export class GoogleCloudProvider implements AiProvider {
   constructor(private readonly client: GoogleCloudClient = new FetchGoogleCloudClient()) {}
 
   id: AiProviderId = "gcp";
-  name = "Google Cloud (Gemini)";
+  name = "Google";
   icon = "/assets/google.svg";
 
   configFields: ProviderConfigField[] = [

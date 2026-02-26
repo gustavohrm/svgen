@@ -127,53 +127,6 @@ function ensurePreviewViewBox(svgMarkup: string): ViewportNormalizationResult {
 
   root.setAttribute("viewBox", `0 0 ${width} ${height}`);
   return { svgMarkup: root.outerHTML, hasAutoViewportFix: true };
-  }
-
-  if (root.getAttribute("viewBox")?.trim()) {
-    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
-  }
-
-  const width = parseSvgDimension(root.getAttribute("width"));
-  const height = parseSvgDimension(root.getAttribute("height"));
-
-  if (!width || !height) {
-    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
-  }
-
-  root.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  return { svgMarkup: root.outerHTML, hasAutoViewportFix: true };
-}
-
-function parseSvgDimension(rawValue: string | null): string | null {
-  if (!rawValue) {
-    return null;
-  }
-
-  const trimmed = rawValue.trim();
-  const match = trimmed.match(/^(?:\+)?(\d+(?:\.\d+)?|\.\d+)(?:px)?$/i);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number.parseFloat(match[1]);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed.toString();
-}
-
-function buildSandboxedSvgDocument(svgMarkup: string): string {
-  return [
-    "<!doctype html>",
-    '<html><head><meta charset="utf-8">',
-    "<style>",
-    "html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}",
-    "body{display:flex;align-items:center;justify-content:center}",
-    "svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%}",
-    "</style></head>",
-    `<body>${svgMarkup}</body></html>`,
-  ].join("");
 }
 
 /**
