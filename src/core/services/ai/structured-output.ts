@@ -422,7 +422,8 @@ export function parseSvgVariationsFromResponses(
     }
 
     for (const svg of parsedPartial) {
-      accumulatedStructuredSvgs.add(svg);
+      const canonical = getCanonicalSvg(svg);
+      accumulatedStructuredSvgs.add(canonical);
       if (accumulatedStructuredSvgs.size >= normalizedCount) {
         return [...accumulatedStructuredSvgs].slice(0, normalizedCount);
       }

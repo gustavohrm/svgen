@@ -42,7 +42,7 @@ describe("parseSvgVariationsFromResponses", () => {
   it("parses valid structured payloads", () => {
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 1);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("accepts structured payloads with unknown top-level fields in tolerant mode", () => {
@@ -64,7 +64,7 @@ describe("parseSvgVariationsFromResponses", () => {
   it("falls back to raw svg responses", () => {
     const result = parseSvgVariationsFromResponses([validSvg], 1);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("falls back to raw svg wrapped in markdown fences", () => {
@@ -72,7 +72,7 @@ describe("parseSvgVariationsFromResponses", () => {
 
     const result = parseSvgVariationsFromResponses([wrappedSvg], 1);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("extracts multiple raw svgs from a single response", () => {
@@ -110,13 +110,13 @@ describe("parseSvgVariationsFromResponses", () => {
       1,
     );
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("returns best-effort partial results when responses are underfilled", () => {
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 2);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("salvages valid entries when partial structured arrays include invalid items", () => {
@@ -125,7 +125,7 @@ describe("parseSvgVariationsFromResponses", () => {
       2,
     );
 
-    expect(result).toEqual([validSvg, secondSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg, secondSvg].map(canonicalizeSvg));
   });
 
   it("parses fenced json payloads with surrounding text", () => {
@@ -139,7 +139,7 @@ describe("parseSvgVariationsFromResponses", () => {
 
     const result = parseSvgVariationsFromResponses([response], 1);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("normalizes structured svg strings with surrounding text", () => {
@@ -147,7 +147,7 @@ describe("parseSvgVariationsFromResponses", () => {
 
     const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [wrappedSvg] })], 1);
 
-    expect(result).toEqual([validSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg].map(canonicalizeSvg));
   });
 
   it("accumulates partial structured payloads across responses", () => {
@@ -156,7 +156,7 @@ describe("parseSvgVariationsFromResponses", () => {
       2,
     );
 
-    expect(result).toEqual([validSvg, secondSvg]);
+    expect(result.map(canonicalizeSvg)).toEqual([validSvg, secondSvg].map(canonicalizeSvg));
   });
 
   it("salvages the first valid entry from concatenated multi-root svg payloads when requestedCount is 1", () => {
