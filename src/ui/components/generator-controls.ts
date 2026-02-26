@@ -18,11 +18,8 @@ import {
   showPanel,
   togglePanel,
 } from "./generator-controls.settings";
-import {
-  getColorPalettePreviewStyle,
-  isColorPaletteId,
-  type ColorPaletteId,
-} from "../../core/constants/color-palettes";
+import { isColorPaletteId } from "../../core/constants/color-palettes";
+import { updatePaletteSelectionUi } from "./generator-controls.palette";
 
 const settingsRepository = appComposition.settingsRepository;
 
@@ -173,34 +170,6 @@ export class GeneratorControls extends HTMLElement {
       }
     };
 
-    const applyPaletteSelectionUi = (paletteId: ColorPaletteId) => {
-      if (colorPaletteBtnPreview) {
-        colorPaletteBtnPreview.setAttribute("style", getColorPalettePreviewStyle(paletteId));
-      }
-
-      colorPaletteOptions.forEach((option) => {
-        const optionPaletteId = option.dataset.colorPaletteId;
-        const isSelected = optionPaletteId === paletteId;
-
-        option.classList.toggle("border-border-bright", isSelected);
-        option.classList.toggle("bg-surface-hover/60", isSelected);
-        option.classList.toggle("border-transparent", !isSelected);
-
-        const existingSelectedBadge = option.querySelector("[data-selected-palette-badge]");
-        if (isSelected && !existingSelectedBadge) {
-          const badge = document.createElement("span");
-          badge.className = "text-[11px] text-text-secondary";
-          badge.dataset.selectedPaletteBadge = "true";
-          badge.textContent = "Selected";
-          option.querySelector("span.flex.items-center.gap-2")?.appendChild(badge);
-        }
-
-        if (!isSelected && existingSelectedBadge) {
-          existingSelectedBadge.remove();
-        }
-      });
-    };
-
     colorPaletteBtn?.addEventListener("click", (e) => {
       e.stopPropagation();
       if (colorPaletteMenu) {
@@ -219,7 +188,11 @@ export class GeneratorControls extends HTMLElement {
         }
 
         settingsRepository.setColorPaletteId(paletteId);
-        applyPaletteSelectionUi(paletteId);
+        updatePaletteSelectionUi({
+          paletteId,
+          previewNode: colorPaletteBtnPreview,
+          optionNodes: colorPaletteOptions,
+        });
 
         if (colorPaletteMenu) {
           hidePanel(colorPaletteMenu);

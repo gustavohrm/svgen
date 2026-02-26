@@ -1,6 +1,7 @@
 import type { AppSettings } from "../../core/modules/db";
 import {
   COLOR_PALETTE_OPTIONS,
+  getColorPaletteOptionButtonClass,
   getColorPalettePreviewStyle,
 } from "../../core/constants/color-palettes";
 
@@ -96,9 +97,9 @@ export function renderGeneratorControls(settings: AppSettings): string {
                     return `<button
                       type="button"
                       data-color-palette-id="${palette.id}"
-                      class="w-full text-left rounded-lg px-2 py-2 border ${isSelected ? "border-border-bright bg-surface-hover/60" : "border-transparent hover:border-border/60 hover:bg-surface-hover/50"} transition-colors"
+                      class="${getColorPaletteOptionButtonClass(isSelected)}"
                     >
-                      <span class="flex items-center gap-2">
+                      <span class="flex items-center gap-2" data-color-palette-option-content>
                         <span class="size-5 rounded-md border border-border/70" style="${paletteStyle}"></span>
                         <span class="flex-1 min-w-0">
                           <span class="block text-xs font-semibold text-text">${palette.label}</span>

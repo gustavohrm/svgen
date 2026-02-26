@@ -67,6 +67,16 @@ export function getColorPalettePreviewStyle(paletteId: ColorPaletteId): string {
   return `background: linear-gradient(135deg, ${first} 0%, ${second} 36%, ${third} 68%, ${fourth} 100%);`;
 }
 
+export function getColorPaletteOptionButtonClass(isSelected: boolean): string {
+  const baseClass = "w-full text-left rounded-lg px-2 py-2 border transition-colors";
+
+  if (isSelected) {
+    return `${baseClass} border-border-bright bg-surface-hover/60`;
+  }
+
+  return `${baseClass} border-transparent hover:border-border/60 hover:bg-surface-hover/50`;
+}
+
 export function buildColorPalettePolicyXml(paletteId: ColorPaletteId): string {
   const palette = getColorPaletteById(paletteId);
 
