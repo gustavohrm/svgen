@@ -91,6 +91,32 @@ describe("AiService", () => {
     expect(prompt).toContain('id="ai-choice"');
   });
 
+  it("should fall back to default palette when colorPaletteId is invalid", () => {
+    vi.mocked(mockSettingsRepository.getSettings).mockReturnValue({
+      apiKeys: [
+        {
+          id: "key1",
+          providerId: "gcp",
+          name: "Primary GCP key",
+          value: "test-key",
+          createdAt: Date.now(),
+          selectedModels: [],
+        },
+      ],
+      activeKeys: { gcp: "key1" },
+      variations: 1,
+      temperature: 0.7,
+      systemPrompt: "",
+      colorPaletteId: "not-a-valid-palette" as any,
+    });
+
+    const settings = mockSettingsRepository.getSettings();
+    const prompt = service.buildSystemPrompt(settings);
+
+    expect(prompt).toContain('<color_palette_policy mode="strict">');
+    expect(prompt).toContain('id="monochrome"');
+  });
+
   it("should build system prompt with references", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings, ["<svg>ref</svg>"]);
