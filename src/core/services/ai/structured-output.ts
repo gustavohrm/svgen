@@ -2,6 +2,12 @@ import { z } from "zod";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
+/**
+ * Build a Zod schema that validates an object containing exactly `requestedCount` non-empty SVG strings.
+ *
+ * @param requestedCount - Desired number of SVG entries; will be normalized to a positive integer before use.
+ * @returns A Zod strict object schema with a `svgs` property: an array of non-empty strings whose length equals the normalized count.
+ */
 function buildSvgVariationsPayloadSchema(requestedCount: number) {
   const normalizedCount = normalizePositiveInt(requestedCount);
 
@@ -10,6 +16,12 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
   });
 }
 
+/**
+ * Build a Zod schema for a payload whose `svgs` property is an array of 1 to N non-empty SVG strings.
+ *
+ * @param requestedCount - Desired maximum number of SVGs; the value is normalized to a positive integer.
+ * @returns A Zod strict object schema requiring `svgs` to be an array of non-empty strings with a minimum length of 1 and a maximum length equal to the normalized count.
+ */
 function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
   const normalizedCount = normalizePositiveInt(requestedCount);
 
@@ -224,6 +236,12 @@ function parsePartialSvgVariationsFromText(text: string, requestedCount: number)
   return normalizedSvgs ?? [];
 }
 
+/**
+ * Normalize and deduplicate an array of SVG strings, preserving first-occurrence order.
+ *
+ * @param svgs - Array of SVG strings to normalize and deduplicate
+ * @returns An array of unique, normalized SVG markup strings in their original first-occurrence order, or `null` if any input cannot be normalized
+ */
 function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
   const normalizedSvgs: string[] = [];
   const uniqueSvgs = new Set<string>();
@@ -246,14 +264,15 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
 }
 
 /**
- * Parse and return exactly `requestedCount` normalized SVG markups from model responses.
+ * Selects and returns exactly `requestedCount` normalized SVG markup strings extracted from model responses.
  *
+ * Attempts structured exact-count parsing first, then accumulates valid partial structured entries across responses, and finally falls back to extracting raw SVG documents; throws if the exact count cannot be satisfied.
  * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no single response satisfies the exact-count contract, it attempts to accumulate partial structured payloads across responses until the requested unique count is met. If structured parsing cannot satisfy the contract, it falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
  *
  * @param responses - Array of textual model responses to search for SVG variations
- * @param requestedCount - Exact number of SVGs to require; coerced to a positive integer
- * @returns An array of exactly `requestedCount` normalized SVG markup strings
- * @throws Error if no response can satisfy the exact-count contract
+ * @param requestedCount - Number of SVGs required; coerced to a positive integer
+ * @returns An array containing exactly `requestedCount` normalized SVG markup strings
+ * @throws Error if no combination of responses yields the exact required count of valid SVGs
  */
 export function parseSvgVariationsFromResponses(
   responses: string[],
