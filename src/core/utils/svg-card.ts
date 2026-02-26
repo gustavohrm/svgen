@@ -50,6 +50,16 @@ const INVALID_SVG_FALLBACK =
   `<path d="M32 16L16 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
   `</svg>`;
 
+interface PreviewRenderResult {
+  iframeHtml: string;
+  hasAutoViewportFix: boolean;
+}
+
+interface ViewportNormalizationResult {
+  svgMarkup: string;
+  hasAutoViewportFix: boolean;
+}
+
 // --- Helpers ---
 
 /**
@@ -57,11 +67,61 @@ const INVALID_SVG_FALLBACK =
  * preventing generated CSS from affecting the app UI.
  */
 export function sanitizeSvgForDisplay(rawSvg: string): string {
+  return buildSvgPreview(rawSvg).iframeHtml;
+}
+
+function buildSvgPreview(rawSvg: string): PreviewRenderResult {
   const safeSvg = sanitizeSvgMarkup(rawSvg) ?? INVALID_SVG_FALLBACK;
-  const iframeDocument = buildSandboxedSvgDocument(safeSvg);
+  const normalizedSvg = ensurePreviewViewBox(safeSvg);
+  const iframeDocument = buildSandboxedSvgDocument(normalizedSvg.svgMarkup);
   const safeSrcDoc = escapeHtml(iframeDocument);
 
-  return `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" title="SVG preview" aria-hidden="true" tabindex="-1" srcdoc="${safeSrcDoc}"></iframe>`;
+  return {
+    iframeHtml: `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" title="SVG preview" aria-hidden="true" tabindex="-1" srcdoc="${safeSrcDoc}"></iframe>`,
+    hasAutoViewportFix: normalizedSvg.hasAutoViewportFix,
+  };
+}
+
+function ensurePreviewViewBox(svgMarkup: string): ViewportNormalizationResult {
+  const doc = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+  const root = doc.documentElement;
+
+  if (!root || root.nodeName.toLowerCase() !== "svg") {
+    return { svgMarkup, hasAutoViewportFix: false };
+  }
+
+  if (root.getAttribute("viewBox")?.trim()) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  const width = parseSvgDimension(root.getAttribute("width"));
+  const height = parseSvgDimension(root.getAttribute("height"));
+
+  if (!width || !height) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  root.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  return { svgMarkup: root.outerHTML, hasAutoViewportFix: true };
+}
+
+function parseSvgDimension(rawValue: string | null): string | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  const trimmed = rawValue.trim();
+  const match = trimmed.match(/^(?:\+)?(\d+(?:\.\d+)?|\.\d+)(?:px)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[1]);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed.toString();
 }
 
 function buildSandboxedSvgDocument(svgMarkup: string): string {
@@ -168,11 +228,16 @@ export function renderSvgCard(options: SvgCardOptions): string {
   const sublabelHtml = safeSublabel
     ? `<span class="text-xs text-text-muted">${safeSublabel}</span>`
     : "";
+  const preview = buildSvgPreview(svg);
+  const viewportBadgeHtml = preview.hasAutoViewportFix
+    ? '<span class="absolute top-3 left-3 rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200" title="Preview auto-added a viewBox from width and height.">Auto-fit viewBox</span>'
+    : "";
 
   return `
     <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border flex flex-col">
       <div class="p-8 flex-1 min-h-[220px] flex items-center justify-center relative">
-        ${sanitizeSvgForDisplay(svg)}
+        ${preview.iframeHtml}
+        ${viewportBadgeHtml}
       </div>
       <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
         <div class="flex flex-col gap-0.5 min-w-0 flex-1">
