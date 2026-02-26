@@ -186,7 +186,7 @@ describe("GenerateSvgUseCase", () => {
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",
       message:
-        "Initial results underfilled after sanitization; a single refill pass recovered all 2 missing variation(s).",
+        "The first model response returned fewer usable variations than requested; one refill pass recovered all 2 missing variation(s).",
     });
     expect(uiAdapter.notify).not.toHaveBeenCalledWith({
       type: "success",
@@ -254,7 +254,7 @@ describe("GenerateSvgUseCase", () => {
     expect(uiAdapter.notify).toHaveBeenCalledWith({
       type: "warning",
       message:
-        "Initial results underfilled after sanitization; one refill pass requested 2 more variation(s) but only 1 of 3 safe SVGs are available.",
+        "The model responses remained underfilled after one refill pass: requested 3 total variation(s), asked for 2 more in refill, and recovered 1 safe SVG(s).",
     });
   });
 

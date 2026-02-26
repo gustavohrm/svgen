@@ -44,13 +44,14 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result).toEqual([validSvg]);
   });
 
-  it("rejects structured payloads with unknown top-level fields", () => {
+  it("accepts structured payloads with unknown top-level fields in tolerant mode", () => {
     const payloadWithUnknownField =
       '{"svgs":["\\u003csvg viewBox=\\"0 0 10 10\\"\\u003e\\u003ccircle cx=\\"5\\" cy=\\"5\\" r=\\"4\\"/\\u003e\\u003c/svg\\u003e"],"extra":true}';
 
-    expect(() => parseSvgVariationsFromResponses([payloadWithUnknownField], 1)).toThrow(
-      "Model returned an invalid variations payload",
-    );
+    const result = parseSvgVariationsFromResponses([payloadWithUnknownField], 1);
+
+    expect(result).toHaveLength(1);
+    expect(canonicalizeSvg(result[0])).toBe(canonicalizeSvg(validSvg));
   });
 
   it("throws when no responses are returned", () => {
@@ -102,13 +103,28 @@ describe("parseSvgVariationsFromResponses", () => {
     expect(result[0]).toContain("</svg>");
   });
 
-  it("rejects structured payloads when svgs array length does not match requestedCount", () => {
-    expect(() =>
-      parseSvgVariationsFromResponses(
-        [JSON.stringify({ svgs: [validSvg, secondSvg, thirdSvg] })],
-        1,
-      ),
-    ).toThrow("exactly 1 SVG strings");
+  it("truncates oversized structured payloads to requestedCount", () => {
+    const result = parseSvgVariationsFromResponses(
+      [JSON.stringify({ svgs: [validSvg, secondSvg, thirdSvg] })],
+      1,
+    );
+
+    expect(result).toEqual([validSvg]);
+  });
+
+  it("returns best-effort partial results when responses are underfilled", () => {
+    const result = parseSvgVariationsFromResponses([JSON.stringify({ svgs: [validSvg] })], 2);
+
+    expect(result).toEqual([validSvg]);
+  });
+
+  it("salvages valid entries when partial structured arrays include invalid items", () => {
+    const result = parseSvgVariationsFromResponses(
+      [JSON.stringify({ svgs: [validSvg, "not-an-svg", secondSvg] })],
+      2,
+    );
+
+    expect(result).toEqual([validSvg, secondSvg]);
   });
 
   it("parses fenced json payloads with surrounding text", () => {

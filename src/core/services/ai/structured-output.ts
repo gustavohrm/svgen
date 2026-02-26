@@ -10,11 +10,9 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
   });
 }
 
-function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
-  const normalizedCount = normalizePositiveInt(requestedCount);
-
-  return z.strictObject({
-    svgs: z.array(z.string().min(1)).min(1).max(normalizedCount),
+function buildPartialSvgVariationsPayloadSchema(_requestedCount: number) {
+  return z.object({
+    svgs: z.array(z.string().min(1)).min(1),
   });
 }
 
@@ -217,8 +215,10 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
  * Extracts normalized SVG markup strings from a structured JSON payload that may contain a partial subset of requested variations.
  *
  * @param text - Text that may contain a JSON payload with an `svgs` array.
- * @param requestedCount - Maximum number of SVG strings allowed in the payload.
- * @returns A normalized, deduplicated SVG array, or an empty array if validation fails.
+ * @param requestedCount - Target number of SVG strings to return.
+ * Invalid SVG entries are discarded in this partial mode.
+ *
+ * @returns A normalized, deduplicated SVG array truncated to `requestedCount`, or an empty array if validation fails.
  */
 function parsePartialSvgVariationsFromText(text: string, requestedCount: number): string[] {
   const normalizedCount = normalizePositiveInt(requestedCount);
@@ -233,8 +233,8 @@ function parsePartialSvgVariationsFromText(text: string, requestedCount: number)
     return [];
   }
 
-  const normalizedSvgs = normalizeStructuredSvgArray(parsedPayload.data.svgs);
-  return normalizedSvgs ?? [];
+  const normalizedSvgs = normalizeStructuredSvgArrayBestEffort(parsedPayload.data.svgs);
+  return normalizedSvgs.slice(0, normalizedCount);
 }
 
 function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
@@ -248,6 +248,23 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
     }
 
     if (uniqueSvgs.has(normalized)) {
+      continue;
+    }
+
+    uniqueSvgs.add(normalized);
+    normalizedSvgs.push(normalized);
+  }
+
+  return normalizedSvgs;
+}
+
+function normalizeStructuredSvgArrayBestEffort(svgs: string[]): string[] {
+  const normalizedSvgs: string[] = [];
+  const uniqueSvgs = new Set<string>();
+
+  for (const svg of svgs) {
+    const normalized = normalizeSvgMarkup(svg);
+    if (!normalized || uniqueSvgs.has(normalized)) {
       continue;
     }
 
@@ -290,14 +307,21 @@ function extractSvgDocumentsFromText(text: string): string[] {
 }
 
 /**
- * Parse and return exactly `requestedCount` normalized SVG markups from model responses.
+ * Parse and return up to `requestedCount` normalized SVG markups from model responses.
  *
- * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no single response satisfies the exact-count contract, it attempts to accumulate partial structured payloads across responses until the requested unique count is met. If structured parsing cannot satisfy the contract, it falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
+ * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array,
+ * enforcing exact array length and validating each SVG document. If no single response satisfies the
+ * exact-count contract, it accumulates partial structured payloads (including oversized arrays and
+ * payloads that include additional top-level fields) across responses until the requested unique count
+ * is met. If still underfilled, it falls back to extracting raw SVG documents directly from responses
+ * and combines those with structured results. If at least one valid SVG is found, returns the best-effort
+ * partial list; throws only when no valid SVG document can be recovered. The `requestedCount` is coerced
+ * to a positive integer.
  *
  * @param responses - Array of textual model responses to search for SVG variations
- * @param requestedCount - Exact number of SVGs to require; coerced to a positive integer
- * @returns An array of exactly `requestedCount` normalized SVG markup strings
- * @throws Error if no response can satisfy the exact-count contract
+ * @param requestedCount - Target number of SVGs; coerced to a positive integer
+ * @returns An array containing up to `requestedCount` normalized SVG markup strings
+ * @throws Error if no valid SVG document can be recovered from the responses
  */
 export function parseSvgVariationsFromResponses(
   responses: string[],
@@ -313,8 +337,13 @@ export function parseSvgVariationsFromResponses(
   }
 
   const accumulatedStructuredSvgs = new Set<string>();
-  for (const response of responses) {
+  const structuredPayloadResponseIndexes = new Set<number>();
+  for (const [index, response] of responses.entries()) {
     const parsedPartial = parsePartialSvgVariationsFromText(response, normalizedCount);
+    if (parsedPartial.length > 0) {
+      structuredPayloadResponseIndexes.add(index);
+    }
+
     for (const svg of parsedPartial) {
       accumulatedStructuredSvgs.add(svg);
       if (accumulatedStructuredSvgs.size >= normalizedCount) {
@@ -323,14 +352,18 @@ export function parseSvgVariationsFromResponses(
     }
   }
 
-  const fallbackSvgs = new Set<string>();
-  for (const response of responses) {
+  const fallbackSvgs = new Set<string>(accumulatedStructuredSvgs);
+  for (const [index, response] of responses.entries()) {
     const normalized = normalizeSvgMarkup(response);
     if (normalized) {
       fallbackSvgs.add(normalized);
     }
 
-    if (normalizedCount > 1 && fallbackSvgs.size < normalizedCount) {
+    if (
+      normalizedCount > 1 &&
+      fallbackSvgs.size < normalizedCount &&
+      !structuredPayloadResponseIndexes.has(index)
+    ) {
       const extractedSvgs = extractSvgDocumentsFromText(response);
       for (const svg of extractedSvgs) {
         fallbackSvgs.add(svg);
@@ -349,6 +382,10 @@ export function parseSvgVariationsFromResponses(
     return [...fallbackSvgs].slice(0, normalizedCount);
   }
 
+  if (fallbackSvgs.size > 0) {
+    return [...fallbackSvgs];
+  }
+
   const responseContext =
     responses
       .flatMap((response, index) => {
@@ -362,6 +399,6 @@ export function parseSvgVariationsFromResponses(
       .join(" | ") || "no response content";
 
   throw new Error(
-    `Model returned an invalid variations payload. Expected exactly ${normalizedCount} SVG strings in JSON under 'svgs' (or exactly ${normalizedCount} raw SVG responses in fallback), but could not satisfy the exact-count contract. Response context: ${responseContext}`,
+    `Model returned an invalid variations payload. Could not parse any valid SVG documents from structured JSON under 'svgs' or raw SVG fallback responses. Response context: ${responseContext}`,
   );
 }

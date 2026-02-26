@@ -169,7 +169,7 @@ export class GenerateSvgUseCase {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Initial results underfilled after sanitization; a single refill pass recovered all ${refillRequestCount} missing variation(s).`,
+          message: `The first model response returned fewer usable variations than requested; one refill pass recovered all ${refillRequestCount} missing variation(s).`,
         });
       }
 
@@ -177,7 +177,7 @@ export class GenerateSvgUseCase {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Initial results underfilled after sanitization; one refill pass requested ${refillRequestCount} more variation(s) but only ${safeResults.length} of ${requestedVariations} safe SVGs are available.`,
+          message: `The model responses remained underfilled after one refill pass: requested ${requestedVariations} total variation(s), asked for ${refillRequestCount} more in refill, and recovered ${safeResults.length} safe SVG(s).`,
         });
       }
 
