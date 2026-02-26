@@ -1,5 +1,5 @@
 import DOMPurify from "dompurify";
-import { SVG_CSS_ALLOWED_PROPERTIES, SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
+import { SVG_CSS_ALLOWED_AT_RULES } from "../constants/svg-css-policy";
 
 const ALLOWED_SVG_TAGS = [
   "svg",
@@ -190,12 +190,15 @@ const URL_REFERENCE_ATTR_NAMES = new Set<string>([
 const LOCAL_FRAGMENT_REFERENCE_PATTERN = /^#[-\w:.]+$/;
 const LOCAL_FRAGMENT_URL_REFERENCE_PATTERN = /^url\s*\(\s*(['"]?)#[-\w:.]+\1\s*\)$/i;
 
-const ALLOWED_CSS_PROPERTIES = new Set<string>(SVG_CSS_ALLOWED_PROPERTIES);
-const ALLOWED_CSS_AT_RULES = new Set<string>(
-  SVG_CSS_ALLOWED_AT_RULES.map((rule) => normalizeCssAtRule(rule)).filter(
-    (rule) => rule.length > 0,
-  ),
+const NORMALIZED_ALLOWED_CSS_AT_RULES = SVG_CSS_ALLOWED_AT_RULES.map((rule) =>
+  normalizeCssAtRule(rule),
+).filter((rule) => rule.length > 0);
+const ALLOWED_CSS_AT_RULES = new Set<string>(NORMALIZED_ALLOWED_CSS_AT_RULES);
+const CSS_NESTED_RULE_NAME_CANDIDATES = new Set<string>(["media", "supports"]);
+const CSS_NESTED_RULE_AT_RULES = new Set<string>(
+  NORMALIZED_ALLOWED_CSS_AT_RULES.filter((rule) => CSS_NESTED_RULE_NAME_CANDIDATES.has(rule)),
 );
+const BLOCKED_CSS_PROPERTIES = new Set<string>(["behavior", "-moz-binding"]);
 
 interface NodeCryptoModule {
   webcrypto?: Crypto;
@@ -524,6 +527,14 @@ function hasUnterminatedCssComment(css: string): boolean {
   return false;
 }
 
+/**
+ * Validates that a CSS stylesheet is safe for reinsertion into an SVG under the module's CSS policy.
+ *
+ * Validates top-level rules and at-rules, ensures selectors, declaration blocks and nested at-rule bodies are permitted, and checks structural correctness such as balanced braces and parentheses.
+ *
+ * @param css - The raw CSS stylesheet text to validate
+ * @returns `true` if the stylesheet meets the sanitizer's safety rules, `false` otherwise
+ */
 function isSafeCssStylesheet(css: string): boolean {
   let index = 0;
 
@@ -540,23 +551,16 @@ function isSafeCssStylesheet(css: string): boolean {
         return false;
       }
 
-      if (atRuleName !== "keyframes") {
+      const openBraceIndex = findTopLevelCharacter(css, "{", index);
+      if (openBraceIndex === -1) {
         return false;
       }
-
-      const keyframesMatch = css.slice(index).match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*\{/i);
-      if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
-        return false;
-      }
-
-      const openBraceIndex = index + keyframesMatch[0].length - 1;
       const closeBraceIndex = findMatchingBrace(css, openBraceIndex);
       if (closeBraceIndex === -1) {
         return false;
       }
 
-      const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
-      if (!isSafeKeyframesBody(keyframesBody)) {
+      if (!isSafeAtRuleBody(css, index, openBraceIndex, closeBraceIndex, atRuleName)) {
         return false;
       }
 
@@ -590,6 +594,93 @@ function isSafeCssStylesheet(css: string): boolean {
   return true;
 }
 
+/**
+ * Validates the body of a CSS at-rule for safety according to the module's SVG/CSS policy.
+ *
+ * @param css - The full stylesheet text containing the at-rule.
+ * @param atRuleStartIndex - Index of the at-rule's leading `@` in `css`.
+ * @param openBraceIndex - Index of the at-rule's opening `{` in `css`.
+ * @param closeBraceIndex - Index of the matching closing `}` in `css`.
+ * @param atRuleName - Normalized at-rule name (lowercased, without the leading `@`).
+ * @returns `true` if the at-rule's prelude and nested body are allowed and safe under the policy, `false` otherwise.
+ */
+function isSafeAtRuleBody(
+  css: string,
+  atRuleStartIndex: number,
+  openBraceIndex: number,
+  closeBraceIndex: number,
+  atRuleName: string,
+): boolean {
+  if (atRuleName === "keyframes") {
+    const keyframesPrelude = css.slice(atRuleStartIndex, openBraceIndex);
+    const keyframesMatch = keyframesPrelude.match(/^@keyframes\s+([A-Za-z_][\w-]*)\s*$/i);
+    if (!keyframesMatch || !isSafeKeyframesName(keyframesMatch[1])) {
+      return false;
+    }
+
+    const keyframesBody = css.slice(openBraceIndex + 1, closeBraceIndex);
+    return isSafeKeyframesBody(keyframesBody);
+  }
+
+  if (!CSS_NESTED_RULE_AT_RULES.has(atRuleName)) {
+    return false;
+  }
+
+  const atRulePrelude = css.slice(atRuleStartIndex, openBraceIndex);
+  if (!isSafeAtRulePrelude(atRulePrelude, atRuleName)) {
+    return false;
+  }
+
+  const nestedStylesheet = css.slice(openBraceIndex + 1, closeBraceIndex);
+  return isSafeCssStylesheet(nestedStylesheet);
+}
+
+/**
+ * Validates the prelude (the portion following an at-rule name) for allowed characters, balanced structure, and rule-specific requirements.
+ *
+ * @param prelude - The raw at-rule prelude string to validate (may include the leading at-rule token).
+ * @param atRuleName - The at-rule name (normalized, e.g., "media" or "supports") to apply rule-specific checks.
+ * @returns `true` if the prelude is syntactically safe, contains only allowed local fragment URLs, has balanced parentheses, and meets any at-rule-specific constraints; `false` otherwise.
+ */
+function isSafeAtRulePrelude(prelude: string, atRuleName: string): boolean {
+  const normalizedPrelude = prelude.replace(/^@[a-z-]+/i, "").trim();
+  if (!normalizedPrelude) {
+    return false;
+  }
+
+  if (DISALLOWED_CSS_PATTERN.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!hasBalancedParentheses(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!containsOnlyLocalFragmentUrls(normalizedPrelude)) {
+    return false;
+  }
+
+  if (!/^[,.:()'"\/%+\-<>=\s\w]*$/.test(normalizedPrelude)) {
+    return false;
+  }
+
+  if (atRuleName === "media") {
+    return /\(|\b(?:all|print|screen|speech)\b/i.test(normalizedPrelude);
+  }
+
+  if (atRuleName === "supports") {
+    return normalizedPrelude.includes("(");
+  }
+
+  return false;
+}
+
+/**
+ * Validates whether a string is a safe CSS `@keyframes` identifier.
+ *
+ * @param name - The candidate keyframes name to validate
+ * @returns `true` if `name` starts with a letter or underscore and is 1–64 characters long composed of letters, digits, underscores, or hyphens; `false` otherwise.
+ */
 function isSafeKeyframesName(name: string): boolean {
   return /^[A-Za-z_][\w-]{0,63}$/.test(name);
 }
@@ -658,6 +749,12 @@ function isSafeKeyframeSelector(selector: string): boolean {
   return true;
 }
 
+/**
+ * Checks whether a CSS selector is syntactically safe according to the sanitizer's selector policy.
+ *
+ * @param selector - The CSS selector string to validate
+ * @returns `true` if the selector meets the length and character restrictions allowed by the sanitizer, `false` otherwise.
+ */
 function isSafeCssSelector(selector: string): boolean {
   if (!selector || selector.length > 300) {
     return false;
@@ -667,9 +764,15 @@ function isSafeCssSelector(selector: string): boolean {
     return false;
   }
 
-  return /^[#.:\[\]="'()*+,>~\s\w-]+$/.test(selector);
+  return /^[#.:\[\]="'()*+,>~|^$\s\w-]+$/.test(selector);
 }
 
+/**
+ * Validates a CSS declaration block ensuring each declaration has an allowed property and a safe value.
+ *
+ * @param block - A CSS declaration block (for example: "color: red; stroke-width: 1;")
+ * @returns `true` if all declarations are syntactically valid, each property is permitted, and each value passes safety checks; `false` otherwise.
+ */
 function isSafeCssDeclarations(block: string): boolean {
   const declarations = splitCssDeclarations(block);
   if (declarations === null) {
@@ -689,12 +792,7 @@ function isSafeCssDeclarations(block: string): boolean {
     const property = declaration.slice(0, colonIndex).trim().toLowerCase();
     const value = declaration.slice(colonIndex + 1).trim();
 
-    if (!isSafeCssPropertyName(property)) {
-      return false;
-    }
-
-    // Custom properties are intentionally allowed for SVG-local theming variables.
-    if (!ALLOWED_CSS_PROPERTIES.has(property) && !isAllowedCustomProperty(property)) {
+    if (!isAllowedCssProperty(property)) {
       return false;
     }
 
@@ -706,6 +804,44 @@ function isSafeCssDeclarations(block: string): boolean {
   return true;
 }
 
+/**
+ * Determines whether a CSS property name is permitted by the sanitizer policy.
+ *
+ * Accepts standard CSS properties and CSS custom properties (e.g., `--foo`)
+ * only if they meet the policy's name rules and are not explicitly disallowed.
+ *
+ * @param property - The CSS property name to validate
+ * @returns `true` if the property is allowed, `false` otherwise.
+ */
+function isAllowedCssProperty(property: string): boolean {
+  // Security trade-off: isAllowedCssProperty moved from an allowlist to a
+  // blocklist model. It now relies on isSafeCssPropertyName,
+  // isAllowedCustomProperty, and BLOCKED_CSS_PROPERTIES to block dangerous CSS
+  // while allowing broader valid properties. Because this is more permissive,
+  // safe rendering also depends on sandboxed iframe isolation to mitigate any
+  // bypass that slips past these checks.
+  if (!isSafeCssPropertyName(property)) {
+    return false;
+  }
+
+  if (isAllowedCustomProperty(property)) {
+    return true;
+  }
+
+  return !BLOCKED_CSS_PROPERTIES.has(property);
+}
+
+/**
+ * Splits a CSS declaration block into separate declarations.
+ *
+ * The function returns individual declarations (without trailing semicolons) and
+ * treats semicolons inside quoted strings or balanced parentheses as part of a
+ * declaration. If a top-level brace (`{` or `}`) is encountered, the input is
+ * considered invalid and the function returns `null`.
+ *
+ * @param block - A string containing CSS declarations (the content typically found between `{` and `}`).
+ * @returns An array of declaration strings, or `null` if the block contains top-level braces (invalid structure).
+ */
 function splitCssDeclarations(block: string): string[] | null {
   const declarations: string[] = [];
   let start = 0;
@@ -766,11 +902,46 @@ function splitCssDeclarations(block: string): string[] | null {
   return declarations;
 }
 
-function findTopLevelColon(input: string): number {
-  let parenDepth = 0;
-  let quote: '"' | "'" | null = null;
+type QuoteCharacter = '"' | "'";
 
-  for (let index = 0; index < input.length; index++) {
+interface TopLevelCharacterContext {
+  index: number;
+  char: string;
+  parenDepth: number;
+}
+
+interface TopLevelCharacterTraversalOptions {
+  startIndex?: number;
+  canParenDepthBeNegative?: boolean;
+  shouldStop?: (context: TopLevelCharacterContext) => boolean;
+}
+
+interface TopLevelCharacterTraversalResult {
+  parenDepth: number;
+  quote: QuoteCharacter | null;
+}
+
+/**
+ * Traverses a string character-by-character while tracking top-level parenthesis depth and the active quote context.
+ *
+ * @param input - The string to scan.
+ * @param options - Optional traversal settings.
+ *   - startIndex: index to begin scanning from (default 0).
+ *   - canParenDepthBeNegative: when true, allows decrementing parenthesis depth below zero.
+ *   - shouldStop: callback invoked with `{ index, char, parenDepth }`; if it returns a truthy value traversal stops and the current state is returned.
+ * @returns An object containing:
+ *   - `parenDepth`: the final parenthesis nesting depth reached (number).
+ *   - `quote`: the active quote character (`'` or `"`) if inside a quoted string, or `null` otherwise.
+ */
+function iterateTopLevelChars(
+  input: string,
+  options: TopLevelCharacterTraversalOptions = {},
+): TopLevelCharacterTraversalResult {
+  const { startIndex = 0, canParenDepthBeNegative = false, shouldStop } = options;
+  let parenDepth = 0;
+  let quote: QuoteCharacter | null = null;
+
+  for (let index = startIndex; index < input.length; index++) {
     const char = input[index];
 
     if (quote) {
@@ -793,24 +964,89 @@ function findTopLevelColon(input: string): number {
 
     if (char === "(") {
       parenDepth += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      if (parenDepth > 0) {
+    } else if (char === ")") {
+      if (canParenDepthBeNegative || parenDepth > 0) {
         parenDepth -= 1;
       }
-      continue;
     }
 
-    if (char === ":" && parenDepth === 0) {
-      return index;
+    if (
+      shouldStop?.({
+        index,
+        char,
+        parenDepth,
+      })
+    ) {
+      return {
+        parenDepth,
+        quote,
+      };
     }
   }
 
-  return -1;
+  return {
+    parenDepth,
+    quote,
+  };
 }
 
+/**
+ * Finds the first colon (:) in the input that occurs at top level (not inside parentheses or quoted strings).
+ *
+ * @param input - The string to search for a top-level colon.
+ * @returns The zero-based index of the first top-level colon, or `-1` if none is found.
+ */
+function findTopLevelColon(input: string): number {
+  let colonIndex = -1;
+
+  iterateTopLevelChars(input, {
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === ":" && parenDepth === 0) {
+        colonIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return colonIndex;
+}
+
+/**
+ * Finds the first occurrence of a given character at the top CSS level (not nested inside parentheses or quoted strings).
+ *
+ * @param input - The string to search.
+ * @param targetCharacter - The character to locate.
+ * @param startIndex - Optional index to begin the search from; defaults to 0.
+ * @returns The index of the first top-level occurrence of `targetCharacter`, or `-1` if none is found.
+ */
+function findTopLevelCharacter(input: string, targetCharacter: string, startIndex = 0): number {
+  let characterIndex = -1;
+
+  iterateTopLevelChars(input, {
+    startIndex,
+    shouldStop: ({ index, char, parenDepth }) => {
+      if (char === targetCharacter && parenDepth === 0) {
+        characterIndex = index;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  return characterIndex;
+}
+
+/**
+ * Determines whether a CSS property value is safe to allow in inline SVG styles.
+ *
+ * This validates length and character constraints, rejects disallowed CSS constructs (e.g., @import, javascript:, expression(), -moz-binding, closing </style>), forbids braces, angle brackets, backticks, backslashes, and ensures any url(...) references are local fragment URLs.
+ *
+ * @param value - The CSS property value to validate (e.g., the right-hand side of `property: value`).
+ * @returns `true` if `value` satisfies the safety checks, `false` otherwise.
+ */
 function isSafeCssValue(value: string): boolean {
   if (!value || value.length > 300) {
     return false;
@@ -832,9 +1068,15 @@ function isSafeCssValue(value: string): boolean {
     return false;
   }
 
-  return /^[#(),.%/\s+\-!"'\w:]*$/.test(value);
+  return /^[#(),.%/\s+\-!"'\w:*\[\]?|=]*$/.test(value);
 }
 
+/**
+ * Validates and sanitizes an SVG element's inline `style` attribute value.
+ *
+ * @param styleValue - The raw `style` attribute text to validate.
+ * @returns The trimmed, allowed `style` value (possibly empty) if safe, `null` if the value is disallowed.
+ */
 function sanitizeStyleAttribute(styleValue: string): string | null {
   const trimmed = styleValue.trim();
   if (trimmed.length === 0) {
@@ -856,14 +1098,59 @@ function sanitizeStyleAttribute(styleValue: string): string | null {
   return trimmed;
 }
 
+/**
+ * Determines whether a CSS property name is syntactically valid for the sanitizer.
+ *
+ * @param property - The CSS property name to validate
+ * @returns `true` if `property` is a valid standard property name or a valid custom property (starts with `--`), `false` otherwise
+ */
 function isSafeCssPropertyName(property: string): boolean {
-  return /^[a-z-]+$/.test(property) || /^--[a-z0-9-]+$/.test(property);
+  return /^-?[a-z](?:[a-z-]*[a-z])?$/.test(property) || /^--[a-z0-9-]+$/.test(property);
 }
 
+/**
+ * Determines whether a CSS custom property name is allowed by the sanitizer policy.
+ *
+ * @param property - The CSS property name to validate (expected to start with `--`)
+ * @returns `true` if `property` is a valid custom property name matching `--` followed by lowercase letters, digits, or hyphens, `false` otherwise.
+ */
 function isAllowedCustomProperty(property: string): boolean {
   return /^--[a-z0-9-]+$/.test(property);
 }
 
+/**
+ * Determines whether parentheses in the input are balanced and there are no unterminated quotes.
+ *
+ * @param input - The string to validate
+ * @returns `true` if every opening parenthesis has a matching closing parenthesis, there are no unmatched closing parentheses, and there is no unclosed quote; `false` otherwise.
+ */
+function hasBalancedParentheses(input: string): boolean {
+  let hasUnbalancedClosingParenthesis = false;
+  const traversalResult = iterateTopLevelChars(input, {
+    canParenDepthBeNegative: true,
+    shouldStop: ({ char, parenDepth }) => {
+      if (char === ")" && parenDepth < 0) {
+        hasUnbalancedClosingParenthesis = true;
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  if (hasUnbalancedClosingParenthesis) {
+    return false;
+  }
+
+  return traversalResult.parenDepth === 0 && traversalResult.quote === null;
+}
+
+/**
+ * Determines whether all CSS `url(...)` references in the input are local fragment identifiers.
+ *
+ * @param value - The string to inspect for `url(...)` references
+ * @returns `true` if every `url(...)` in `value` references a local fragment of the form `#id` (allowed characters: letters, digits, underscore, hyphen, colon, period), `false` otherwise.
+ */
 function containsOnlyLocalFragmentUrls(value: string): boolean {
   const urlRegex = /url\s*\(([^)]*)\)/gi;
   let match: RegExpExecArray | null;

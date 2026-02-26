@@ -43,26 +43,145 @@ interface SvgCardActionHandler {
   handler: (cardId: string) => void;
 }
 
+const INVALID_SVG_FALLBACK =
+  `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">` +
+  `<rect x="4" y="4" width="40" height="40" rx="8" stroke="#9ca3af" stroke-opacity="0.4" stroke-width="2"/>` +
+  `<path d="M16 16L32 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `<path d="M32 16L16 32" stroke="#9ca3af" stroke-opacity="0.8" stroke-width="2.5" stroke-linecap="round"/>` +
+  `</svg>`;
+
+interface PreviewRenderResult {
+  iframeHtml: string;
+  hasAutoViewportFix: boolean;
+}
+
+interface ViewportNormalizationResult {
+  svgMarkup: string;
+  hasAutoViewportFix: boolean;
+}
+
 // --- Helpers ---
 
 /**
- * Injects sizing classes into raw SVG markup so it scales
- * properly inside the card preview area.
+ * Produce an HTML string for a sandboxed iframe that displays a sanitized SVG.
+ *
+ * @returns An HTML string suitable for use as an iframe's `srcdoc` that contains the sanitized SVG preview.
  */
 export function sanitizeSvgForDisplay(rawSvg: string): string {
-  const safeSvg = sanitizeSvgMarkup(rawSvg);
-  if (!safeSvg) {
-    return `<svg viewBox="0 0 48 48" class="w-full h-full max-h-56 drop-shadow-xl" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="40" height="40" rx="8" stroke="currentColor" stroke-opacity="0.3" stroke-width="2"/><path d="M16 16L32 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/><path d="M32 16L16 32" stroke="currentColor" stroke-opacity="0.6" stroke-width="2.5" stroke-linecap="round"/></svg>`;
-  }
-
-  const documentNode = new DOMParser().parseFromString(safeSvg, "image/svg+xml");
-  const root = documentNode.documentElement;
-  const currentClass = root.getAttribute("class") ?? "";
-  const displayClasses = "w-full h-full max-h-56 drop-shadow-xl";
-  root.setAttribute("class", `${displayClasses} ${currentClass}`.trim());
-  return root.outerHTML;
+  return buildSvgPreview(rawSvg).iframeHtml;
 }
 
+/**
+ * Builds a sandboxed iframe HTML snippet that safely renders an SVG preview.
+ *
+ * Sanitizes the provided SVG, ensures a usable viewport (adding a viewBox when necessary),
+ * wraps the normalized SVG in a minimal sandboxed HTML document, escapes it for use in
+ * an iframe `srcdoc`, and returns the iframe markup along with a flag indicating whether
+ * a viewport fix was applied.
+ *
+ * @param rawSvg - The raw SVG markup to sanitize and render.
+ * @returns An object with `iframeHtml` — an iframe HTML string whose `srcdoc` contains the sanitized SVG preview, and `hasAutoViewportFix` — `true` if a viewBox was automatically added to the SVG, `false` otherwise.
+ */
+function buildSvgPreview(rawSvg: string): PreviewRenderResult {
+  const safeSvg = sanitizeSvgMarkup(rawSvg) ?? INVALID_SVG_FALLBACK;
+  const normalizedSvg = ensurePreviewViewBox(safeSvg);
+  const iframeDocument = buildSandboxedSvgDocument(normalizedSvg.svgMarkup);
+  const safeSrcDoc = escapeHtml(iframeDocument);
+
+  return {
+    iframeHtml: `<iframe class="w-full h-full max-h-56 border-0 pointer-events-none" sandbox loading="lazy" referrerpolicy="no-referrer" title="SVG preview" aria-hidden="true" tabindex="-1" srcdoc="${safeSrcDoc}"></iframe>`,
+    hasAutoViewportFix: normalizedSvg.hasAutoViewportFix,
+  };
+}
+
+/**
+ * Ensures an SVG string has a `viewBox`, adding one when width and height are present.
+ *
+ * Parses the provided SVG markup and, if the root is an `<svg>` element that lacks a `viewBox`
+ * but has valid numeric `width` and `height` attributes, adds a `viewBox="0 0 {width} {height}"`.
+ *
+ * @param svgMarkup - The raw SVG markup to normalize
+ * @returns An object containing `svgMarkup` (the possibly modified SVG root markup) and
+ *          `hasAutoViewportFix` (`true` if a `viewBox` was added, `false` otherwise)
+ */
+function ensurePreviewViewBox(svgMarkup: string): ViewportNormalizationResult {
+  const doc = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+  const root = doc.documentElement;
+
+  if (!root || root.nodeName.toLowerCase() !== "svg") {
+    return { svgMarkup, hasAutoViewportFix: false };
+  }
+
+  if (root.getAttribute("viewBox")?.trim()) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  const width = parseSvgDimension(root.getAttribute("width"));
+  const height = parseSvgDimension(root.getAttribute("height"));
+
+  if (!width || !height) {
+    return { svgMarkup: root.outerHTML, hasAutoViewportFix: false };
+  }
+
+  root.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  return { svgMarkup: root.outerHTML, hasAutoViewportFix: true };
+}
+
+/**
+ * Extracts a positive numeric length from an SVG width/height attribute value.
+ *
+ * Accepts optional leading `+`, optional `px` suffix, integers, decimals (e.g. `10`, `10.5`, `.5`).
+ *
+ * @param rawValue - The raw attribute string to parse (may include whitespace, `px`, or a `+` sign)
+ * @returns The parsed positive numeric value as a string with any unit removed, or `null` if the input is missing, invalid, zero, or negative
+ */
+function parseSvgDimension(rawValue: string | null): string | null {
+  if (!rawValue) {
+    return null;
+  }
+
+  const trimmed = rawValue.trim();
+  const match = trimmed.match(/^(?:\+)?(\d+(?:\.\d+)?|\.\d+)(?:px)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(match[1]);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed.toString();
+}
+
+/**
+ * Builds a minimal, sandboxed HTML document that centers and constrains an SVG for iframe srcdoc.
+ *
+ * The returned HTML contains a transparent, full-bleed layout that centers the provided SVG and ensures it scales to the iframe viewport without scrollbars.
+ *
+ * @param svgMarkup - Sanitized SVG markup to embed into the document body
+ * @returns A complete HTML document string suitable for use as an iframe `srcdoc`
+ */
+function buildSandboxedSvgDocument(svgMarkup: string): string {
+  return [
+    "<!doctype html>",
+    '<html><head><meta charset="utf-8">',
+    "<style>",
+    "html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}",
+    "body{display:flex;align-items:center;justify-content:center}",
+    "svg{display:block;width:100%;height:100%;max-width:100%;max-height:100%}",
+    "</style></head>",
+    `<body>${svgMarkup}</body></html>`,
+  ].join("");
+}
+
+/**
+ * Renders an inline action button HTML for a card action.
+ *
+ * @param action - Action descriptor (id, icon key, title, optional hoverClass) used to build attributes and styling
+ * @param cardId - Identifier of the card the button targets; placed on the `data-card-id` attribute
+ * @returns HTML markup for a compact icon button containing `data-action` and `data-card-id` attributes
+ */
 function buildActionButton(action: CardAction, cardId: string): string {
   const hoverClass = action.hoverClass ?? "hover:text-text hover:bg-surface-hover";
   const safeActionId = escapeHtml(action.id);
@@ -103,8 +222,10 @@ function buildMenuActionButton(action: CardAction, cardId: string): string {
 // --- Public API ---
 
 /**
- * Renders the HTML for a single SVG card.
- * Follows the unified dark-mode design language across the app.
+ * Render an HTML string for a single SVG card containing a sandboxed SVG preview, label/sublabel, and optional action menu.
+ *
+ * @param options - Configuration for the card (svg markup, cardId, label, optional sublabel, extra actions, and flags to include built-in copy/download actions)
+ * @returns The complete HTML markup for the rendered SVG card
  */
 export function renderSvgCard(options: SvgCardOptions): string {
   const {
@@ -154,11 +275,16 @@ export function renderSvgCard(options: SvgCardOptions): string {
   const sublabelHtml = safeSublabel
     ? `<span class="text-xs text-text-muted">${safeSublabel}</span>`
     : "";
+  const preview = buildSvgPreview(svg);
+  const viewportBadgeHtml = preview.hasAutoViewportFix
+    ? '<span class="absolute top-3 left-3 rounded-full border border-amber-400/40 bg-amber-400/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-200" title="Preview auto-added a viewBox from width and height.">Auto-fit viewBox</span>'
+    : "";
 
   return `
     <div class="bg-transparent border border-border rounded-xl overflow-hidden hover:bg-surface-hover/5 transition-all duration-300 group hover:border-border flex flex-col">
       <div class="p-8 flex-1 min-h-[220px] flex items-center justify-center relative">
-        ${sanitizeSvgForDisplay(svg)}
+        ${preview.iframeHtml}
+        ${viewportBadgeHtml}
       </div>
       <div class="px-5 py-4 border-t border-border/50 flex items-center justify-between gap-3">
         <div class="flex flex-col gap-0.5 min-w-0 flex-1">
