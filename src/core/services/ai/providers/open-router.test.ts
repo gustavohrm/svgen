@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OpenRouterProvider } from "./open-router";
+import { FetchOpenRouterClient } from "./clients";
 
 describe("OpenRouterProvider", () => {
   let provider: OpenRouterProvider;
@@ -145,6 +146,13 @@ describe("OpenRouterProvider", () => {
   });
 
   it("should retry fallback request when fallback generation times out", async () => {
+    const fastRetryProvider = new OpenRouterProvider(
+      new FetchOpenRouterClient(global.fetch as typeof fetch, {
+        generationTimeoutRetries: 1,
+        retryDelayMs: 0,
+      }),
+    );
+
     (global.fetch as any)
       .mockResolvedValueOnce({
         ok: false,
@@ -173,7 +181,7 @@ describe("OpenRouterProvider", () => {
           }),
       });
 
-    const result = await provider.generate({
+    const result = await fastRetryProvider.generate({
       prompt: "test prompt",
       systemPrompt: "test system prompt",
       model: "test-model",

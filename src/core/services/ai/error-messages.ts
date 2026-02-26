@@ -10,6 +10,7 @@ interface ErrorMappingContext {
  * @param error - The value to extract a message from; may be an Error, string, null, or other types.
  * @returns The `message` property if `error` is an `Error`; otherwise the stringified `error`, using an empty string for `null` or `undefined`.
  */
+const GENERIC_GENERATION_ERROR_MESSAGE = "Failed to generate SVG. Please try again.";
 function getErrorText(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -58,15 +59,25 @@ export function mapGenerationErrorToUserMessage(
 
   if (
     includesAny(normalized, [
+      "model not found",
+      "does not exist",
+      "unknown model",
+      "unsupported model",
+      "is not found",
+    ])
+  ) {
+    return "The selected model is unavailable or no longer supported. Choose another model and try again.";
+  }
+
+  if (
+    includesAny(normalized, [
       "model is overloaded",
       "overloaded",
       "high demand",
-      "service unavailable",
+      "service temporarily unavailable",
       "currently unavailable",
       "temporarily unavailable",
       "over capacity",
-      "capacity",
-      "unavailable",
     ])
   ) {
     if (context.providerId === "gcp") {
@@ -104,18 +115,6 @@ export function mapGenerationErrorToUserMessage(
     return "Your API quota or billing limit appears to be reached. Check your provider billing/quota settings and try again.";
   }
 
-  if (
-    includesAny(normalized, [
-      "model not found",
-      "does not exist",
-      "unknown model",
-      "unsupported model",
-      "is not found",
-    ])
-  ) {
-    return "The selected model is unavailable or no longer supported. Choose another model and try again.";
-  }
-
   if (includesAny(normalized, ["failed to fetch", "networkerror", "network error", "econnreset"])) {
     return "Network error while contacting the AI provider. Check your connection and try again.";
   }
@@ -125,8 +124,9 @@ export function mapGenerationErrorToUserMessage(
   }
 
   if (rawText.trim().length > 0) {
-    return rawText;
+    console.warn("Unmapped generation error details:", rawText);
+    return GENERIC_GENERATION_ERROR_MESSAGE;
   }
 
-  return "Failed to generate SVG. Please try again.";
+  return GENERIC_GENERATION_ERROR_MESSAGE;
 }

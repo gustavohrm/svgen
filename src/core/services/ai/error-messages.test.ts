@@ -39,4 +39,76 @@ describe("mapGenerationErrorToUserMessage", () => {
 
     expect(message).toContain("Authentication failed");
   });
+
+  it("maps quota and billing errors", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("OpenRouter API error: quota exceeded due to billing limit"),
+      { providerId: "open-router" },
+    );
+
+    expect(message.toLowerCase()).toContain("quota");
+    expect(message.toLowerCase()).toContain("billing");
+  });
+
+  it("maps model-not-found and unsupported-model errors", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("GCP API error: model not found and unsupported model"),
+      { providerId: "gcp" },
+    );
+
+    expect(message.toLowerCase()).toContain("model");
+    expect(message.toLowerCase()).toContain("supported");
+  });
+
+  it("maps network failures", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("Failed to fetch due to network error"),
+      {
+        providerId: "open-router",
+      },
+    );
+
+    expect(message.toLowerCase()).toContain("network");
+  });
+
+  it("maps safety and content-policy failures", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("Request blocked by content policy safety filters"),
+      {
+        providerId: "open-router",
+      },
+    );
+
+    expect(message.toLowerCase()).toContain("content policy");
+    expect(message.toLowerCase()).toContain("safety");
+  });
+
+  it("uses generic provider wording for non-gcp high-demand errors", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("OpenRouter API error: service temporarily unavailable due to high demand"),
+      {
+        providerId: "open-router",
+      },
+    );
+
+    expect(message).toContain("the selected model");
+    expect(message).toContain("high demand");
+  });
+
+  it("returns a safe generic message for unmatched errors", () => {
+    const message = mapGenerationErrorToUserMessage(
+      new Error("Internal stack trace: provider runtime panic at providers/foo.ts:123"),
+      { providerId: "open-router" },
+    );
+
+    expect(message).toBe("Failed to generate SVG. Please try again.");
+  });
+
+  it("returns default generic message when error is undefined", () => {
+    const message = mapGenerationErrorToUserMessage(undefined, {
+      providerId: "gcp",
+    });
+
+    expect(message).toBe("Failed to generate SVG. Please try again.");
+  });
 });
