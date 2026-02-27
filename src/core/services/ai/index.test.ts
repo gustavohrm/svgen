@@ -3,7 +3,12 @@ import { AiService, createAiService, ProviderRegistry, SettingsRepository } from
 import { AiProvider, GenerateOptions } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { DEFAULT_COLOR_PALETTE_ID } from "../../constants/color-palettes";
-import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
+import {
+  SVG_BLOCKED_TAG_NAMES,
+  SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  SVG_CSS_CAPABILITY_CONTRACT,
+  SVG_CSS_URL_REFERENCE_RULE,
+} from "../../constants/svg-css-policy";
 
 function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
   return {
@@ -56,6 +61,13 @@ describe("AiService", () => {
     const settings = mockSettingsRepository.getSettings();
     const prompt = service.buildSystemPrompt(settings);
     const capabilityContractPayload = JSON.stringify(SVG_CSS_CAPABILITY_CONTRACT);
+    const blockedCssPatternsDisplay = SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) =>
+      source.replace(/\\\//g, "/"),
+    ).join(", ");
+    const escapedBlockedCssPatternsDisplay = blockedCssPatternsDisplay
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
     expect(prompt).toContain("expert SVG designer");
     expect(prompt).toContain("Prefer named SVG primitives");
@@ -69,6 +81,19 @@ describe("AiService", () => {
       "No SMIL animation tags: <animate>, <animateMotion>, <animateTransform>, <set>.",
     );
     expect(prompt).toContain("<system_instructions>");
+    expect(prompt).toContain('<complexity_policy mode="single-craft">');
+    expect(prompt).toContain("<variation_matrix>");
+    expect(prompt).toContain("<sanitizer_compatibility>");
+    expect(prompt).toContain(
+      `<blocked_svg_tags><![CDATA[${SVG_BLOCKED_TAG_NAMES.join(", ")}]]></blocked_svg_tags>`,
+    );
+    expect(prompt).toContain(
+      `<blocked_css_patterns><![CDATA[${SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ")}]]></blocked_css_patterns>`,
+    );
+    expect(prompt).toContain(
+      `<rule>Never use blocked CSS patterns: ${escapedBlockedCssPatternsDisplay}.</rule>`,
+    );
+    expect(prompt).toContain(`<url_rules><![CDATA[${SVG_CSS_URL_REFERENCE_RULE}]]></url_rules>`);
     expect(prompt).toContain("<quality_rubric>");
     expect(prompt).toContain("<response_contract>");
     expect(prompt).toContain('"svgs"');
@@ -147,6 +172,7 @@ describe("AiService", () => {
 
     expect(prompt).toContain("Generate exactly 3 distinct SVG variations.");
     expect(prompt).toContain('Return exactly 3 SVG strings under the "svgs" key');
+    expect(prompt).toContain('<complexity_policy mode="compact-multi">');
     expect(prompt).toContain('"minItems":3');
     expect(prompt).toContain('"maxItems":3');
   });
@@ -158,6 +184,8 @@ describe("AiService", () => {
     expect(prompt).toContain("<variation_count>3</variation_count>");
     expect(prompt).toContain("<user_prompt><![CDATA[draw an orbit icon]]></user_prompt>");
     expect(prompt).toContain('Return exactly 3 SVG strings in "svgs".');
+    expect(prompt).toContain("Each pair of SVG variations must differ on at least two axes");
+    expect(prompt).toContain("Avoid sanitizer-triggering features");
   });
 
   it("should keep XML well-formed when user prompt contains CDATA terminator", () => {

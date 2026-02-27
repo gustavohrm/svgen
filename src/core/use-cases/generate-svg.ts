@@ -44,6 +44,9 @@ interface AiGenerationService {
   ): Promise<string[]>;
 }
 
+export const SANITIZER_GUIDANCE =
+  "Avoid blocked tags (script, foreignObject, animate, animateMotion, animateTransform, set), inline on* attributes, external URLs, and blocked CSS patterns.";
+
 export class GenerateSvgUseCase {
   constructor(
     private readonly settingsRepository: SettingsRepository,
@@ -101,6 +104,7 @@ export class GenerateSvgUseCase {
       );
       const firstPassMerge = sanitizeAndMergeGeneratedSvgs(firstPassGeneratedSvgs);
       let safeResults = firstPassMerge.svgs;
+      let initialSafeCount = safeResults.length;
       let refillRequestCount = 0;
       let refillPassGeneratedSvgs: string[] = [];
       let refillPassMerge: SanitizedMergeResult = {
@@ -113,7 +117,13 @@ export class GenerateSvgUseCase {
 
       if (missingAfterFirstPass > 0) {
         refillRequestCount = missingAfterFirstPass;
-        const refillPrompt = buildRefillPrompt(prompt, missingAfterFirstPass);
+        const refillPrompt = buildRefillPrompt(prompt, {
+          missingCount: missingAfterFirstPass,
+          requestedCount: requestedVariations,
+          acceptedCount: safeResults.length,
+          blockedCount: firstPassMerge.blockedCount,
+          duplicateCount: firstPassMerge.duplicateCount,
+        });
         const refillReferences = mergeReferenceSvgs(referenceSvgs, safeResults);
 
         refillPassGeneratedSvgs = await this.aiService.generateMultiple(
@@ -159,11 +169,13 @@ export class GenerateSvgUseCase {
         });
       }
 
+      const refillRecovered = safeResults.length - initialSafeCount;
+
       if (refillAttempted && safeResults.length === requestedVariations) {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Initial results underfilled after sanitization; a single refill pass recovered all ${refillRequestCount} missing variation(s).`,
+          message: `The first model response returned fewer usable variations than requested; one refill pass recovered all ${refillRequestCount} missing variation(s).`,
         });
       }
 
@@ -171,7 +183,7 @@ export class GenerateSvgUseCase {
         hasWarnings = true;
         this.uiAdapter.notify({
           type: "warning",
-          message: `Initial results underfilled after sanitization; one refill pass requested ${refillRequestCount} more variation(s) but only ${safeResults.length} of ${requestedVariations} safe SVGs are available.`,
+          message: `The model responses remained underfilled after one refill pass: requested ${requestedVariations} total variation(s), asked for ${refillRequestCount} more in refill, and recovered ${refillRecovered} safe SVG(s).`,
         });
       }
 
@@ -205,17 +217,68 @@ export class GenerateSvgUseCase {
  * Build a refill prompt that preserves style family while forcing distinct additions.
  *
  * @param prompt - The original generation prompt
- * @param missingCount - Number of missing variations to recover
+ * @param feedback - Refilling context and first-pass failure hints
  * @returns Prompt text for a single refill pass
  */
-function buildRefillPrompt(prompt: string, missingCount: number): string {
-  const normalizedMissingCount = normalizePositiveInt(missingCount);
+interface RefillPromptFeedback {
+  missingCount: number;
+  requestedCount: number;
+  acceptedCount: number;
+  blockedCount: number;
+  duplicateCount: number;
+}
+
+function buildRefillPrompt(prompt: string, feedback: RefillPromptFeedback): string {
+  const normalizedMissingCount = normalizePositiveInt(feedback.missingCount);
+  const normalizedRequestedCount = normalizePositiveInt(feedback.requestedCount);
+  const normalizedAcceptedCount = Math.max(
+    0,
+    Math.min(
+      normalizedRequestedCount,
+      Number.isFinite(feedback.acceptedCount) ? Math.trunc(feedback.acceptedCount) : 0,
+    ),
+  );
+  const normalizedBlockedCount =
+    Number.isFinite(feedback.blockedCount) && feedback.blockedCount > 0
+      ? Math.trunc(feedback.blockedCount)
+      : 0;
+  const normalizedDuplicateCount =
+    Number.isFinite(feedback.duplicateCount) && feedback.duplicateCount > 0
+      ? Math.trunc(feedback.duplicateCount)
+      : 0;
+
+  const failureHints: string[] = [];
+
+  if (normalizedBlockedCount > 0) {
+    failureHints.push(`Previous candidates were blocked by sanitization. ${SANITIZER_GUIDANCE}`);
+  }
+
+  if (normalizedDuplicateCount > 0) {
+    failureHints.push(
+      "Previous candidates included duplicates. Produce net-new compositions with different focal layout, motion direction, and color direction.",
+    );
+  }
+
+  if (failureHints.length === 0) {
+    failureHints.push(
+      "Prior pass under-delivered count. Return fully formed, distinct SVG documents that satisfy the exact missing count.",
+    );
+  }
 
   return `${prompt}\n\n<refill_request>
   <missing_variations>${normalizedMissingCount}</missing_variations>
+  <requested_variations_total>${normalizedRequestedCount}</requested_variations_total>
+  <accepted_variations_so_far>${normalizedAcceptedCount}</accepted_variations_so_far>
+  <failure_feedback>
+    <blocked_after_sanitization>${normalizedBlockedCount}</blocked_after_sanitization>
+    <duplicates_removed>${normalizedDuplicateCount}</duplicates_removed>
+    <likely_failure_modes>${failureHints.join(" ")}</likely_failure_modes>
+  </failure_feedback>
   <style_continuity>Preserve the same style family and design language as previously accepted SVGs.</style_continuity>
   <distinctness_requirements>Each new SVG must use a clearly distinct composition, motion direction, and color direction versus prior accepted outputs and versus other refill outputs.</distinctness_requirements>
+  <pairwise_difference_rule>Every pair of refill SVGs must differ on at least two axes: composition, shape language, color direction, or motion profile.</pairwise_difference_rule>
   <novelty_rule>Return only net-new variations; do not duplicate or trivially mutate previous outputs.</novelty_rule>
+  <sanitizer_compatibility>${SANITIZER_GUIDANCE}</sanitizer_compatibility>
 </refill_request>`;
 }
 

@@ -44,7 +44,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
           id="prompt-input"
           rows="3"
           class="w-full bg-transparent text-text placeholder-text-muted outline-none resize-none leading-relaxed"
-          placeholder="Describe the SVG you want to generate (e.g., a glowing isometric cube)..."
+          placeholder="Subject: what to draw | Style: visual language | Composition: layout | Color intent: palette | Motion: behavior | Constraints: must/avoid"
         ></textarea>
 
         <div class="flex items-center justify-between">

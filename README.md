@@ -11,6 +11,30 @@ The goal is not just to forward a prompt to a provider. The app focuses on a mor
 - Applies app-level safeguards so output is safer and more consistent
 - Lets users manage provider keys/settings in the app UI
 
+## Prompt quality tips
+
+You usually get better SVG generations when your prompt specifies intent across these dimensions:
+
+- Subject: what should be drawn
+- Style: visual language (minimal, geometric, illustrative, etc.)
+- Composition: layout/focal structure
+- Color intent: palette or contrast direction
+- Motion: animation behavior, or explicitly static
+- Constraints: must-have and must-avoid rules
+
+Suggested template:
+
+```text
+Subject: ...
+Style: ...
+Composition: ...
+Color intent: ...
+Motion: ...
+Constraints: ...
+```
+
+For local prompt-engineering checks, run the harness tests in `src/core/services/ai/prompt-quality-harness.test.ts`.
+
 ## Project structure
 
 - `src/index.ts`: main generation flow bootstrap

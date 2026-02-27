@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DOMParser as XmldomParser, XMLSerializer as XmldomSerializer } from "@xmldom/xmldom";
 import { extractSvgFromResult } from "../../utils/svg-parser";
 import { normalizePositiveInt } from "../../utils/number";
 
@@ -16,22 +17,55 @@ function buildSvgVariationsPayloadSchema(requestedCount: number) {
   });
 }
 
-/**
- * Build a Zod schema for a payload whose `svgs` property is an array of 1 to N non-empty SVG strings.
- *
- * @param requestedCount - Desired maximum number of SVGs; the value is normalized to a positive integer.
- * @returns A Zod strict object schema requiring `svgs` to be an array of non-empty strings with a minimum length of 1 and a maximum length equal to the normalized count.
- */
-function buildPartialSvgVariationsPayloadSchema(requestedCount: number) {
-  const normalizedCount = normalizePositiveInt(requestedCount);
-
-  return z.strictObject({
-    svgs: z.array(z.string().min(1)).min(1).max(normalizedCount),
+function buildPartialSvgVariationsPayloadSchema() {
+  return z.object({
+    svgs: z.array(z.unknown()).min(1),
   });
 }
 
 const CODE_FENCE_REGEX = /```(?:json)?\s*([\s\S]*?)\s*```/i;
 const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
+
+/**
+ * Note: When parsing with "text/html", xmldom places elements in the XHTML namespace
+ * (http://www.w3.org/1999/xhtml). Downstream namespace-sensitive code or XPath queries
+ * may need to account for this.
+ */
+function parseHtmlFragment(text: string): Element | null {
+  if (typeof DOMParser === "undefined" || typeof window === "undefined") {
+    try {
+      const doc = new XmldomParser({
+        locator: {},
+        errorHandler: () => {}, // Suppress console output for parsing errors
+      }).parseFromString(text, "text/html");
+
+      const body = doc.getElementsByTagName("body")[0];
+      if (body) {
+        return body as Element;
+      }
+
+      const docElement = doc.documentElement;
+      if (!docElement) return null;
+
+      if (docElement.tagName?.toLowerCase() === "svg") {
+        const wrapper = doc.createElement("body");
+        wrapper.appendChild(docElement);
+        return wrapper as Element;
+      }
+
+      return docElement as Element;
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const parsed = new DOMParser().parseFromString(text, "text/html");
+    return parsed.body || parsed.documentElement || null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Determines whether the given string contains exactly one standalone SVG document with no other content.
@@ -40,29 +74,33 @@ const SVG_MARKUP_REGEX = /^<svg[\s\S]*<\/svg>$/i;
  * @returns `true` if `input` contains one `<svg>...</svg>` block and no non-whitespace characters before or after it, `false` otherwise
  */
 function isSingleSvgDocument(input: string): boolean {
-  const lowered = input.toLowerCase();
-  const firstSvgIndex = lowered.indexOf("<svg");
-  const lastSvgIndex = lowered.lastIndexOf("<svg");
-  const firstClosingSvgIndex = lowered.indexOf("</svg>");
-  const lastClosingSvgIndex = lowered.lastIndexOf("</svg>");
-
-  if (firstSvgIndex === -1 || firstClosingSvgIndex === -1) {
+  const parsedBody = parseHtmlFragment(input);
+  if (!parsedBody) {
     return false;
   }
 
-  if (firstSvgIndex !== lastSvgIndex || firstClosingSvgIndex !== lastClosingSvgIndex) {
-    return false;
+  let topLevelSvgCount = 0;
+
+  for (const node of Array.from(parsedBody.childNodes)) {
+    if (node.nodeType === 3) {
+      // Node.TEXT_NODE === 3
+      if (node.textContent?.trim() !== "") {
+        return false;
+      }
+    } else if (node.nodeType === 1) {
+      // Node.ELEMENT_NODE === 1
+      const tagName = (node as Element).tagName?.toLowerCase();
+      if (tagName !== "svg") {
+        return false;
+      }
+
+      topLevelSvgCount += 1;
+    } else {
+      return false;
+    }
   }
 
-  if (input.slice(0, firstSvgIndex).trim() !== "") {
-    return false;
-  }
-
-  if (input.slice(lastClosingSvgIndex + "</svg>".length).trim() !== "") {
-    return false;
-  }
-
-  return true;
+  return topLevelSvgCount === 1;
 }
 
 /**
@@ -129,7 +167,7 @@ function normalizeSvgMarkup(svg: string): string | null {
   const trimmedInput = svg.trim();
   const extracted = extractSvgFromResult(trimmedInput).trim();
 
-  if (!isSingleSvgDocument(trimmedInput) || !isSingleSvgDocument(extracted)) {
+  if (!isSingleSvgDocument(extracted)) {
     return null;
   }
 
@@ -216,8 +254,10 @@ function parseSvgVariationsFromText(text: string, requestedCount: number): strin
  * Extracts normalized SVG markup strings from a structured JSON payload that may contain a partial subset of requested variations.
  *
  * @param text - Text that may contain a JSON payload with an `svgs` array.
- * @param requestedCount - Maximum number of SVG strings allowed in the payload.
- * @returns A normalized, deduplicated SVG array, or an empty array if validation fails.
+ * @param requestedCount - Target number of SVG strings to return.
+ * Invalid SVG entries are discarded in this partial mode.
+ *
+ * @returns A normalized, deduplicated SVG array truncated to `requestedCount`, or an empty array if validation fails.
  */
 function parsePartialSvgVariationsFromText(text: string, requestedCount: number): string[] {
   const normalizedCount = normalizePositiveInt(requestedCount);
@@ -226,14 +266,16 @@ function parsePartialSvgVariationsFromText(text: string, requestedCount: number)
     return [];
   }
 
-  const parsedPayload =
-    buildPartialSvgVariationsPayloadSchema(normalizedCount).safeParse(parsedJson);
+  const parsedPayload = buildPartialSvgVariationsPayloadSchema().safeParse(parsedJson);
   if (!parsedPayload.success) {
     return [];
   }
 
-  const normalizedSvgs = normalizeStructuredSvgArray(parsedPayload.data.svgs);
-  return normalizedSvgs ?? [];
+  const validStringSvgs = parsedPayload.data.svgs.filter(
+    (item): item is string => typeof item === "string",
+  );
+  const normalizedSvgs = normalizeStructuredSvgArrayBestEffort(validStringSvgs);
+  return normalizedSvgs.slice(0, normalizedCount);
 }
 
 /**
@@ -263,16 +305,102 @@ function normalizeStructuredSvgArray(svgs: string[]): string[] | null {
   return normalizedSvgs;
 }
 
+function normalizeStructuredSvgArrayBestEffort(svgs: string[]): string[] {
+  const normalizedSvgs: string[] = [];
+  const uniqueSvgs = new Set<string>();
+
+  for (const svg of svgs) {
+    const normalized = normalizeSvgMarkup(svg);
+    if (!normalized || uniqueSvgs.has(normalized)) {
+      continue;
+    }
+
+    uniqueSvgs.add(normalized);
+    normalizedSvgs.push(normalized);
+  }
+
+  return normalizedSvgs;
+}
+
+function extractSvgDocumentsFromText(text: string): string[] {
+  const parsedBody = parseHtmlFragment(text);
+  if (!parsedBody) {
+    return [];
+  }
+
+  const normalizedSvgs: string[] = [];
+  const uniqueSvgs = new Set<string>();
+
+  const svgElements = Array.from(parsedBody.getElementsByTagName("svg"));
+
+  for (const node of svgElements) {
+    const element = node as Element;
+
+    let isNested = false;
+    let parent = element.parentNode;
+    while (parent && parent.nodeType === 1) {
+      // Node.ELEMENT_NODE
+      if ((parent as Element).tagName?.toLowerCase() === "svg") {
+        isNested = true;
+        break;
+      }
+      parent = parent.parentNode;
+    }
+    if (isNested) {
+      continue;
+    }
+
+    const html =
+      typeof element.outerHTML === "string"
+        ? element.outerHTML
+        : new XmldomSerializer().serializeToString(element);
+
+    const normalized = normalizeSvgMarkup(html);
+    if (!normalized || uniqueSvgs.has(normalized)) {
+      continue;
+    }
+
+    uniqueSvgs.add(normalized);
+    normalizedSvgs.push(normalized);
+  }
+
+  return normalizedSvgs;
+}
+
+function getCanonicalSvg(svg: string): string {
+  const parsed = parseHtmlFragment(svg);
+  if (!parsed) {
+    return svg;
+  }
+  const elements =
+    parsed.tagName?.toLowerCase() === "svg"
+      ? [parsed]
+      : Array.from(parsed.getElementsByTagName("svg"));
+  if (elements.length === 0) {
+    return svg;
+  }
+  const element = elements[0];
+  return typeof element.outerHTML === "string"
+    ? element.outerHTML
+    : new XmldomSerializer().serializeToString(element);
+}
+
 /**
- * Selects and returns exactly `requestedCount` normalized SVG markup strings extracted from model responses.
+ * Parse and return up to `requestedCount` normalized SVG markups from model responses.
  *
- * Attempts structured exact-count parsing first, then accumulates valid partial structured entries across responses, and finally falls back to extracting raw SVG documents; throws if the exact count cannot be satisfied.
- * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array, enforcing exact array length and validating each SVG document. If no single response satisfies the exact-count contract, it attempts to accumulate partial structured payloads across responses until the requested unique count is met. If structured parsing cannot satisfy the contract, it falls back to extracting raw SVG documents directly from responses and only succeeds when that fallback reaches the exact normalized count. The `requestedCount` is coerced to a positive integer.
+ * Tries a primary flow that parses each response as a structured JSON payload with an `svgs` array,
+ * enforcing exact array length and validating each SVG document. If no single response satisfies the
+ * exact-count contract, it accumulates partial structured payloads (including oversized arrays and
+ * payloads that include additional top-level fields) across responses until the requested unique count
+ * is met. If still underfilled, it falls back to extracting raw SVG documents directly from responses
+ * and combines those with structured results. If at least one valid SVG is found, returns the best-effort
+ * partial list; throws only when no valid SVG document can be recovered. The `requestedCount` is coerced
+ * to a positive integer.
  *
  * @param responses - Array of textual model responses to search for SVG variations
- * @param requestedCount - Number of SVGs required; coerced to a positive integer
- * @returns An array containing exactly `requestedCount` normalized SVG markup strings
- * @throws Error if no combination of responses yields the exact required count of valid SVGs
+ * @param requestedCount - Target number of SVGs; coerced to a positive integer
+ * @returns An array containing up to `requestedCount` normalized SVG markup strings
+ * @throws Error if no valid SVG document can be recovered from the responses
  */
 export function parseSvgVariationsFromResponses(
   responses: string[],
@@ -288,10 +416,16 @@ export function parseSvgVariationsFromResponses(
   }
 
   const accumulatedStructuredSvgs = new Set<string>();
-  for (const response of responses) {
+  const structuredPayloadResponseIndexes = new Set<number>();
+  for (const [index, response] of responses.entries()) {
     const parsedPartial = parsePartialSvgVariationsFromText(response, normalizedCount);
+    if (parsedPartial.length > 0) {
+      structuredPayloadResponseIndexes.add(index);
+    }
+
     for (const svg of parsedPartial) {
-      accumulatedStructuredSvgs.add(svg);
+      const canonical = getCanonicalSvg(svg);
+      accumulatedStructuredSvgs.add(canonical);
       if (accumulatedStructuredSvgs.size >= normalizedCount) {
         return [...accumulatedStructuredSvgs].slice(0, normalizedCount);
       }
@@ -299,18 +433,48 @@ export function parseSvgVariationsFromResponses(
   }
 
   const fallbackSvgs = new Set<string>();
+  const canonicalSeen = new Set<string>();
+
+  for (const svg of accumulatedStructuredSvgs) {
+    fallbackSvgs.add(svg);
+    canonicalSeen.add(getCanonicalSvg(svg));
+  }
+
   for (const response of responses) {
     const normalized = normalizeSvgMarkup(response);
     if (normalized) {
-      fallbackSvgs.add(normalized);
-      if (fallbackSvgs.size >= normalizedCount) {
-        break;
+      const canonical = getCanonicalSvg(normalized);
+      if (!canonicalSeen.has(canonical)) {
+        fallbackSvgs.add(normalized);
+        canonicalSeen.add(canonical);
       }
+    }
+
+    if (fallbackSvgs.size < normalizedCount) {
+      const extractedSvgs = extractSvgDocumentsFromText(response);
+      for (const svg of extractedSvgs) {
+        const canonical = getCanonicalSvg(svg);
+        if (!canonicalSeen.has(canonical)) {
+          fallbackSvgs.add(svg);
+          canonicalSeen.add(canonical);
+        }
+        if (fallbackSvgs.size >= normalizedCount) {
+          break;
+        }
+      }
+    }
+
+    if (fallbackSvgs.size >= normalizedCount) {
+      break;
     }
   }
 
   if (fallbackSvgs.size === normalizedCount) {
     return [...fallbackSvgs].slice(0, normalizedCount);
+  }
+
+  if (fallbackSvgs.size > 0) {
+    return [...fallbackSvgs];
   }
 
   const responseContext =
@@ -326,6 +490,6 @@ export function parseSvgVariationsFromResponses(
       .join(" | ") || "no response content";
 
   throw new Error(
-    `Model returned an invalid variations payload. Expected exactly ${normalizedCount} SVG strings in JSON under 'svgs' (or exactly ${normalizedCount} raw SVG responses in fallback), but could not satisfy the exact-count contract. Response context: ${responseContext}`,
+    `Model returned an invalid variations payload. Could not parse any valid SVG documents from structured JSON under 'svgs' or raw SVG fallback responses. Response context: ${responseContext}`,
   );
 }

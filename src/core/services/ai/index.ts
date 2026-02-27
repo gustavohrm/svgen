@@ -7,7 +7,12 @@ import {
   DEFAULT_COLOR_PALETTE_ID,
   isColorPaletteId,
 } from "../../constants/color-palettes";
-import { SVG_CSS_CAPABILITY_CONTRACT } from "../../constants/svg-css-policy";
+import {
+  SVG_BLOCKED_TAG_NAMES,
+  SVG_CSS_BLOCKED_PATTERN_SOURCES,
+  SVG_CSS_CAPABILITY_CONTRACT,
+  SVG_CSS_URL_REFERENCE_RULE,
+} from "../../constants/svg-css-policy";
 
 export interface SettingsRepository {
   getSettings(): AppSettings;
@@ -48,6 +53,57 @@ function calculateMaxOutputTokens(variationCount: number): number {
   return Math.max(MAX_OUTPUT_TOKENS_FLOOR, Math.min(MAX_OUTPUT_TOKENS_CEILING, computed));
 }
 
+function buildComplexityPolicyXml(variationCount: number): string {
+  const normalizedVariationCount = normalizePositiveInt(variationCount);
+
+  if (normalizedVariationCount >= 3) {
+    return `<complexity_policy mode="compact-multi">
+  <rule>When producing ${normalizedVariationCount} variations, keep each SVG compact and readable.</rule>
+  <rule>Prefer clean primitive geometry and restrained layer depth over overly dense markup.</rule>
+  <rule>Use at most one heavy visual effect stack (complex filter/mask chain) per variation.</rule>
+</complexity_policy>`;
+  }
+
+  if (normalizedVariationCount === 2) {
+    return `<complexity_policy mode="balanced-duo">
+  <rule>For 2 variations, balance craft and compactness.</rule>
+  <rule>Allow richer detail, but avoid decorative complexity that obscures silhouette readability.</rule>
+</complexity_policy>`;
+  }
+
+  return `<complexity_policy mode="single-craft">
+  <rule>For a single variation, prioritize craft and polish while keeping markup intentional and maintainable.</rule>
+</complexity_policy>`;
+}
+
+function buildVariationMatrixXml(): string {
+  return `<variation_matrix>
+  <axes>
+    <axis id="composition">centered mark, diagonal flow, radial burst, layered scene, asymmetrical cluster</axis>
+    <axis id="shape_language">geometric, organic, technical, minimal-outline, bold-solid</axis>
+    <axis id="color_direction">high-contrast, analogous, monochrome, duotone, split-accent</axis>
+    <axis id="motion_profile">static, pulse, directional drift, rotation, staggered cadence</axis>
+  </axes>
+  <rules>
+    <rule>Assign each variation a distinct combination across the four axes.</rule>
+    <rule>Every pair of variations must differ on at least two axes.</rule>
+    <rule>Avoid near-duplicates caused by only micro-adjusting color or transform.</rule>
+  </rules>
+</variation_matrix>`;
+}
+
+function buildSanitizerCompatibilityXml(): string {
+  const blockedSvgTags = SVG_BLOCKED_TAG_NAMES.join(", ");
+  const blockedCssPatterns = buildBlockedCssPatternsDisplayText();
+
+  return `<sanitizer_compatibility>
+  <blocked_svg_tags><![CDATA[${toCdata(blockedSvgTags)}]]></blocked_svg_tags>
+  <blocked_css_patterns><![CDATA[${toCdata(blockedCssPatterns)}]]></blocked_css_patterns>
+  <blocked_attributes>Any inline on* event handlers are forbidden.</blocked_attributes>
+  <url_rules><![CDATA[${toCdata(SVG_CSS_URL_REFERENCE_RULE)}]]></url_rules>
+</sanitizer_compatibility>`;
+}
+
 /**
  * Produce an XML fragment of guardrails that enforce generation rules, quality criteria, the SVG CSS capability contract, and a response schema for a set of SVG variations.
  *
@@ -57,21 +113,30 @@ function calculateMaxOutputTokens(variationCount: number): number {
 function buildSystemPromptGuardrails(variationCount: number): string {
   const normalizedVariationCount = normalizePositiveInt(variationCount);
   const variationsSchema = buildSvgVariationsJsonSchema(normalizedVariationCount);
+  const blockedCssPatternsForPrompt = escapeXmlText(buildBlockedCssPatternsDisplayText());
 
   return `
 <generation_rules>
   <rule>Generate exactly ${normalizedVariationCount} distinct SVG variations.</rule>
   <rule>Return exactly ${normalizedVariationCount} SVG strings under the "svgs" key; never return fewer or more.</rule>
   <rule>Each variation should differ meaningfully in composition, motion, color direction, or visual style.</rule>
+  <rule>Every pair of variations must differ on at least two axes from the variation matrix below.</rule>
   <rule>Do not duplicate compositions or near-identical variations to satisfy count.</rule>
   <rule>Each variation must be a complete, valid &lt;svg&gt;...&lt;/svg&gt; document.</rule>
   <rule>Do not use markdown, code fences, or explanatory text.</rule>
   <rule>Keep SVGs self-contained (no external assets, fonts, CSS, or scripts).</rule>
+  <rule>Never use blocked tags: script, foreignObject, animate, animateMotion, animateTransform, set.</rule>
+  <rule>Never use inline event handler attributes (on*).</rule>
+  <rule>Only local URL references are allowed: #id and url(#id).</rule>
+  <rule>Never use blocked CSS patterns: ${blockedCssPatternsForPrompt}.</rule>
   <rule>Prefer named SVG primitives over paths when equivalent.</rule>
   <rule>If animation is requested, use inline CSS animation and avoid SMIL tags such as &lt;animate&gt;, &lt;animateTransform&gt;, &lt;animateMotion&gt;, and &lt;set&gt;.</rule>
   <rule>Prefer viewBox-based responsive coordinates.</rule>
-  <rule>Treat the CSS capability contract below as strict enforcement, not guidance.</rule>
+  <rule>Treat the sanitizer compatibility section and CSS capability contract below as strict enforcement, not guidance.</rule>
 </generation_rules>
+${buildComplexityPolicyXml(normalizedVariationCount)}
+${buildVariationMatrixXml()}
+${buildSanitizerCompatibilityXml()}
 <quality_rubric>
   <criterion id="composition">Clear focal hierarchy, balanced negative space, and intentional layering.</criterion>
   <criterion id="craft">Clean geometry, alignment discipline, and coherent shape language.</criterion>
@@ -137,6 +202,8 @@ export class AiService {
     <requirement>Return exactly ${normalizedVariationCount} SVG strings in "svgs".</requirement>
     <requirement>Do not return fewer or more than ${normalizedVariationCount} SVG strings.</requirement>
     <requirement>Each item must be a full &lt;svg&gt;...&lt;/svg&gt; document.</requirement>
+    <requirement>Each pair of SVG variations must differ on at least two axes: composition, shape language, color direction, or motion profile.</requirement>
+    <requirement>Avoid sanitizer-triggering features: script/foreignObject/SMIL tags, on* handlers, external URLs, and blocked CSS patterns.</requirement>
   </output_requirements>
 </generation_request>`;
   }
@@ -213,6 +280,14 @@ export function createAiService(
  */
 function toCdata(value: string): string {
   return value.replace(/\]\]>/g, "]]]]><![CDATA[>");
+}
+
+function buildBlockedCssPatternsDisplayText(): string {
+  return SVG_CSS_BLOCKED_PATTERN_SOURCES.map((source) => source.replace(/\\\//g, "/")).join(", ");
+}
+
+function escapeXmlText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
