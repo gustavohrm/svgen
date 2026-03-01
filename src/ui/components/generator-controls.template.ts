@@ -227,6 +227,7 @@ export function renderGeneratorControls(settings: AppSettings): string {
           </button>
         </div>
       </div>
+      <div id="quick-actions-container" class="flex flex-wrap gap-2 mt-3 empty:hidden"></div>
       <div id="attachments-container" class="flex flex-wrap gap-4 mt-6 empty:hidden"></div>
     </div>
 

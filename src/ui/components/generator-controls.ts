@@ -1,5 +1,5 @@
 import { APP_EVENTS } from "../../core/constants/events";
-import { emitAppEvent } from "../../core/events/app-events";
+import { emitAppEvent, onAppEvent, type SvgResultsDetail } from "../../core/events/app-events";
 import type { AiProviderId } from "../../core/types";
 import { ModelDropdown } from "./model-dropdown";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/services/ai/index";
@@ -20,13 +20,23 @@ import {
 } from "./generator-controls.settings";
 import { isColorPaletteId } from "../../core/constants/color-palettes";
 import { updatePaletteSelectionUi } from "./generator-controls.palette";
+import { QUICK_ACTION_PROMPTS } from "../../core/constants/quick-actions";
 
 const settingsRepository = appComposition.settingsRepository;
 
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
   private isGenerating: boolean = false;
+  private hasResults: boolean = false;
   private attachmentsRenderToken = 0;
+  private unsubscribeEvents: Array<() => void> = [];
+
+  private _onClick = (e: Event) => {
+    const btn = (e.target as HTMLElement).closest("#generate-btn");
+    if (btn) {
+      void this.handleGenerate();
+    }
+  };
 
   private handleDocumentClick = (e: Event) => {
     const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
@@ -69,6 +79,125 @@ export class GeneratorControls extends HTMLElement {
     }
   };
 
+  private handleSVGenResults = (detail: SvgResultsDetail) => {
+    this.hasResults = (detail?.svgs?.length ?? 0) > 0;
+    this.updateQuickActionsVisibility();
+  };
+
+  private fisherYatesShuffle<T>(array: T[]): T[] {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  private updateQuickActionsVisibility() {
+    const container = this.querySelector("#quick-actions-container") as HTMLDivElement | null;
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    if (!container || !promptInput) return;
+
+    const isInputEmpty = promptInput.value.trim().length === 0;
+
+    if (this.hasResults || !isInputEmpty) {
+      container.classList.add("hidden");
+    } else {
+      container.classList.remove("hidden");
+      if (container.children.length === 0) {
+        this.renderQuickActions();
+      }
+    }
+  }
+
+  private renderQuickActions() {
+    const container = this.querySelector("#quick-actions-container") as HTMLDivElement | null;
+    if (!container) return;
+
+    // Pick 4-5 random prompts
+    const shuffled = this.fisherYatesShuffle([...QUICK_ACTION_PROMPTS]);
+    const selected = shuffled.slice(0, 4 + Math.floor(Math.random() * 2));
+
+    const fragment = document.createDocumentFragment();
+
+    selected.forEach((prompt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "quick-action-btn px-3 py-1.5 text-xs bg-transparent hover:bg-surface-hover border border-border/40 hover:border-border-bright rounded-lg text-text-secondary hover:text-text transition cursor-pointer";
+      btn.dataset.prompt = prompt;
+      btn.textContent = prompt;
+
+      btn.addEventListener("click", () => {
+        const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+        if (promptInput) {
+          promptInput.value = prompt;
+          this.updateQuickActionsVisibility();
+          promptInput.focus();
+        }
+      });
+
+      fragment.appendChild(btn);
+    });
+
+    container.innerHTML = "";
+    container.appendChild(fragment);
+  }
+
+  private handleGenerate = async () => {
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    if (!promptInput || this.isGenerating) return;
+
+    const prompt = promptInput.value.trim();
+    if (!prompt) return;
+
+    const selector = this.querySelector("#model-selector") as ModelDropdown | null;
+    const model = selector?.selectedModel;
+    const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
+
+    // Set local isGenerating immediately to prevent re-entrancy during async prep
+    this.isGenerating = true;
+
+    // Trigger UI state immediately for better feedback
+    const generateBtn = this.querySelector("#generate-btn") as HTMLButtonElement | null;
+    if (generateBtn) {
+      setGenerateButtonLoading(generateBtn);
+    }
+
+    try {
+      let svgsAsText: string[] = [];
+      if (this.referenceFiles.length > 0) {
+        const results = await Promise.allSettled(this.referenceFiles.map((file) => file.text()));
+        svgsAsText = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((r) => r.value);
+
+        if (svgsAsText.length === 0) {
+          console.error("Failed to read any of the reference SVGs.");
+          this.handleGenerationFinished();
+          return;
+        }
+
+        const failures = results.filter((r) => r.status === "rejected");
+        if (failures.length > 0) {
+          console.warn(`${failures.length} reference SVG(s) failed to load and were skipped.`);
+        }
+      }
+
+      const variations = settingsRepository.getSettings().variations || 1;
+
+      emitAppEvent(APP_EVENTS.START_GENERATION, {
+        prompt,
+        referenceSvgs: svgsAsText,
+        model,
+        providerId,
+        variations,
+      });
+    } catch (error) {
+      console.error("Error during generation preparation:", error);
+      this.handleGenerationFinished();
+    }
+  };
+
   constructor() {
     super();
   }
@@ -76,12 +205,14 @@ export class GeneratorControls extends HTMLElement {
   connectedCallback() {
     this.render();
     this.attachEvents();
+    this.updateQuickActionsVisibility();
   }
 
   disconnectedCallback() {
-    window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    for (const u of this.unsubscribeEvents) u();
+    this.unsubscribeEvents = [];
     document.removeEventListener("click", this.handleDocumentClick);
+    this.removeEventListener("click", this._onClick);
   }
 
   private render() {
@@ -298,6 +429,11 @@ export class GeneratorControls extends HTMLElement {
       }
     });
 
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    promptInput?.addEventListener("input", () => {
+      this.updateQuickActionsVisibility();
+    });
+
     document.addEventListener("click", this.handleDocumentClick);
 
     // File uploads
@@ -329,35 +465,16 @@ export class GeneratorControls extends HTMLElement {
     });
 
     // Generation Submit
-    this.addEventListener("click", async (e) => {
-      const btn = (e.target as HTMLElement).closest("#generate-btn");
-      if (!btn) return;
+    this.addEventListener("click", this._onClick);
 
-      const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
-      if (!promptInput || this.isGenerating) return;
-
-      const prompt = promptInput.value.trim();
-      const selector = this.querySelector("#model-selector") as ModelDropdown | null;
-      const model = selector?.selectedModel;
-      const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
-
-      if (!prompt) return;
-
-      const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
-      const variations = settingsRepository.getSettings().variations || 1;
-
-      emitAppEvent(APP_EVENTS.START_GENERATION, {
-        prompt,
-        referenceSvgs: svgsAsText,
-        model,
-        providerId,
-        variations,
-      });
-    });
-
-    // Subscribing to global events generated by index.ts Orchestrator
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    // Subscribing to global events
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted),
+    );
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished),
+    );
+    this.unsubscribeEvents.push(onAppEvent(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults));
   }
 }
 
