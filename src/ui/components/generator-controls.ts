@@ -1,5 +1,5 @@
 import { APP_EVENTS } from "../../core/constants/events";
-import { emitAppEvent, onAppEvent } from "../../core/events/app-events";
+import { emitAppEvent, onAppEvent, type SvgResultsDetail } from "../../core/events/app-events";
 import type { AiProviderId } from "../../core/types";
 import { ModelDropdown } from "./model-dropdown";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/services/ai/index";
@@ -31,6 +31,13 @@ export class GeneratorControls extends HTMLElement {
   private hasResults: boolean = false;
   private attachmentsRenderToken = 0;
   private unsubscribeEvents: Array<() => void> = [];
+
+  private _onClick = (e: Event) => {
+    const btn = (e.target as HTMLElement).closest("#generate-btn");
+    if (btn) {
+      void this.handleGenerate();
+    }
+  };
 
   private handleDocumentClick = (e: Event) => {
     const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
@@ -73,8 +80,8 @@ export class GeneratorControls extends HTMLElement {
     }
   };
 
-  private handleSVGenResults = () => {
-    this.hasResults = true;
+  private handleSVGenResults = (detail: SvgResultsDetail) => {
+    this.hasResults = (detail?.svgs?.length ?? 0) > 0;
     this.updateQuickActionsVisibility();
   };
 
@@ -166,7 +173,9 @@ export class GeneratorControls extends HTMLElement {
 
   disconnectedCallback() {
     this.unsubscribeEvents.forEach((u) => u());
+    this.unsubscribeEvents = [];
     document.removeEventListener("click", this.handleDocumentClick);
+    this.removeEventListener("click", this._onClick);
   }
 
   private render() {
@@ -419,12 +428,7 @@ export class GeneratorControls extends HTMLElement {
     });
 
     // Generation Submit
-    this.addEventListener("click", (e) => {
-      const btn = (e.target as HTMLElement).closest("#generate-btn");
-      if (btn) {
-        void this.handleGenerate();
-      }
-    });
+    this.addEventListener("click", this._onClick);
 
     // Subscribing to global events
     this.unsubscribeEvents.push(
