@@ -24,6 +24,7 @@ interface SettingsState {
   searchTerm: string;
   filterProvider: AiProviderId | "all";
   sortDirection: "asc" | "desc";
+  activeTab: "models" | "usage";
 }
 
 const numberFormatter = new Intl.NumberFormat("en-US");
@@ -130,7 +131,43 @@ const store = createStore<SettingsState>({
   searchTerm: "",
   filterProvider: "all",
   sortDirection: "asc",
+  activeTab: "models",
 });
+
+function renderTabs(state: SettingsState) {
+  if (!container) return;
+
+  const modelsTabBtn = container.querySelector("#tab-models-btn");
+  const usageTabBtn = container.querySelector("#tab-usage-btn");
+  const modelsPanel = container.querySelector("#models-panel");
+  const usagePanel = container.querySelector("#usage-panel");
+
+  if (!modelsTabBtn || !usageTabBtn || !modelsPanel || !usagePanel) {
+    return;
+  }
+
+  const isModelsTab = state.activeTab === "models";
+
+  if (isModelsTab) {
+    modelsPanel.classList.remove("hidden");
+    usagePanel.classList.add("hidden");
+  } else {
+    modelsPanel.classList.add("hidden");
+    usagePanel.classList.remove("hidden");
+  }
+
+  modelsTabBtn.className = `settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+    isModelsTab
+      ? "bg-background text-text"
+      : "text-text-muted hover:text-text hover:bg-surface-hover/50"
+  }`;
+
+  usageTabBtn.className = `settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+    !isModelsTab
+      ? "bg-background text-text"
+      : "text-text-muted hover:text-text hover:bg-surface-hover/50"
+  }`;
+}
 
 /* ── Helpers ── */
 function getAllModels(): ModelEntry[] {
@@ -353,6 +390,7 @@ function renderFilterDropdown(state: SettingsState) {
 
 /* ── Full render ── */
 function render(state: SettingsState = store.get()) {
+  renderTabs(state);
   renderUsage();
   renderModels(state);
   renderFilterDropdown(state);
@@ -374,6 +412,18 @@ function bindStaticEvents() {
   const searchInput = container.querySelector("#model-search") as HTMLInputElement;
   searchInput?.addEventListener("input", (e) => {
     store.set({ searchTerm: (e.target as HTMLInputElement).value });
+  });
+
+  container.querySelector("#tab-models-btn")?.addEventListener("click", () => {
+    if (store.get().activeTab !== "models") {
+      store.set({ activeTab: "models" });
+    }
+  });
+
+  container.querySelector("#tab-usage-btn")?.addEventListener("click", () => {
+    if (store.get().activeTab !== "usage") {
+      store.set({ activeTab: "usage" });
+    }
   });
 
   // Filter dropdown toggle
