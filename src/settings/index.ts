@@ -408,7 +408,10 @@ function renderFilterDropdown(state: SettingsState) {
 /* ── Full render ── */
 function render(state: SettingsState = store.get()) {
   renderTabs(state);
-  renderUsage();
+  const isUsageVisible = state.activeTab === "usage";
+  if (isUsageVisible) {
+    renderUsage();
+  }
 
   const isModelsPanelVisible = state.activeTab !== "usage";
   if (isModelsPanelVisible) {
@@ -464,10 +467,12 @@ function bindStaticEvents() {
 
   // Filter dropdown toggle
   const filterBtn = container.querySelector("#filter-btn");
-  const filterDropdown = container.querySelector("#filter-dropdown") as HTMLElement;
+  const filterDropdown = container.querySelector("#filter-dropdown");
 
   filterBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (!(filterDropdown instanceof HTMLElement)) return;
+
     const isHidden = filterDropdown.classList.toggle("hidden");
     filterBtn.setAttribute("aria-expanded", (!isHidden).toString());
   });
