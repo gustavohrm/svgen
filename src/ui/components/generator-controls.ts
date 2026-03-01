@@ -21,7 +21,6 @@ import {
 import { isColorPaletteId } from "../../core/constants/color-palettes";
 import { updatePaletteSelectionUi } from "./generator-controls.palette";
 import { QUICK_ACTION_PROMPTS } from "../../core/constants/quick-actions";
-import { escapeHtml } from "../../core/utils/html-escape";
 
 const settingsRepository = appComposition.settingsRepository;
 
@@ -118,32 +117,30 @@ export class GeneratorControls extends HTMLElement {
     const shuffled = this.fisherYatesShuffle([...QUICK_ACTION_PROMPTS]);
     const selected = shuffled.slice(0, 4 + Math.floor(Math.random() * 2));
 
-    container.innerHTML = selected
-      .map((prompt) => {
-        const escaped = escapeHtml(prompt);
-        return `
-      <button
-        type="button"
-        class="quick-action-btn px-3 py-1.5 text-xs bg-transparent hover:bg-surface-hover border border-border/40 hover:border-border-bright rounded-lg text-text-secondary hover:text-text transition cursor-pointer"
-        data-prompt="${escaped}"
-      >
-        ${escaped}
-      </button>
-    `;
-      })
-      .join("");
+    const fragment = document.createDocumentFragment();
 
-    container.querySelectorAll(".quick-action-btn").forEach((btn) => {
+    selected.forEach((prompt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className =
+        "quick-action-btn px-3 py-1.5 text-xs bg-transparent hover:bg-surface-hover border border-border/40 hover:border-border-bright rounded-lg text-text-secondary hover:text-text transition cursor-pointer";
+      btn.dataset.prompt = prompt;
+      btn.textContent = prompt;
+
       btn.addEventListener("click", () => {
-        const prompt = (btn as HTMLButtonElement).dataset.prompt;
         const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
-        if (prompt && promptInput) {
+        if (promptInput) {
           promptInput.value = prompt;
           this.updateQuickActionsVisibility();
           promptInput.focus();
         }
       });
+
+      fragment.appendChild(btn);
     });
+
+    container.innerHTML = "";
+    container.appendChild(fragment);
   }
 
   private handleGenerate = async () => {
@@ -157,7 +154,24 @@ export class GeneratorControls extends HTMLElement {
 
     if (!prompt) return;
 
-    const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
+    let svgsAsText: string[] = [];
+    if (this.referenceFiles.length > 0) {
+      const results = await Promise.allSettled(this.referenceFiles.map((file) => file.text()));
+      svgsAsText = results
+        .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+        .map((r) => r.value);
+
+      if (svgsAsText.length === 0) {
+        console.error("Failed to read any of the reference SVGs.");
+        return;
+      }
+
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.warn(`${failures.length} reference SVG(s) failed to load and were skipped.`);
+      }
+    }
+
     const variations = settingsRepository.getSettings().variations || 1;
 
     emitAppEvent(APP_EVENTS.START_GENERATION, {
