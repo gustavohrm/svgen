@@ -151,9 +151,17 @@ function renderTabs(state: SettingsState) {
   if (isModelsTab) {
     modelsPanel.classList.remove("hidden");
     usagePanel.classList.add("hidden");
+    modelsTabBtn.setAttribute("aria-selected", "true");
+    modelsTabBtn.setAttribute("tabindex", "0");
+    usageTabBtn.setAttribute("aria-selected", "false");
+    usageTabBtn.setAttribute("tabindex", "-1");
   } else {
     modelsPanel.classList.add("hidden");
     usagePanel.classList.remove("hidden");
+    modelsTabBtn.setAttribute("aria-selected", "false");
+    modelsTabBtn.setAttribute("tabindex", "-1");
+    usageTabBtn.setAttribute("aria-selected", "true");
+    usageTabBtn.setAttribute("tabindex", "0");
   }
 
   modelsTabBtn.className = `settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
@@ -432,12 +440,14 @@ function bindStaticEvents() {
 
   filterBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
-    filterDropdown.classList.toggle("hidden");
+    const isHidden = filterDropdown.classList.toggle("hidden");
+    filterBtn.setAttribute("aria-expanded", (!isHidden).toString());
   });
 
   document.addEventListener("click", (e) => {
     if (!filterBtn?.contains(e.target as Node)) {
       filterDropdown?.classList.add("hidden");
+      filterBtn?.setAttribute("aria-expanded", "false");
     }
   });
 
@@ -467,7 +477,9 @@ function attachDynamicEvents() {
       }
 
       const filterDropdown = container?.querySelector("#filter-dropdown") as HTMLElement;
+      const filterToggleBtn = container?.querySelector("#filter-btn");
       filterDropdown?.classList.add("hidden");
+      filterToggleBtn?.setAttribute("aria-expanded", "false");
 
       return;
     }

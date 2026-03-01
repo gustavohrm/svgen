@@ -13,10 +13,14 @@
     <main class="flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col min-h-0 overflow-hidden">
       <div id="settings-container" class="flex flex-col min-h-0 flex-1">
         <div class="mb-6 shrink-0">
-          <div class="inline-flex items-center rounded-xl bg-surface p-1 gap-1">
+          <div class="inline-flex items-center rounded-xl bg-surface p-1 gap-1" role="tablist">
             <button
               id="tab-models-btn"
               type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="models-panel"
+              tabindex="0"
               class="settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
             >
               Models
@@ -24,6 +28,10 @@
             <button
               id="tab-usage-btn"
               type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="usage-panel"
+              tabindex="-1"
               class="settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
             >
               Usage
@@ -31,7 +39,12 @@
           </div>
         </div>
 
-        <section id="usage-panel" class="mb-6 shrink-0 hidden">
+        <section
+          id="usage-panel"
+          class="mb-6 shrink-0 hidden"
+          role="tabpanel"
+          aria-labelledby="tab-usage-btn"
+        >
           <div class="border border-border/50 rounded-xl p-4 bg-surface/20">
             <div class="flex items-center justify-between gap-3 mb-3">
               <h3 class="text-sm font-semibold text-text tracking-wide uppercase">Usage</h3>
@@ -64,7 +77,12 @@
           </div>
         </section>
 
-        <section id="models-panel" class="flex flex-col min-h-0 flex-1">
+        <section
+          id="models-panel"
+          class="flex flex-col min-h-0 flex-1"
+          role="tabpanel"
+          aria-labelledby="tab-models-btn"
+        >
           <!-- Header -->
           <div class="flex items-center justify-between mb-2 shrink-0">
             <h2 class="text-xl font-semibold text-text tracking-tight">Models</h2>
@@ -112,6 +130,7 @@
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
+              <label for="model-search" class="sr-only">Search models</label>
               <input
                 type="text"
                 id="model-search"
@@ -124,6 +143,9 @@
             <div class="relative">
               <button
                 id="filter-btn"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="filter-dropdown"
                 class="flex items-center gap-2 px-4 py-2.5 border border-border/50 rounded-xl text-sm text-text-secondary hover:text-text hover:border-border transition-all cursor-pointer"
               >
                 <svg

@@ -217,7 +217,7 @@ describe("AiService", () => {
 
     const result = await service.generate(options);
 
-    expect(result).toBe("<svg>test</svg>");
+    expect(result.svg).toBe("<svg>test</svg>");
     expect(mockProviderRegistry.getProvider).toHaveBeenCalledWith("gcp");
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({

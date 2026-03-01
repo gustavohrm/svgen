@@ -3,6 +3,7 @@ import {
   AiProvider,
   GenerateOptions,
   ProviderGenerateResult,
+  TokenUsage,
 } from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { normalizePositiveInt } from "../../utils/number";
@@ -213,9 +214,14 @@ export class AiService {
 </generation_request>`;
   }
 
-  async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
+  async generate(
+    options: Omit<GenerateOptions, "apiKey">,
+  ): Promise<{ svg: string; usage?: TokenUsage }> {
     const result = await this.generateVariationSet(options, 1);
-    return result.svgs[0] || "";
+    return {
+      svg: result.svgs[0] || "",
+      usage: result.usage,
+    };
   }
 
   private async generateVariationSet(
