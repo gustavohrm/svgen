@@ -1,5 +1,5 @@
 import { APP_EVENTS } from "../constants/events";
-import { AiProviderId } from "../types";
+import { AiProviderId, TokenUsage } from "../types";
 
 export interface StartGenerationDetail {
   prompt: string;
@@ -14,6 +14,7 @@ export interface SvgResultsDetail {
   prompt?: string;
   model?: string;
   generatedAt?: number;
+  usage?: TokenUsage;
 }
 
 export interface AppEventMap {

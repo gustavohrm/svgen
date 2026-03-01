@@ -11,6 +11,15 @@ import {
 } from "../../constants/svg-css-policy";
 
 function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
+  const usage = {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    requestCount: 0,
+    providers: {},
+    updatedAt: undefined,
+  };
+
   return {
     apiKeys: [
       {
@@ -28,6 +37,7 @@ function makeTestSettings(overrides: Partial<AppSettings> = {}): AppSettings {
     systemPrompt: "",
     colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
     ...overrides,
+    usage: overrides.usage ?? usage,
   };
 }
 
@@ -42,7 +52,7 @@ describe("AiService", () => {
       id: "gcp",
       name: "GCP",
       configFields: [],
-      generate: vi.fn().mockResolvedValue(["<svg>test</svg>"]),
+      generate: vi.fn().mockResolvedValue({ svgs: ["<svg>test</svg>"] }),
       fetchModels: vi.fn().mockResolvedValue(["model1"]),
     } as any;
 
@@ -244,7 +254,10 @@ describe("AiService", () => {
   });
 
   it("should generate multiple SVGs in a single request", async () => {
-    (mockProvider.generate as any).mockResolvedValue(["<svg>test1</svg>", "<svg>test2</svg>"]);
+    (mockProvider.generate as any).mockResolvedValue({
+      svgs: ["<svg>test1</svg>", "<svg>test2</svg>"],
+      usage: { inputTokens: 80, outputTokens: 40, totalTokens: 120 },
+    });
     const options: Omit<GenerateOptions, "apiKey"> = {
       prompt: "draw a circle",
       model: "gemini-pro",
@@ -253,9 +266,10 @@ describe("AiService", () => {
 
     const results = await service.generateMultiple(options, 2);
 
-    expect(results).toHaveLength(2);
-    expect(results[0]).toBe("<svg>test1</svg>");
-    expect(results[1]).toBe("<svg>test2</svg>");
+    expect(results.svgs).toHaveLength(2);
+    expect(results.svgs[0]).toBe("<svg>test1</svg>");
+    expect(results.svgs[1]).toBe("<svg>test2</svg>");
+    expect(results.usage).toEqual({ inputTokens: 80, outputTokens: 40, totalTokens: 120 });
     expect(mockProvider.generate).toHaveBeenCalledTimes(1);
     expect(mockProvider.generate).toHaveBeenCalledWith(
       expect.objectContaining({

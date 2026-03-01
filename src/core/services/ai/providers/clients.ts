@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { buildGcpSvgVariationsSchema, buildSvgVariationsJsonSchema } from "../structured-output";
 import { normalizeSchemaCount } from "../../../utils/number";
+import type { TokenUsage } from "../../../types/index";
 
 type FetchLike = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -56,6 +57,13 @@ const openRouterGenerateResponseSchema = z.object({
         .optional(),
     }),
   ),
+  usage: z
+    .object({
+      prompt_tokens: z.number().int().nonnegative().optional(),
+      completion_tokens: z.number().int().nonnegative().optional(),
+      total_tokens: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 });
 
 const gcpModelsResponseSchema = z.object({
@@ -77,7 +85,84 @@ const gcpGenerateResponseSchema = z.object({
         .optional(),
     }),
   ),
+  usageMetadata: z
+    .object({
+      promptTokenCount: z.number().int().nonnegative().optional(),
+      candidatesTokenCount: z.number().int().nonnegative().optional(),
+      totalTokenCount: z.number().int().nonnegative().optional(),
+    })
+    .optional(),
 });
+
+function coalesceTotalTokens(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+}): number | undefined {
+  if (typeof usage.totalTokens === "number") {
+    return usage.totalTokens;
+  }
+
+  const hasInput = typeof usage.inputTokens === "number";
+  const hasOutput = typeof usage.outputTokens === "number";
+  if (hasInput || hasOutput) {
+    return (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+  }
+
+  return undefined;
+}
+
+function normalizeOpenRouterUsage(
+  payload: z.infer<typeof openRouterGenerateResponseSchema>,
+): TokenUsage | undefined {
+  const inputTokens = payload.usage?.prompt_tokens;
+  const outputTokens = payload.usage?.completion_tokens;
+  const totalTokens = coalesceTotalTokens({
+    inputTokens,
+    outputTokens,
+    totalTokens: payload.usage?.total_tokens,
+  });
+
+  if (
+    typeof inputTokens !== "number" &&
+    typeof outputTokens !== "number" &&
+    typeof totalTokens !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+  };
+}
+
+function normalizeGcpUsage(
+  payload: z.infer<typeof gcpGenerateResponseSchema>,
+): TokenUsage | undefined {
+  const inputTokens = payload.usageMetadata?.promptTokenCount;
+  const outputTokens = payload.usageMetadata?.candidatesTokenCount;
+  const totalTokens = coalesceTotalTokens({
+    inputTokens,
+    outputTokens,
+    totalTokens: payload.usageMetadata?.totalTokenCount,
+  });
+
+  if (
+    typeof inputTokens !== "number" &&
+    typeof outputTokens !== "number" &&
+    typeof totalTokens !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+  };
+}
 
 function formatRequestTarget(input: RequestInfo | URL): string {
   if (typeof input === "string") {
@@ -353,7 +438,7 @@ export interface OpenRouterClient {
     maxOutputTokens?: number;
     appOrigin: string;
     appName: string;
-  }): Promise<string[]>;
+  }): Promise<{ responses: string[]; usage?: TokenUsage }>;
 }
 
 export interface GoogleCloudClient {
@@ -367,7 +452,7 @@ export interface GoogleCloudClient {
     temperature?: number;
     topP?: number;
     maxOutputTokens?: number;
-  }): Promise<string[]>;
+  }): Promise<{ responses: string[]; usage?: TokenUsage }>;
 }
 
 /**
@@ -465,7 +550,7 @@ export class FetchOpenRouterClient implements OpenRouterClient {
     maxOutputTokens?: number;
     appOrigin: string;
     appName: string;
-  }): Promise<string[]> {
+  }): Promise<{ responses: string[]; usage?: TokenUsage }> {
     const endpoint = "https://openrouter.ai/api/v1/chat/completions";
     const headers = {
       "Content-Type": "application/json",
@@ -549,7 +634,12 @@ export class FetchOpenRouterClient implements OpenRouterClient {
     }
 
     const payload = openRouterGenerateResponseSchema.parse(await response.json());
-    return payload.choices.map((choice) => parseOpenRouterMessageContent(choice.message?.content));
+    return {
+      responses: payload.choices.map((choice) =>
+        parseOpenRouterMessageContent(choice.message?.content),
+      ),
+      usage: normalizeOpenRouterUsage(payload),
+    };
   }
 }
 
@@ -590,7 +680,7 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     temperature?: number;
     topP?: number;
     maxOutputTokens?: number;
-  }): Promise<string[]> {
+  }): Promise<{ responses: string[]; usage?: TokenUsage }> {
     const generateUrl = `https://generativelanguage.googleapis.com/v1beta/models/${options.model}:generateContent?key=${options.apiKey}`;
     const variationsSchema = buildGcpSvgVariationsSchema(normalizeSchemaCount(options.count));
 
@@ -675,6 +765,9 @@ export class FetchGoogleCloudClient implements GoogleCloudClient {
     }
 
     const parsed = gcpGenerateResponseSchema.parse(await response.json());
-    return parsed.candidates.map((candidate) => parseGoogleCandidateText(candidate));
+    return {
+      responses: parsed.candidates.map((candidate) => parseGoogleCandidateText(candidate)),
+      usage: normalizeGcpUsage(parsed),
+    };
   }
 }

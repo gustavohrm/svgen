@@ -6,6 +6,22 @@ import {
 } from "../../constants/color-palettes";
 import { createId } from "../../utils/id";
 
+export interface UsageCounters {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  requestCount: number;
+}
+
+export interface UsageProviderSnapshot extends UsageCounters {
+  models: Record<string, UsageCounters>;
+}
+
+export interface UsageSnapshot extends UsageCounters {
+  providers: Partial<Record<AiProviderId, UsageProviderSnapshot>>;
+  updatedAt?: number;
+}
+
 export interface ApiKeyItem {
   id: string;
   providerId: AiProviderId;
@@ -25,6 +41,24 @@ export interface AppSettings {
   colorPaletteId: ColorPaletteId;
   lastSelectedModel?: string;
   lastSelectedProviderId?: string;
+  usage: UsageSnapshot;
+}
+
+function createEmptyUsageCounters(): UsageCounters {
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    requestCount: 0,
+  };
+}
+
+function createEmptyUsageSnapshot(): UsageSnapshot {
+  return {
+    ...createEmptyUsageCounters(),
+    providers: {},
+    updatedAt: undefined,
+  };
 }
 
 const defaultSettings: AppSettings = {
@@ -36,6 +70,7 @@ const defaultSettings: AppSettings = {
   colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
   lastSelectedModel: undefined,
   lastSelectedProviderId: undefined,
+  usage: createEmptyUsageSnapshot(),
 };
 
 interface LegacySettingsPayload {
@@ -46,6 +81,7 @@ interface LegacySettingsPayload {
   gcpKey?: string;
   apiKeys?: unknown;
   activeKeys?: Record<string, string>;
+  usage?: unknown;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -65,10 +101,95 @@ function cloneApiKeyItem(key: ApiKeyItem): ApiKeyItem {
 }
 
 function cloneSettings(settings: AppSettings): AppSettings {
+  const providers = Object.fromEntries(
+    Object.entries(settings.usage.providers).map(([providerId, providerUsage]) => [
+      providerId,
+      {
+        ...providerUsage,
+        models: Object.fromEntries(
+          Object.entries(providerUsage.models).map(([model, modelUsage]) => [
+            model,
+            { ...modelUsage },
+          ]),
+        ),
+      },
+    ]),
+  ) as Partial<Record<AiProviderId, UsageProviderSnapshot>>;
+
   return {
     ...settings,
     apiKeys: settings.apiKeys.map((key) => cloneApiKeyItem(key)),
     activeKeys: { ...settings.activeKeys },
+    usage: {
+      ...settings.usage,
+      providers,
+    },
+  };
+}
+
+function sanitizeUsageCounterValue(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.trunc(value));
+}
+
+function normalizeUsageCounters(input: unknown): UsageCounters {
+  if (!isRecord(input)) {
+    return createEmptyUsageCounters();
+  }
+
+  return {
+    inputTokens: sanitizeUsageCounterValue(input.inputTokens),
+    outputTokens: sanitizeUsageCounterValue(input.outputTokens),
+    totalTokens: sanitizeUsageCounterValue(input.totalTokens),
+    requestCount: sanitizeUsageCounterValue(input.requestCount),
+  };
+}
+
+function normalizeUsageSnapshot(input: unknown): UsageSnapshot {
+  if (!isRecord(input)) {
+    return createEmptyUsageSnapshot();
+  }
+
+  const baseCounters = normalizeUsageCounters(input);
+  const normalizedProviders: Partial<Record<AiProviderId, UsageProviderSnapshot>> = {};
+  const providersRaw = isRecord(input.providers) ? input.providers : {};
+
+  for (const [providerId, providerRaw] of Object.entries(providersRaw)) {
+    if (providerId !== "gcp" && providerId !== "open-router") {
+      continue;
+    }
+
+    if (!isRecord(providerRaw)) {
+      continue;
+    }
+
+    const providerCounters = normalizeUsageCounters(providerRaw);
+    const modelsRaw = isRecord(providerRaw.models) ? providerRaw.models : {};
+    const models: Record<string, UsageCounters> = {};
+
+    for (const [model, modelUsage] of Object.entries(modelsRaw)) {
+      if (!model) {
+        continue;
+      }
+
+      models[model] = normalizeUsageCounters(modelUsage);
+    }
+
+    normalizedProviders[providerId as AiProviderId] = {
+      ...providerCounters,
+      models,
+    };
+  }
+
+  const updatedAt = sanitizeUsageCounterValue(input.updatedAt);
+
+  return {
+    ...baseCounters,
+    providers: normalizedProviders,
+    updatedAt: updatedAt > 0 ? updatedAt : undefined,
   };
 }
 
@@ -117,6 +238,7 @@ function normalizeSettings(input: Partial<AppSettings>): AppSettings {
       typeof input.lastSelectedProviderId === "string"
         ? input.lastSelectedProviderId
         : defaultSettings.lastSelectedProviderId,
+    usage: normalizeUsageSnapshot(input.usage),
   };
 }
 
@@ -132,6 +254,13 @@ export interface SettingsRepository {
   setTemperature(value: number): AppSettings;
   setSystemPrompt(value: string): AppSettings;
   setColorPaletteId(value: ColorPaletteId): AppSettings;
+  recordUsage(usage: {
+    providerId: AiProviderId;
+    model: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  }): AppSettings;
 }
 
 export class BrowserSettingsRepository implements SettingsRepository {
@@ -333,5 +462,56 @@ export class BrowserSettingsRepository implements SettingsRepository {
 
   setColorPaletteId(value: ColorPaletteId): AppSettings {
     return this.saveSettings({ colorPaletteId: value });
+  }
+
+  recordUsage(usage: {
+    providerId: AiProviderId;
+    model: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  }): AppSettings {
+    const current = this.getSettings();
+    const inputTokens = sanitizeUsageCounterValue(usage.inputTokens);
+    const outputTokens = sanitizeUsageCounterValue(usage.outputTokens);
+    const totalTokens =
+      typeof usage.totalTokens === "number" && Number.isFinite(usage.totalTokens)
+        ? Math.max(0, Math.trunc(usage.totalTokens))
+        : inputTokens + outputTokens;
+    const requestCount = 1;
+
+    const providerUsage = current.usage.providers[usage.providerId] ?? {
+      ...createEmptyUsageCounters(),
+      models: {},
+    };
+    const modelUsage = providerUsage.models[usage.model] ?? createEmptyUsageCounters();
+
+    const nextUsage: UsageSnapshot = {
+      inputTokens: current.usage.inputTokens + inputTokens,
+      outputTokens: current.usage.outputTokens + outputTokens,
+      totalTokens: current.usage.totalTokens + totalTokens,
+      requestCount: current.usage.requestCount + requestCount,
+      updatedAt: Date.now(),
+      providers: {
+        ...current.usage.providers,
+        [usage.providerId]: {
+          inputTokens: providerUsage.inputTokens + inputTokens,
+          outputTokens: providerUsage.outputTokens + outputTokens,
+          totalTokens: providerUsage.totalTokens + totalTokens,
+          requestCount: providerUsage.requestCount + requestCount,
+          models: {
+            ...providerUsage.models,
+            [usage.model]: {
+              inputTokens: modelUsage.inputTokens + inputTokens,
+              outputTokens: modelUsage.outputTokens + outputTokens,
+              totalTokens: modelUsage.totalTokens + totalTokens,
+              requestCount: modelUsage.requestCount + requestCount,
+            },
+          },
+        },
+      },
+    };
+
+    return this.saveSettings({ usage: nextUsage }, current);
   }
 }

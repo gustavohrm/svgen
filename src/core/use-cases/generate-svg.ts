@@ -1,5 +1,5 @@
 import { AppSettings } from "../modules/db/index";
-import { AiProviderId } from "../types";
+import { AiProviderId, ProviderGenerateResult, TokenUsage } from "../types";
 import { normalizePositiveInt } from "../utils/number";
 import { sanitizeSvgMarkup } from "../utils/svg-sanitizer";
 import { mapGenerationErrorToUserMessage } from "../services/ai/error-messages";
@@ -17,6 +17,7 @@ export interface GenerateSvgResult {
   prompt?: string;
   model?: string;
   generatedAt?: number;
+  usage?: TokenUsage;
 }
 
 export interface GenerationUiAdapter {
@@ -26,6 +27,13 @@ export interface GenerationUiAdapter {
 
 interface SettingsRepository {
   getSettings(): AppSettings;
+  recordUsage(usage: {
+    providerId: AiProviderId;
+    model: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+  }): AppSettings;
 }
 
 interface ProviderRegistry {
@@ -41,7 +49,7 @@ interface AiGenerationService {
       providerId: AiProviderId;
     },
     count: number,
-  ): Promise<string[]>;
+  ): Promise<ProviderGenerateResult>;
 }
 
 export const SANITIZER_GUIDANCE =
@@ -93,7 +101,7 @@ export class GenerateSvgUseCase {
       const requestedVariationsInput =
         Number.isFinite(variations) && variations > 0 ? variations : (settings.variations ?? 4);
       const requestedVariations = normalizePositiveInt(requestedVariationsInput);
-      const firstPassGeneratedSvgs = await this.aiService.generateMultiple(
+      const firstPassGeneration = await this.aiService.generateMultiple(
         {
           prompt,
           referenceSvgs,
@@ -102,6 +110,8 @@ export class GenerateSvgUseCase {
         },
         requestedVariations,
       );
+      let aggregatedUsage = mergeUsage(undefined, firstPassGeneration.usage);
+      const firstPassGeneratedSvgs = firstPassGeneration.svgs;
       const firstPassMerge = sanitizeAndMergeGeneratedSvgs(firstPassGeneratedSvgs);
       let safeResults = firstPassMerge.svgs;
       let initialSafeCount = safeResults.length;
@@ -126,7 +136,7 @@ export class GenerateSvgUseCase {
         });
         const refillReferences = mergeReferenceSvgs(referenceSvgs, safeResults);
 
-        refillPassGeneratedSvgs = await this.aiService.generateMultiple(
+        const refillGeneration = await this.aiService.generateMultiple(
           {
             prompt: refillPrompt,
             referenceSvgs: refillReferences,
@@ -135,6 +145,8 @@ export class GenerateSvgUseCase {
           },
           missingAfterFirstPass,
         );
+        aggregatedUsage = mergeUsage(aggregatedUsage, refillGeneration.usage);
+        refillPassGeneratedSvgs = refillGeneration.svgs;
 
         refillPassMerge = sanitizeAndMergeGeneratedSvgs(refillPassGeneratedSvgs, safeResults);
         safeResults = refillPassMerge.svgs;
@@ -188,13 +200,26 @@ export class GenerateSvgUseCase {
       }
 
       if (!hasWarnings && safeResults.length === requestedVariations) {
-        this.uiAdapter.notify({ type: "success", message: "SVGs generated successfully" });
+        this.uiAdapter.notify({
+          type: "success",
+          message: buildSuccessMessage(aggregatedUsage),
+        });
       }
+
+      this.settingsRepository.recordUsage({
+        providerId,
+        model,
+        inputTokens: aggregatedUsage?.inputTokens,
+        outputTokens: aggregatedUsage?.outputTokens,
+        totalTokens: aggregatedUsage?.totalTokens,
+      });
+
       return {
         svgs: safeResults,
         prompt,
         model,
         generatedAt: Date.now(),
+        usage: aggregatedUsage,
       };
     } catch (error: unknown) {
       const errorMessage = mapGenerationErrorToUserMessage(error, { providerId });
@@ -206,6 +231,68 @@ export class GenerateSvgUseCase {
       return { svgs: [] };
     }
   }
+}
+
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+function formatTokenCount(value: number | undefined): string {
+  if (typeof value !== "number") {
+    return "N/A";
+  }
+
+  return numberFormatter.format(value);
+}
+
+function buildSuccessMessage(usage: TokenUsage | undefined): string {
+  if (!usage) {
+    return "SVGs generated successfully";
+  }
+
+  return `SVGs generated successfully (${formatTokenCount(usage.inputTokens)} in / ${formatTokenCount(usage.outputTokens)} out)`;
+}
+
+function mergeUsage(
+  current: TokenUsage | undefined,
+  next: TokenUsage | undefined,
+): TokenUsage | undefined {
+  if (!current && !next) {
+    return undefined;
+  }
+
+  const inputTokens =
+    (typeof current?.inputTokens === "number" ? current.inputTokens : 0) +
+    (typeof next?.inputTokens === "number" ? next.inputTokens : 0);
+  const outputTokens =
+    (typeof current?.outputTokens === "number" ? current.outputTokens : 0) +
+    (typeof next?.outputTokens === "number" ? next.outputTokens : 0);
+  const totalTokensFromProviders =
+    (typeof current?.totalTokens === "number" ? current.totalTokens : 0) +
+    (typeof next?.totalTokens === "number" ? next.totalTokens : 0);
+
+  const hasInput =
+    typeof current?.inputTokens === "number" || typeof next?.inputTokens === "number";
+  const hasOutput =
+    typeof current?.outputTokens === "number" || typeof next?.outputTokens === "number";
+  const hasTotal =
+    typeof current?.totalTokens === "number" || typeof next?.totalTokens === "number";
+
+  const merged: TokenUsage = {};
+
+  if (hasInput) {
+    merged.inputTokens = inputTokens;
+  }
+
+  if (hasOutput) {
+    merged.outputTokens = outputTokens;
+  }
+
+  if (hasTotal) {
+    merged.totalTokens = totalTokensFromProviders;
+  } else if (hasInput || hasOutput) {
+    merged.totalTokens = inputTokens + outputTokens;
+  }
+
+  return merged;
 }
 
 /**

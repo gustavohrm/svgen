@@ -41,6 +41,39 @@
           Choose which models appear in your selector.
         </p>
 
+        <section id="usage-panel" class="mb-6 shrink-0">
+          <div class="border border-border/50 rounded-xl p-4 bg-surface/20">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-sm font-semibold text-text tracking-wide uppercase">Usage</h3>
+              <span id="usage-last-updated" class="text-xs text-text-muted">
+                No usage tracked yet
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Input tokens</p>
+                <p id="usage-input-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Output tokens</p>
+                <p id="usage-output-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Total tokens</p>
+                <p id="usage-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Requests</p>
+                <p id="usage-request-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+            </div>
+            <div id="usage-provider-breakdown" class="space-y-2"></div>
+            <p class="text-xs text-text-muted mt-3">
+              Token usage depends on provider support and may be partial for some requests.
+            </p>
+          </div>
+        </section>
+
         <!-- Controls: Search + Filter + Sort -->
         <div class="flex items-center gap-3 mb-4 shrink-0">
           <div class="relative flex-1">

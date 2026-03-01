@@ -13,12 +13,17 @@ describe("FetchOpenRouterClient", () => {
             },
           },
         ],
+        usage: {
+          prompt_tokens: 110,
+          completion_tokens: 60,
+          total_tokens: 170,
+        },
       }),
     } as Response);
 
     const client = new FetchOpenRouterClient(fetchMock);
 
-    await client.generate({
+    const result = await client.generate({
       prompt: "test",
       systemPrompt: "test",
       model: "openai/gpt-4.1-mini",
@@ -29,6 +34,9 @@ describe("FetchOpenRouterClient", () => {
       topP: 0.82,
       maxOutputTokens: 4096,
     });
+
+    expect(result.responses).toEqual([JSON.stringify({ svgs: ["<svg>ok</svg>"] })]);
+    expect(result.usage).toEqual({ inputTokens: 110, outputTokens: 60, totalTokens: 170 });
 
     const requestPayload = JSON.parse((fetchMock as any).mock.calls[0][1].body);
     expect(requestPayload.top_p).toBe(0.82);
@@ -50,12 +58,17 @@ describe("FetchGoogleCloudClient", () => {
             },
           },
         ],
+        usageMetadata: {
+          promptTokenCount: 90,
+          candidatesTokenCount: 40,
+          totalTokenCount: 130,
+        },
       }),
     } as Response);
 
     const client = new FetchGoogleCloudClient(fetchMock);
 
-    await client.generate({
+    const result = await client.generate({
       prompt: "test",
       systemPrompt: "test",
       model: "gemini-2.5-flash",
@@ -64,6 +77,9 @@ describe("FetchGoogleCloudClient", () => {
       topP: 0.81,
       maxOutputTokens: 5000,
     });
+
+    expect(result.responses).toEqual([JSON.stringify({ svgs: ["<svg>ok</svg>"] })]);
+    expect(result.usage).toEqual({ inputTokens: 90, outputTokens: 40, totalTokens: 130 });
 
     const requestPayload = JSON.parse((fetchMock as any).mock.calls[0][1].body);
     expect(requestPayload.generationConfig.topP).toBe(0.81);
@@ -102,7 +118,7 @@ describe("FetchGoogleCloudClient", () => {
       apiKey: "test-key",
     });
 
-    expect(result).toEqual([JSON.stringify({ svgs: ["<svg>ok</svg>"] })]);
+    expect(result.responses).toEqual([JSON.stringify({ svgs: ["<svg>ok</svg>"] })]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

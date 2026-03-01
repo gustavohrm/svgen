@@ -1,5 +1,6 @@
 import "../ui/components/app-header";
 import { AiProviderId } from "../core/types/index";
+import type { UsageProviderSnapshot, UsageSnapshot } from "../core/modules/db/index";
 import { createStore } from "../core/utils/store";
 import { escapeHtml } from "../core/utils/html-escape";
 import "../ui/components/api-keys-modal";
@@ -23,6 +24,105 @@ interface SettingsState {
   searchTerm: string;
   filterProvider: AiProviderId | "all";
   sortDirection: "asc" | "desc";
+}
+
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+function formatInteger(value: number): string {
+  return numberFormatter.format(value);
+}
+
+function formatTimestamp(value: number | undefined): string {
+  if (typeof value !== "number") {
+    return "No usage tracked yet";
+  }
+
+  return `Updated ${new Date(value).toLocaleString()}`;
+}
+
+function renderProviderUsageRows(usage: UsageSnapshot): string {
+  const providers = providerRegistry.getAllProviders();
+
+  const rows = providers
+    .map((provider) => {
+      const providerUsage = usage.providers[provider.id];
+      if (!providerUsage || providerUsage.requestCount === 0) {
+        return "";
+      }
+
+      const safeProviderName = escapeHtml(provider.name);
+      const safeProviderIcon = escapeHtml(provider.icon);
+      const modelRows = Object.entries(providerUsage.models)
+        .filter(([, modelUsage]) => modelUsage.requestCount > 0)
+        .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+        .slice(0, 5)
+        .map(([model, modelUsage]) => buildModelUsageRow(model, modelUsage))
+        .join("");
+
+      return `
+        <div class="rounded-lg border border-border/40 px-3 py-2.5">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-4 h-4 object-contain" />
+              <span class="text-sm font-medium text-text">${safeProviderName}</span>
+            </div>
+            <span class="text-xs text-text-muted">${formatInteger(providerUsage.requestCount)} req</span>
+          </div>
+          <div class="mt-1.5 text-xs text-text-muted">
+            ${formatInteger(providerUsage.inputTokens)} in / ${formatInteger(providerUsage.outputTokens)} out / ${formatInteger(providerUsage.totalTokens)} total
+          </div>
+          ${modelRows ? `<div class="mt-2 space-y-1">${modelRows}</div>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  if (!rows) {
+    return `<p class="text-xs text-text-muted">No provider usage yet.</p>`;
+  }
+
+  return rows;
+}
+
+function buildModelUsageRow(model: string, usage: UsageProviderSnapshot["models"][string]): string {
+  const safeModel = escapeHtml(model);
+  return `
+    <div class="flex items-center justify-between gap-2 rounded-md border border-border/30 px-2 py-1.5">
+      <span class="text-xs text-text-secondary truncate">${safeModel}</span>
+      <span class="text-[11px] text-text-muted shrink-0">${formatInteger(usage.totalTokens)} total</span>
+    </div>
+  `;
+}
+
+function renderUsage() {
+  if (!container) return;
+
+  const usageInputTotal = container.querySelector("#usage-input-total");
+  const usageOutputTotal = container.querySelector("#usage-output-total");
+  const usageTotal = container.querySelector("#usage-total");
+  const usageRequestTotal = container.querySelector("#usage-request-total");
+  const usageLastUpdated = container.querySelector("#usage-last-updated");
+  const usageProviderBreakdown = container.querySelector("#usage-provider-breakdown");
+
+  if (
+    !usageInputTotal ||
+    !usageOutputTotal ||
+    !usageTotal ||
+    !usageRequestTotal ||
+    !usageLastUpdated ||
+    !usageProviderBreakdown
+  ) {
+    return;
+  }
+
+  const usage = settingsRepository.getSettings().usage;
+
+  usageInputTotal.textContent = formatInteger(usage.inputTokens);
+  usageOutputTotal.textContent = formatInteger(usage.outputTokens);
+  usageTotal.textContent = formatInteger(usage.totalTokens);
+  usageRequestTotal.textContent = formatInteger(usage.requestCount);
+  usageLastUpdated.textContent = formatTimestamp(usage.updatedAt);
+  usageProviderBreakdown.innerHTML = renderProviderUsageRows(usage);
 }
 
 /* ── State ── */
@@ -253,6 +353,7 @@ function renderFilterDropdown(state: SettingsState) {
 
 /* ── Full render ── */
 function render(state: SettingsState = store.get()) {
+  renderUsage();
   renderModels(state);
   renderFilterDropdown(state);
 }
