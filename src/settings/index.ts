@@ -3,6 +3,7 @@ import { AiProviderId } from "../core/types/index";
 import type { UsageProviderSnapshot, UsageSnapshot } from "../core/modules/db/index";
 import { createStore } from "../core/utils/store";
 import { escapeHtml } from "../core/utils/html-escape";
+import DOMPurify from "dompurify";
 import "../ui/components/api-keys-modal";
 import { ApiKeysModal } from "../ui/components/api-keys-modal";
 import { appComposition } from "../core/app/composition-root";
