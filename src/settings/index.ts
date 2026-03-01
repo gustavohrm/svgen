@@ -408,8 +408,12 @@ function renderFilterDropdown(state: SettingsState) {
 function render(state: SettingsState = store.get()) {
   renderTabs(state);
   renderUsage();
-  renderModels(state);
-  renderFilterDropdown(state);
+
+  const isModelsPanelVisible = state.activeTab !== "usage";
+  if (isModelsPanelVisible) {
+    renderModels(state);
+    renderFilterDropdown(state);
+  }
 }
 
 /* ── Event Bindings ── */
@@ -446,6 +450,8 @@ function bindStaticEvents() {
   container.querySelector('[role="tablist"]')?.addEventListener("keydown", (e: Event) => {
     const keyboardEvent = e as KeyboardEvent;
     if (keyboardEvent.key !== "ArrowLeft" && keyboardEvent.key !== "ArrowRight") return;
+
+    keyboardEvent.preventDefault();
 
     const currentTab = store.get().activeTab;
     const nextTab = currentTab === "models" ? "usage" : "models";
