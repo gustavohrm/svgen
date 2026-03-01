@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppSettings } from "../modules/db";
-import { AiProviderId } from "../types";
+import { AiProviderId, ProviderGenerateResult } from "../types";
 import { GenerateSvgUseCase, GenerationUiAdapter } from "./generate-svg";
 
 describe("GenerateSvgUseCase", () => {
@@ -11,6 +11,13 @@ describe("GenerateSvgUseCase", () => {
 
   let settingsRepository: {
     getSettings: () => AppSettings;
+    recordUsage: (usage: {
+      providerId: AiProviderId;
+      model: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      totalTokens?: number;
+    }) => AppSettings;
   };
   let providerRegistry: {
     getProvider: (id: AiProviderId) => unknown;
@@ -24,7 +31,7 @@ describe("GenerateSvgUseCase", () => {
         providerId: AiProviderId;
       },
       count: number,
-    ) => Promise<string[]>;
+    ) => Promise<ProviderGenerateResult>;
   };
   let generateMultipleMock: ReturnType<
     typeof vi.fn<
@@ -36,7 +43,7 @@ describe("GenerateSvgUseCase", () => {
           providerId: AiProviderId;
         },
         count: number,
-      ) => Promise<string[]>
+      ) => Promise<ProviderGenerateResult>
     >
   >;
   let uiAdapter: GenerationUiAdapter;
@@ -60,7 +67,26 @@ describe("GenerateSvgUseCase", () => {
         temperature: 0.7,
         systemPrompt: "",
         colorPaletteId: "monochrome",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          requestCount: 0,
+          providers: {},
+          updatedAt: undefined,
+        },
       }),
+      recordUsage: vi
+        .fn<
+          (usage: {
+            providerId: AiProviderId;
+            model: string;
+            inputTokens?: number;
+            outputTokens?: number;
+            totalTokens?: number;
+          }) => AppSettings
+        >()
+        .mockImplementation(() => settingsRepository.getSettings()),
     };
 
     providerRegistry = {
@@ -77,9 +103,9 @@ describe("GenerateSvgUseCase", () => {
             providerId: AiProviderId;
           },
           count: number,
-        ) => Promise<string[]>
+        ) => Promise<ProviderGenerateResult>
       >()
-      .mockResolvedValue([validSvg]);
+      .mockResolvedValue({ svgs: [validSvg] });
     aiService = {
       generateMultiple: generateMultipleMock,
     };
@@ -93,7 +119,7 @@ describe("GenerateSvgUseCase", () => {
   });
 
   it("returns shaped successful payload and emits success notification", async () => {
-    generateMultipleMock.mockResolvedValue([validSvg, validSvgAlt]);
+    generateMultipleMock.mockResolvedValue({ svgs: [validSvg, validSvgAlt] });
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -124,6 +150,34 @@ describe("GenerateSvgUseCase", () => {
     });
   });
 
+  it("includes token usage in success notification and persists usage", async () => {
+    generateMultipleMock.mockResolvedValue({
+      svgs: [validSvg],
+      usage: { inputTokens: 321, outputTokens: 123, totalTokens: 444 },
+    });
+
+    const result = await useCase.execute({
+      prompt: "draw a badge",
+      referenceSvgs: [],
+      model: "gemini-2.5-flash",
+      providerId: "gcp",
+      variations: 1,
+    });
+
+    expect(result.usage).toEqual({ inputTokens: 321, outputTokens: 123, totalTokens: 444 });
+    expect(uiAdapter.notify).toHaveBeenCalledWith({
+      type: "success",
+      message: "SVGs generated successfully (321 in / 123 out)",
+    });
+    expect(settingsRepository.recordUsage).toHaveBeenCalledWith({
+      providerId: "gcp",
+      model: "gemini-2.5-flash",
+      inputTokens: 321,
+      outputTokens: 123,
+      totalTokens: 444,
+    });
+  });
+
   it("navigates to settings when provider key is missing", async () => {
     vi.mocked(settingsRepository.getSettings).mockReturnValue({
       apiKeys: [],
@@ -132,6 +186,14 @@ describe("GenerateSvgUseCase", () => {
       temperature: 0.7,
       systemPrompt: "",
       colorPaletteId: "monochrome",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 0,
+        providers: {},
+        updatedAt: undefined,
+      },
     });
 
     const result = await useCase.execute({
@@ -153,8 +215,8 @@ describe("GenerateSvgUseCase", () => {
 
   it("warns when provider returns fewer variations than requested", async () => {
     generateMultipleMock
-      .mockResolvedValueOnce([validSvg])
-      .mockResolvedValueOnce([validSvgAlt, validSvgThird]);
+      .mockResolvedValueOnce({ svgs: [validSvg] })
+      .mockResolvedValueOnce({ svgs: [validSvgAlt, validSvgThird] });
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -196,8 +258,8 @@ describe("GenerateSvgUseCase", () => {
 
   it("triggers refill when sanitization blocks first-pass output", async () => {
     generateMultipleMock
-      .mockResolvedValueOnce([validSvg, unsafeSvg])
-      .mockResolvedValueOnce([validSvgAlt]);
+      .mockResolvedValueOnce({ svgs: [validSvg, unsafeSvg] })
+      .mockResolvedValueOnce({ svgs: [validSvgAlt] });
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -239,7 +301,9 @@ describe("GenerateSvgUseCase", () => {
   });
 
   it("uses at most one refill pass and warns when still under target", async () => {
-    generateMultipleMock.mockResolvedValueOnce([validSvg]).mockResolvedValueOnce([]);
+    generateMultipleMock.mockResolvedValueOnce({ svgs: [validSvg] }).mockResolvedValueOnce({
+      svgs: [],
+    });
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -260,8 +324,8 @@ describe("GenerateSvgUseCase", () => {
 
   it("dedupes across passes and caps final output to requested count", async () => {
     generateMultipleMock
-      .mockResolvedValueOnce([validSvg, validSvg])
-      .mockResolvedValueOnce([validSvg, validSvgAlt]);
+      .mockResolvedValueOnce({ svgs: [validSvg, validSvg] })
+      .mockResolvedValueOnce({ svgs: [validSvg, validSvgAlt] });
 
     const result = await useCase.execute({
       prompt: "draw a badge",
@@ -320,6 +384,14 @@ describe("GenerateSvgUseCase", () => {
       temperature: 0.7,
       systemPrompt: "",
       colorPaletteId: "monochrome",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 0,
+        providers: {},
+        updatedAt: undefined,
+      },
     });
 
     generateMultipleMock.mockRejectedValue(

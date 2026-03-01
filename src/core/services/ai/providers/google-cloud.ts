@@ -3,6 +3,7 @@ import {
   ProviderGenerateOptions,
   ProviderConfigField,
   AiProviderId,
+  ProviderGenerateResult,
 } from "../../../types/index";
 import { FetchGoogleCloudClient, GoogleCloudClient } from "./clients";
 import { parseSvgVariationsFromResponses } from "../structured-output";
@@ -33,7 +34,7 @@ export class GoogleCloudProvider implements AiProvider {
     }
   }
 
-  async generate(options: ProviderGenerateOptions): Promise<string[]> {
+  async generate(options: ProviderGenerateOptions): Promise<ProviderGenerateResult> {
     const {
       prompt,
       systemPrompt,
@@ -49,7 +50,7 @@ export class GoogleCloudProvider implements AiProvider {
       throw new Error("GCP (Gemini) API key is required");
     }
 
-    const responses = await this.client.generate({
+    const result = await this.client.generate({
       prompt,
       systemPrompt,
       model,
@@ -60,6 +61,9 @@ export class GoogleCloudProvider implements AiProvider {
       maxOutputTokens,
     });
 
-    return parseSvgVariationsFromResponses(responses, count);
+    return {
+      svgs: parseSvgVariationsFromResponses(result.responses, count),
+      usage: result.usage,
+    };
   }
 }

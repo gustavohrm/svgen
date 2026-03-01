@@ -1,5 +1,16 @@
 export type AiProviderId = "open-router" | "gcp";
 
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+}
+
+export interface ProviderGenerateResult {
+  svgs: string[];
+  usage?: TokenUsage;
+}
+
 export interface ProviderGenerateOptions {
   prompt: string;
   systemPrompt: string;
@@ -23,7 +34,7 @@ export interface AiProvider {
   name: string;
   icon: string;
   configFields: ProviderConfigField[];
-  generate(options: ProviderGenerateOptions): Promise<string[]>;
+  generate(options: ProviderGenerateOptions): Promise<ProviderGenerateResult>;
   fetchModels(apiKey: string): Promise<string[]>;
 }
 

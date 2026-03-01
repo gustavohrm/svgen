@@ -20,6 +20,14 @@ describe("BrowserSettingsRepository", () => {
     expect(settings.systemPrompt).toBe("");
     expect(settings.colorPaletteId).toBe(DEFAULT_COLOR_PALETTE_ID);
     expect(settings.colorPaletteId).toBe("ai-choice");
+    expect(settings.usage).toEqual({
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      requestCount: 0,
+      providers: {},
+      updatedAt: undefined,
+    });
   });
 
   it("saves and retrieves settings", () => {
@@ -175,6 +183,12 @@ describe("BrowserSettingsRepository", () => {
       temperature: 0.7,
       systemPrompt: "",
       colorPaletteId: DEFAULT_COLOR_PALETTE_ID,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 0,
+      },
     });
     expect(warnSpy).toHaveBeenCalled();
 
@@ -225,5 +239,34 @@ describe("BrowserSettingsRepository", () => {
     const settings = repository.getSettings();
 
     expect(settings.activeKeys.gcp).toBe("legacy-gcp");
+  });
+
+  it("records token usage by provider and model", () => {
+    repository.recordUsage({
+      providerId: "gcp",
+      model: "gemini-2.5-flash",
+      inputTokens: 120,
+      outputTokens: 30,
+    });
+
+    const settings = repository.getSettings();
+    expect(settings.usage.inputTokens).toBe(120);
+    expect(settings.usage.outputTokens).toBe(30);
+    expect(settings.usage.totalTokens).toBe(150);
+    expect(settings.usage.requestCount).toBe(1);
+    expect(settings.usage.providers.gcp?.requestCount).toBe(1);
+    expect(settings.usage.providers.gcp?.models["gemini-2.5-flash"].totalTokens).toBe(150);
+  });
+
+  it("increments request count even when token usage is missing", () => {
+    repository.recordUsage({
+      providerId: "open-router",
+      model: "openai/gpt-4.1-mini",
+    });
+
+    const settings = repository.getSettings();
+    expect(settings.usage.requestCount).toBe(1);
+    expect(settings.usage.totalTokens).toBe(0);
+    expect(settings.usage.providers["open-router"]?.requestCount).toBe(1);
   });
 });

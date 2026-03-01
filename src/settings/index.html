@@ -12,144 +12,220 @@
     <app-header></app-header>
     <main class="flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col min-h-0 overflow-hidden">
       <div id="settings-container" class="flex flex-col min-h-0 flex-1">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-2 shrink-0">
-          <h2 class="text-xl font-semibold text-text tracking-tight">Models</h2>
-          <button
-            id="open-keys-modal-btn"
-            class="p-2 rounded-lg text-text hover:bg-surface transition-all cursor-pointer"
-            title="API Keys"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="size-6"
+        <div class="mb-6 shrink-0">
+          <div class="inline-flex items-center rounded-xl bg-surface p-1 gap-1" role="tablist">
+            <button
+              id="tab-models-btn"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="models-panel"
+              tabindex="0"
+              class="settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
             >
-              <path
-                d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"
-              />
-              <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
-            </svg>
-          </button>
+              Models
+            </button>
+            <button
+              id="tab-usage-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="usage-panel"
+              tabindex="-1"
+              class="settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all"
+            >
+              Usage
+            </button>
+          </div>
         </div>
 
-        <p class="text-sm text-text-muted mb-6 shrink-0">
-          Choose which models appear in your selector.
-        </p>
-
-        <!-- Controls: Search + Filter + Sort -->
-        <div class="flex items-center gap-3 mb-4 shrink-0">
-          <div class="relative flex-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              id="model-search"
-              placeholder="Search models..."
-              class="w-full bg-transparent border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
-            />
+        <section
+          id="usage-panel"
+          class="mb-6 shrink-0 hidden"
+          role="tabpanel"
+          aria-labelledby="tab-usage-btn"
+        >
+          <div class="border border-border/50 rounded-xl p-4 bg-surface/20">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-sm font-semibold text-text tracking-wide uppercase">Usage</h3>
+              <span id="usage-last-updated" class="text-xs text-text-muted">
+                No usage tracked yet
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Input tokens</p>
+                <p id="usage-input-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Output tokens</p>
+                <p id="usage-output-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Total tokens</p>
+                <p id="usage-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+              <div class="rounded-lg border border-border/40 px-3 py-2">
+                <p class="text-[11px] text-text-muted uppercase tracking-wider">Requests</p>
+                <p id="usage-request-total" class="text-sm font-semibold text-text">0</p>
+              </div>
+            </div>
+            <div id="usage-provider-breakdown" class="space-y-2"></div>
+            <p class="text-xs text-text-muted mt-3">
+              Token usage depends on provider support and may be partial for some requests.
+            </p>
           </div>
+        </section>
 
-          <!-- Filter Dropdown -->
-          <div class="relative">
+        <section
+          id="models-panel"
+          class="flex flex-col min-h-0 flex-1"
+          role="tabpanel"
+          aria-labelledby="tab-models-btn"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-2 shrink-0">
+            <h2 class="text-xl font-semibold text-text tracking-tight">Models</h2>
             <button
-              id="filter-btn"
-              class="flex items-center gap-2 px-4 py-2.5 border border-border/50 rounded-xl text-sm text-text-secondary hover:text-text hover:border-border transition-all cursor-pointer"
+              id="open-keys-modal-btn"
+              class="p-2 rounded-lg text-text hover:bg-surface transition-all cursor-pointer"
+              title="API Keys"
             >
               <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
+                class="size-6"
               >
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              <span id="filter-label">All Providers</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path d="m6 9 6 6 6-6" />
+                <path
+                  d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"
+                />
+                <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
               </svg>
             </button>
+          </div>
+
+          <p class="text-sm text-text-muted mb-6 shrink-0">
+            Choose which models appear in your selector.
+          </p>
+
+          <!-- Controls: Search + Filter + Sort -->
+          <div class="flex items-center gap-3 mb-4 shrink-0">
+            <div class="relative flex-1">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+              <label for="model-search" class="sr-only">Search models</label>
+              <input
+                type="text"
+                id="model-search"
+                placeholder="Search models..."
+                class="w-full bg-transparent border border-border/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-text placeholder:text-text-muted outline-none focus:border-border transition-all"
+              />
+            </div>
+
+            <!-- Filter Dropdown -->
+            <div class="relative">
+              <button
+                id="filter-btn"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+                aria-controls="filter-dropdown"
+                class="flex items-center gap-2 px-4 py-2.5 border border-border/50 rounded-xl text-sm text-text-secondary hover:text-text hover:border-border transition-all cursor-pointer"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                </svg>
+                <span id="filter-label">All Providers</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div
+                id="filter-dropdown"
+                class="hidden absolute right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-lg py-1 z-20 min-w-45"
+              >
+                <!-- populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Models Table (scrollable) -->
+          <div
+            class="border border-border/50 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col"
+          >
             <div
-              id="filter-dropdown"
-              class="hidden absolute right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-lg py-1 z-20 min-w-45"
+              id="models-table-header"
+              class="flex items-center gap-4 px-5 py-3 border-b border-border/50 bg-surface/50 shrink-0"
+            >
+              <!-- Populated dynamically -->
+            </div>
+            <div
+              id="models-table"
+              class="divide-y divide-border/30 overflow-y-auto flex-1 min-h-0 custom-scrollbar"
             >
               <!-- populated dynamically -->
             </div>
           </div>
-        </div>
 
-        <!-- Models Table (scrollable) -->
-        <div
-          class="border border-border/50 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col"
-        >
           <div
-            id="models-table-header"
-            class="flex items-center gap-4 px-5 py-3 border-b border-border/50 bg-surface/50 shrink-0"
+            id="empty-state"
+            class="hidden flex-col items-center justify-center py-16 text-center flex-1"
           >
-            <!-- Populated dynamically -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="text-text-muted/30 mb-3"
+            >
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+            </svg>
+            <p class="text-sm text-text-muted">
+              No models found. Add an API key and sync models first.
+            </p>
           </div>
-          <div
-            id="models-table"
-            class="divide-y divide-border/30 overflow-y-auto flex-1 min-h-0 custom-scrollbar"
-          >
-            <!-- populated dynamically -->
-          </div>
-        </div>
-
-        <div
-          id="empty-state"
-          class="hidden flex-col items-center justify-center py-16 text-center flex-1"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="40"
-            height="40"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="text-text-muted/30 mb-3"
-          >
-            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
-          </svg>
-          <p class="text-sm text-text-muted">
-            No models found. Add an API key and sync models first.
-          </p>
-        </div>
+        </section>
 
         <!-- API Keys Modal Component -->
         <api-keys-modal></api-keys-modal>

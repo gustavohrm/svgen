@@ -60,7 +60,7 @@ describe("OpenRouterProvider", () => {
       temperature: 1.1,
     });
 
-    expect(result).toEqual(["<svg>test-1</svg>", "<svg>test-2</svg>"]);
+    expect(result.svgs).toEqual(["<svg>test-1</svg>", "<svg>test-2</svg>"]);
 
     const fetchCall = (global.fetch as any).mock.calls[0];
     const payload = JSON.parse(fetchCall[1].body);
@@ -89,6 +89,11 @@ describe("OpenRouterProvider", () => {
               },
             },
           ],
+          usage: {
+            prompt_tokens: 120,
+            completion_tokens: 45,
+            total_tokens: 165,
+          },
         }),
     });
 
@@ -100,7 +105,8 @@ describe("OpenRouterProvider", () => {
       count: 2,
     });
 
-    expect(result).toEqual(["<svg>from-choice-1</svg>", "<svg>from-choice-2</svg>"]);
+    expect(result.svgs).toEqual(["<svg>from-choice-1</svg>", "<svg>from-choice-2</svg>"]);
+    expect(result.usage).toEqual({ inputTokens: 120, outputTokens: 45, totalTokens: 165 });
   });
 
   it("should fall back to plain prompt when structured output is unsupported", async () => {
@@ -135,7 +141,7 @@ describe("OpenRouterProvider", () => {
       count: 1,
     });
 
-    expect(result).toEqual(["<svg>fallback</svg>"]);
+    expect(result.svgs).toEqual(["<svg>fallback</svg>"]);
     expect((global.fetch as any).mock.calls).toHaveLength(2);
 
     const firstPayload = JSON.parse((global.fetch as any).mock.calls[0][1].body);
@@ -189,7 +195,7 @@ describe("OpenRouterProvider", () => {
       count: 1,
     });
 
-    expect(result).toEqual(["<svg>fallback-timeout-retry</svg>"]);
+    expect(result.svgs).toEqual(["<svg>fallback-timeout-retry</svg>"]);
     expect((global.fetch as any).mock.calls).toHaveLength(3);
   });
 

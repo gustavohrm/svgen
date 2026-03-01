@@ -56,6 +56,14 @@ describe("settings page model selection workflows", () => {
       temperature: 0.7,
       systemPrompt: "",
       colorPaletteId: "monochrome",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 0,
+        providers: {},
+        updatedAt: undefined,
+      },
     });
 
     document.body.innerHTML = `
@@ -135,6 +143,14 @@ describe("settings page model selection workflows", () => {
       temperature: 0.7,
       systemPrompt: "",
       colorPaletteId: "monochrome",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestCount: 0,
+        providers: {},
+        updatedAt: undefined,
+      },
     });
 
     await importSettingsPageModule();

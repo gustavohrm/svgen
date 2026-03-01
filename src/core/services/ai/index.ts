@@ -1,4 +1,10 @@
-import { AiProviderId, AiProvider, GenerateOptions } from "../../types/index";
+import {
+  AiProviderId,
+  AiProvider,
+  GenerateOptions,
+  ProviderGenerateResult,
+  TokenUsage,
+} from "../../types/index";
 import { AppSettings } from "../../modules/db/index";
 import { normalizePositiveInt } from "../../utils/number";
 import { buildSvgVariationsJsonSchema } from "./structured-output";
@@ -208,15 +214,20 @@ export class AiService {
 </generation_request>`;
   }
 
-  async generate(options: Omit<GenerateOptions, "apiKey">): Promise<string> {
-    const results = await this.generateVariationSet(options, 1);
-    return results[0] || "";
+  async generate(
+    options: Omit<GenerateOptions, "apiKey">,
+  ): Promise<{ svg: string; usage?: TokenUsage }> {
+    const result = await this.generateVariationSet(options, 1);
+    return {
+      svg: result.svgs[0] || "",
+      usage: result.usage,
+    };
   }
 
   private async generateVariationSet(
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
-  ): Promise<string[]> {
+  ): Promise<ProviderGenerateResult> {
     const normalizedCount = normalizePositiveInt(count);
     const settings = this.settingsRepository.getSettings();
     const activeKeyId = settings.activeKeys[options.providerId];
@@ -257,7 +268,7 @@ export class AiService {
   async generateMultiple(
     options: Omit<GenerateOptions, "apiKey">,
     count: number,
-  ): Promise<string[]> {
+  ): Promise<ProviderGenerateResult> {
     return this.generateVariationSet(options, count);
   }
 }

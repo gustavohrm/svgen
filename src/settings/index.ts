@@ -1,7 +1,9 @@
 import "../ui/components/app-header";
 import { AiProviderId } from "../core/types/index";
+import type { UsageProviderSnapshot, UsageSnapshot } from "../core/modules/db/index";
 import { createStore } from "../core/utils/store";
 import { escapeHtml } from "../core/utils/html-escape";
+import DOMPurify from "dompurify";
 import "../ui/components/api-keys-modal";
 import { ApiKeysModal } from "../ui/components/api-keys-modal";
 import { appComposition } from "../core/app/composition-root";
@@ -23,6 +25,114 @@ interface SettingsState {
   searchTerm: string;
   filterProvider: AiProviderId | "all";
   sortDirection: "asc" | "desc";
+  activeTab: "models" | "usage";
+}
+
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+function formatInteger(value: number): string {
+  return numberFormatter.format(value);
+}
+
+function formatTimestamp(value: number | undefined): string {
+  if (typeof value !== "number") {
+    return "No usage tracked yet";
+  }
+
+  return `Updated ${new Date(value).toLocaleString("en-US")}`;
+}
+
+function renderProviderUsageRows(usage: UsageSnapshot): string {
+  const providers = providerRegistry.getAllProviders();
+
+  const rows = providers
+    .map((provider) => {
+      const providerUsage = usage.providers[provider.id];
+      if (!providerUsage || providerUsage.requestCount === 0) {
+        return "";
+      }
+
+      const safeProviderName = escapeHtml(provider.name);
+      const safeProviderIcon = escapeHtml(provider.icon);
+      const allModels = Object.entries(providerUsage.models).filter(
+        ([, modelUsage]) => modelUsage.requestCount > 0,
+      );
+      const modelRows = allModels
+        .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
+        .slice(0, 5)
+        .map(([model, modelUsage]) => buildModelUsageRow(model, modelUsage))
+        .join("");
+
+      const truncationCount = allModels.length - 5;
+      const truncationNote =
+        truncationCount > 0
+          ? `<div class="mt-1 text-[10px] text-text-muted/60 text-center italic">…and ${truncationCount} more models not shown</div>`
+          : "";
+
+      return `
+        <div class="rounded-lg border border-border/40 px-3 py-2.5">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <img src="${safeProviderIcon}" alt="${safeProviderName}" class="w-4 h-4 object-contain" />
+              <span class="text-sm font-medium text-text">${safeProviderName}</span>
+            </div>
+            <span class="text-xs text-text-muted">${formatInteger(providerUsage.requestCount)} req</span>
+          </div>
+          <div class="mt-1.5 text-xs text-text-muted">
+            ${formatInteger(providerUsage.inputTokens)} in / ${formatInteger(providerUsage.outputTokens)} out / ${formatInteger(providerUsage.totalTokens)} total
+          </div>
+          ${modelRows ? `<div class="mt-2 space-y-1">${modelRows}${truncationNote}</div>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+
+  if (!rows) {
+    return `<p class="text-xs text-text-muted">No provider usage yet.</p>`;
+  }
+
+  return rows;
+}
+
+function buildModelUsageRow(model: string, usage: UsageProviderSnapshot["models"][string]): string {
+  const safeModel = escapeHtml(model);
+  return `
+    <div class="flex items-center justify-between gap-2 rounded-md border border-border/30 px-2 py-1.5">
+      <span class="text-xs text-text-secondary truncate">${safeModel}</span>
+      <span class="text-[11px] text-text-muted shrink-0">${formatInteger(usage.totalTokens)} total</span>
+    </div>
+  `;
+}
+
+function renderUsage() {
+  if (!container) return;
+
+  const usageInputTotal = container.querySelector("#usage-input-total");
+  const usageOutputTotal = container.querySelector("#usage-output-total");
+  const usageTotal = container.querySelector("#usage-total");
+  const usageRequestTotal = container.querySelector("#usage-request-total");
+  const usageLastUpdated = container.querySelector("#usage-last-updated");
+  const usageProviderBreakdown = container.querySelector("#usage-provider-breakdown");
+
+  if (
+    !usageInputTotal ||
+    !usageOutputTotal ||
+    !usageTotal ||
+    !usageRequestTotal ||
+    !usageLastUpdated ||
+    !usageProviderBreakdown
+  ) {
+    return;
+  }
+
+  const usage = settingsRepository.getSettings().usage;
+
+  usageInputTotal.textContent = formatInteger(usage.inputTokens);
+  usageOutputTotal.textContent = formatInteger(usage.outputTokens);
+  usageTotal.textContent = formatInteger(usage.totalTokens);
+  usageRequestTotal.textContent = formatInteger(usage.requestCount);
+  usageLastUpdated.textContent = formatTimestamp(usage.updatedAt);
+  usageProviderBreakdown.innerHTML = DOMPurify.sanitize(renderProviderUsageRows(usage));
 }
 
 /* ── State ── */
@@ -30,7 +140,51 @@ const store = createStore<SettingsState>({
   searchTerm: "",
   filterProvider: "all",
   sortDirection: "asc",
+  activeTab: "models",
 });
+
+function renderTabs(state: SettingsState) {
+  if (!container) return;
+
+  const modelsTabBtn = container.querySelector("#tab-models-btn");
+  const usageTabBtn = container.querySelector("#tab-usage-btn");
+  const modelsPanel = container.querySelector("#models-panel");
+  const usagePanel = container.querySelector("#usage-panel");
+
+  if (!modelsTabBtn || !usageTabBtn || !modelsPanel || !usagePanel) {
+    return;
+  }
+
+  const isModelsTab = state.activeTab === "models";
+
+  if (isModelsTab) {
+    modelsPanel.classList.remove("hidden");
+    usagePanel.classList.add("hidden");
+    modelsTabBtn.setAttribute("aria-selected", "true");
+    modelsTabBtn.setAttribute("tabindex", "0");
+    usageTabBtn.setAttribute("aria-selected", "false");
+    usageTabBtn.setAttribute("tabindex", "-1");
+  } else {
+    modelsPanel.classList.add("hidden");
+    usagePanel.classList.remove("hidden");
+    modelsTabBtn.setAttribute("aria-selected", "false");
+    modelsTabBtn.setAttribute("tabindex", "-1");
+    usageTabBtn.setAttribute("aria-selected", "true");
+    usageTabBtn.setAttribute("tabindex", "0");
+  }
+
+  modelsTabBtn.className = `settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+    isModelsTab
+      ? "bg-background text-text"
+      : "text-text-muted hover:text-text hover:bg-surface-hover/50"
+  }`;
+
+  usageTabBtn.className = `settings-tab-btn rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+    !isModelsTab
+      ? "bg-background text-text"
+      : "text-text-muted hover:text-text hover:bg-surface-hover/50"
+  }`;
+}
 
 /* ── Helpers ── */
 function getAllModels(): ModelEntry[] {
@@ -253,8 +407,14 @@ function renderFilterDropdown(state: SettingsState) {
 
 /* ── Full render ── */
 function render(state: SettingsState = store.get()) {
-  renderModels(state);
-  renderFilterDropdown(state);
+  renderTabs(state);
+  const isUsageVisible = state.activeTab === "usage";
+  if (isUsageVisible) {
+    renderUsage();
+  } else {
+    renderModels(state);
+    renderFilterDropdown(state);
+  }
 }
 
 /* ── Event Bindings ── */
@@ -275,18 +435,49 @@ function bindStaticEvents() {
     store.set({ searchTerm: (e.target as HTMLInputElement).value });
   });
 
+  container.querySelector("#tab-models-btn")?.addEventListener("click", () => {
+    if (store.get().activeTab !== "models") {
+      store.set({ activeTab: "models" });
+    }
+  });
+
+  container.querySelector("#tab-usage-btn")?.addEventListener("click", () => {
+    if (store.get().activeTab !== "usage") {
+      store.set({ activeTab: "usage" });
+    }
+  });
+
+  // Tab keyboard navigation
+  container.querySelector('[role="tablist"]')?.addEventListener("keydown", (e: Event) => {
+    const keyboardEvent = e as KeyboardEvent;
+    if (keyboardEvent.key !== "ArrowLeft" && keyboardEvent.key !== "ArrowRight") return;
+
+    keyboardEvent.preventDefault();
+
+    const currentTab = store.get().activeTab;
+    const nextTab = currentTab === "models" ? "usage" : "models";
+
+    store.set({ activeTab: nextTab });
+    const nextBtn = container?.querySelector(`#tab-${nextTab}-btn`) as HTMLElement;
+    nextBtn?.focus();
+  });
+
   // Filter dropdown toggle
   const filterBtn = container.querySelector("#filter-btn");
-  const filterDropdown = container.querySelector("#filter-dropdown") as HTMLElement;
+  const filterDropdown = container.querySelector("#filter-dropdown");
 
   filterBtn?.addEventListener("click", (e) => {
     e.stopPropagation();
-    filterDropdown.classList.toggle("hidden");
+    if (!(filterDropdown instanceof HTMLElement)) return;
+
+    const isHidden = filterDropdown.classList.toggle("hidden");
+    filterBtn.setAttribute("aria-expanded", (!isHidden).toString());
   });
 
   document.addEventListener("click", (e) => {
     if (!filterBtn?.contains(e.target as Node)) {
       filterDropdown?.classList.add("hidden");
+      filterBtn?.setAttribute("aria-expanded", "false");
     }
   });
 
@@ -316,7 +507,9 @@ function attachDynamicEvents() {
       }
 
       const filterDropdown = container?.querySelector("#filter-dropdown") as HTMLElement;
+      const filterToggleBtn = container?.querySelector("#filter-btn");
       filterDropdown?.classList.add("hidden");
+      filterToggleBtn?.setAttribute("aria-expanded", "false");
 
       return;
     }

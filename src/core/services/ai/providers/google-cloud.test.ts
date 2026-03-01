@@ -70,7 +70,7 @@ describe("GoogleCloudProvider", () => {
       temperature: 0.3,
     });
 
-    expect(result).toEqual(["<svg>gcp-test-1</svg>", "<svg>gcp-test-2</svg>"]);
+    expect(result.svgs).toEqual(["<svg>gcp-test-1</svg>", "<svg>gcp-test-2</svg>"]);
 
     const fetchCall = (global.fetch as any).mock.calls[0];
     const payload = JSON.parse(fetchCall[1].body);
@@ -107,6 +107,11 @@ describe("GoogleCloudProvider", () => {
               },
             },
           ],
+          usageMetadata: {
+            promptTokenCount: 220,
+            candidatesTokenCount: 80,
+            totalTokenCount: 300,
+          },
         }),
     });
 
@@ -118,7 +123,8 @@ describe("GoogleCloudProvider", () => {
       count: 2,
     });
 
-    expect(result).toEqual(["<svg>candidate-1</svg>", "<svg>candidate-2</svg>"]);
+    expect(result.svgs).toEqual(["<svg>candidate-1</svg>", "<svg>candidate-2</svg>"]);
+    expect(result.usage).toEqual({ inputTokens: 220, outputTokens: 80, totalTokens: 300 });
   });
 
   it("should retry without structured output when model does not support schema", async () => {
@@ -157,7 +163,7 @@ describe("GoogleCloudProvider", () => {
       count: 1,
     });
 
-    expect(result).toEqual(["<svg>fallback</svg>"]);
+    expect(result.svgs).toEqual(["<svg>fallback</svg>"]);
     expect((global.fetch as any).mock.calls).toHaveLength(2);
 
     const firstPayload = JSON.parse((global.fetch as any).mock.calls[0][1].body);
