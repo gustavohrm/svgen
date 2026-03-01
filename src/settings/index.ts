@@ -53,12 +53,20 @@ function renderProviderUsageRows(usage: UsageSnapshot): string {
 
       const safeProviderName = escapeHtml(provider.name);
       const safeProviderIcon = escapeHtml(provider.icon);
-      const modelRows = Object.entries(providerUsage.models)
-        .filter(([, modelUsage]) => modelUsage.requestCount > 0)
+      const allModels = Object.entries(providerUsage.models).filter(
+        ([, modelUsage]) => modelUsage.requestCount > 0,
+      );
+      const modelRows = allModels
         .sort((a, b) => b[1].totalTokens - a[1].totalTokens)
         .slice(0, 5)
         .map(([model, modelUsage]) => buildModelUsageRow(model, modelUsage))
         .join("");
+
+      const truncationCount = allModels.length - 5;
+      const truncationNote =
+        truncationCount > 0
+          ? `<div class="mt-1 text-[10px] text-text-muted/60 text-center italic">…and ${truncationCount} more models not shown</div>`
+          : "";
 
       return `
         <div class="rounded-lg border border-border/40 px-3 py-2.5">
@@ -72,7 +80,7 @@ function renderProviderUsageRows(usage: UsageSnapshot): string {
           <div class="mt-1.5 text-xs text-text-muted">
             ${formatInteger(providerUsage.inputTokens)} in / ${formatInteger(providerUsage.outputTokens)} out / ${formatInteger(providerUsage.totalTokens)} total
           </div>
-          ${modelRows ? `<div class="mt-2 space-y-1">${modelRows}</div>` : ""}
+          ${modelRows ? `<div class="mt-2 space-y-1">${modelRows}${truncationNote}</div>` : ""}
         </div>
       `;
     })
@@ -432,6 +440,19 @@ function bindStaticEvents() {
     if (store.get().activeTab !== "usage") {
       store.set({ activeTab: "usage" });
     }
+  });
+
+  // Tab keyboard navigation
+  container.querySelector('[role="tablist"]')?.addEventListener("keydown", (e: Event) => {
+    const keyboardEvent = e as KeyboardEvent;
+    if (keyboardEvent.key !== "ArrowLeft" && keyboardEvent.key !== "ArrowRight") return;
+
+    const currentTab = store.get().activeTab;
+    const nextTab = currentTab === "models" ? "usage" : "models";
+
+    store.set({ activeTab: nextTab });
+    const nextBtn = container?.querySelector(`#tab-${nextTab}-btn`) as HTMLElement;
+    nextBtn?.focus();
   });
 
   // Filter dropdown toggle
