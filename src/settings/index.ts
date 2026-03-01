@@ -131,7 +131,7 @@ function renderUsage() {
   usageTotal.textContent = formatInteger(usage.totalTokens);
   usageRequestTotal.textContent = formatInteger(usage.requestCount);
   usageLastUpdated.textContent = formatTimestamp(usage.updatedAt);
-  usageProviderBreakdown.innerHTML = renderProviderUsageRows(usage);
+  usageProviderBreakdown.innerHTML = DOMPurify.sanitize(renderProviderUsageRows(usage));
 }
 
 /* ── State ── */
