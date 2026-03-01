@@ -38,7 +38,7 @@ function formatTimestamp(value: number | undefined): string {
     return "No usage tracked yet";
   }
 
-  return `Updated ${new Date(value).toLocaleString()}`;
+  return `Updated ${new Date(value).toLocaleString("en-US")}`;
 }
 
 function renderProviderUsageRows(usage: UsageSnapshot): string {
