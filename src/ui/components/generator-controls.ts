@@ -148,39 +148,54 @@ export class GeneratorControls extends HTMLElement {
     if (!promptInput || this.isGenerating) return;
 
     const prompt = promptInput.value.trim();
+    if (!prompt) return;
+
     const selector = this.querySelector("#model-selector") as ModelDropdown | null;
     const model = selector?.selectedModel;
     const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
 
-    if (!prompt) return;
+    // Set local isGenerating immediately to prevent re-entrancy during async prep
+    this.isGenerating = true;
 
-    let svgsAsText: string[] = [];
-    if (this.referenceFiles.length > 0) {
-      const results = await Promise.allSettled(this.referenceFiles.map((file) => file.text()));
-      svgsAsText = results
-        .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-        .map((r) => r.value);
-
-      if (svgsAsText.length === 0) {
-        console.error("Failed to read any of the reference SVGs.");
-        return;
-      }
-
-      const failures = results.filter((r) => r.status === "rejected");
-      if (failures.length > 0) {
-        console.warn(`${failures.length} reference SVG(s) failed to load and were skipped.`);
-      }
+    // Trigger UI state immediately for better feedback
+    const generateBtn = this.querySelector("#generate-btn") as HTMLButtonElement | null;
+    if (generateBtn) {
+      setGenerateButtonLoading(generateBtn);
     }
 
-    const variations = settingsRepository.getSettings().variations || 1;
+    try {
+      let svgsAsText: string[] = [];
+      if (this.referenceFiles.length > 0) {
+        const results = await Promise.allSettled(this.referenceFiles.map((file) => file.text()));
+        svgsAsText = results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((r) => r.value);
 
-    emitAppEvent(APP_EVENTS.START_GENERATION, {
-      prompt,
-      referenceSvgs: svgsAsText,
-      model,
-      providerId,
-      variations,
-    });
+        if (svgsAsText.length === 0) {
+          console.error("Failed to read any of the reference SVGs.");
+          this.handleGenerationFinished();
+          return;
+        }
+
+        const failures = results.filter((r) => r.status === "rejected");
+        if (failures.length > 0) {
+          console.warn(`${failures.length} reference SVG(s) failed to load and were skipped.`);
+        }
+      }
+
+      const variations = settingsRepository.getSettings().variations || 1;
+
+      emitAppEvent(APP_EVENTS.START_GENERATION, {
+        prompt,
+        referenceSvgs: svgsAsText,
+        model,
+        providerId,
+        variations,
+      });
+    } catch (error) {
+      console.error("Error during generation preparation:", error);
+      this.handleGenerationFinished();
+    }
   };
 
   constructor() {
