@@ -411,10 +411,7 @@ function render(state: SettingsState = store.get()) {
   const isUsageVisible = state.activeTab === "usage";
   if (isUsageVisible) {
     renderUsage();
-  }
-
-  const isModelsPanelVisible = state.activeTab !== "usage";
-  if (isModelsPanelVisible) {
+  } else {
     renderModels(state);
     renderFilterDropdown(state);
   }
