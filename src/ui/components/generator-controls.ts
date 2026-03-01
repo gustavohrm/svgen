@@ -85,6 +85,14 @@ export class GeneratorControls extends HTMLElement {
     this.updateQuickActionsVisibility();
   };
 
+  private fisherYatesShuffle<T>(array: T[]): T[] {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
   private updateQuickActionsVisibility() {
     const container = this.querySelector("#quick-actions-container") as HTMLDivElement | null;
     const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
@@ -107,7 +115,7 @@ export class GeneratorControls extends HTMLElement {
     if (!container) return;
 
     // Pick 4-5 random prompts
-    const shuffled = [...QUICK_ACTION_PROMPTS].sort(() => 0.5 - Math.random());
+    const shuffled = this.fisherYatesShuffle([...QUICK_ACTION_PROMPTS]);
     const selected = shuffled.slice(0, 4 + Math.floor(Math.random() * 2));
 
     container.innerHTML = selected
@@ -172,7 +180,7 @@ export class GeneratorControls extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.unsubscribeEvents.forEach((u) => u());
+    for (const u of this.unsubscribeEvents) u();
     this.unsubscribeEvents = [];
     document.removeEventListener("click", this.handleDocumentClick);
     this.removeEventListener("click", this._onClick);
