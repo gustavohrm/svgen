@@ -1,5 +1,5 @@
 import { APP_EVENTS } from "../../core/constants/events";
-import { emitAppEvent } from "../../core/events/app-events";
+import { emitAppEvent, onAppEvent } from "../../core/events/app-events";
 import type { AiProviderId } from "../../core/types";
 import { ModelDropdown } from "./model-dropdown";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/services/ai/index";
@@ -20,13 +20,17 @@ import {
 } from "./generator-controls.settings";
 import { isColorPaletteId } from "../../core/constants/color-palettes";
 import { updatePaletteSelectionUi } from "./generator-controls.palette";
+import { QUICK_ACTION_PROMPTS } from "../../core/constants/quick-actions";
+import { escapeHtml } from "../../core/utils/html-escape";
 
 const settingsRepository = appComposition.settingsRepository;
 
 export class GeneratorControls extends HTMLElement {
   private referenceFiles: File[] = [];
   private isGenerating: boolean = false;
+  private hasResults: boolean = false;
   private attachmentsRenderToken = 0;
+  private unsubscribeEvents: Array<() => void> = [];
 
   private handleDocumentClick = (e: Event) => {
     const colorPaletteBtn = this.querySelector("#color-palette-btn") as HTMLButtonElement | null;
@@ -69,6 +73,87 @@ export class GeneratorControls extends HTMLElement {
     }
   };
 
+  private handleSVGenResults = () => {
+    this.hasResults = true;
+    this.updateQuickActionsVisibility();
+  };
+
+  private updateQuickActionsVisibility() {
+    const container = this.querySelector("#quick-actions-container") as HTMLDivElement | null;
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    if (!container || !promptInput) return;
+
+    const isInputEmpty = promptInput.value.trim().length === 0;
+
+    if (this.hasResults || !isInputEmpty) {
+      container.classList.add("hidden");
+    } else {
+      container.classList.remove("hidden");
+      if (container.children.length === 0) {
+        this.renderQuickActions();
+      }
+    }
+  }
+
+  private renderQuickActions() {
+    const container = this.querySelector("#quick-actions-container") as HTMLDivElement | null;
+    if (!container) return;
+
+    // Pick 4-5 random prompts
+    const shuffled = [...QUICK_ACTION_PROMPTS].sort(() => 0.5 - Math.random());
+    const selected = shuffled.slice(0, 4 + Math.floor(Math.random() * 2));
+
+    container.innerHTML = selected
+      .map((prompt) => {
+        const escaped = escapeHtml(prompt);
+        return `
+      <button
+        type="button"
+        class="quick-action-btn px-3 py-1.5 text-xs bg-transparent hover:bg-surface-hover border border-border/40 hover:border-border-bright rounded-lg text-text-secondary hover:text-text transition cursor-pointer"
+        data-prompt="${escaped}"
+      >
+        ${escaped}
+      </button>
+    `;
+      })
+      .join("");
+
+    container.querySelectorAll(".quick-action-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const prompt = (btn as HTMLButtonElement).dataset.prompt;
+        const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+        if (prompt && promptInput) {
+          promptInput.value = prompt;
+          this.updateQuickActionsVisibility();
+          promptInput.focus();
+        }
+      });
+    });
+  }
+
+  private handleGenerate = async () => {
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    if (!promptInput || this.isGenerating) return;
+
+    const prompt = promptInput.value.trim();
+    const selector = this.querySelector("#model-selector") as ModelDropdown | null;
+    const model = selector?.selectedModel;
+    const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
+
+    if (!prompt) return;
+
+    const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
+    const variations = settingsRepository.getSettings().variations || 1;
+
+    emitAppEvent(APP_EVENTS.START_GENERATION, {
+      prompt,
+      referenceSvgs: svgsAsText,
+      model,
+      providerId,
+      variations,
+    });
+  };
+
   constructor() {
     super();
   }
@@ -76,11 +161,11 @@ export class GeneratorControls extends HTMLElement {
   connectedCallback() {
     this.render();
     this.attachEvents();
+    this.updateQuickActionsVisibility();
   }
 
   disconnectedCallback() {
-    window.removeEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.removeEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    this.unsubscribeEvents.forEach((u) => u());
     document.removeEventListener("click", this.handleDocumentClick);
   }
 
@@ -298,6 +383,11 @@ export class GeneratorControls extends HTMLElement {
       }
     });
 
+    const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
+    promptInput?.addEventListener("input", () => {
+      this.updateQuickActionsVisibility();
+    });
+
     document.addEventListener("click", this.handleDocumentClick);
 
     // File uploads
@@ -329,35 +419,21 @@ export class GeneratorControls extends HTMLElement {
     });
 
     // Generation Submit
-    this.addEventListener("click", async (e) => {
+    this.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("#generate-btn");
-      if (!btn) return;
-
-      const promptInput = this.querySelector("#prompt-input") as HTMLTextAreaElement | null;
-      if (!promptInput || this.isGenerating) return;
-
-      const prompt = promptInput.value.trim();
-      const selector = this.querySelector("#model-selector") as ModelDropdown | null;
-      const model = selector?.selectedModel;
-      const providerId = (selector?.providerId || undefined) as AiProviderId | undefined;
-
-      if (!prompt) return;
-
-      const svgsAsText = await Promise.all(this.referenceFiles.map((file) => file.text()));
-      const variations = settingsRepository.getSettings().variations || 1;
-
-      emitAppEvent(APP_EVENTS.START_GENERATION, {
-        prompt,
-        referenceSvgs: svgsAsText,
-        model,
-        providerId,
-        variations,
-      });
+      if (btn) {
+        void this.handleGenerate();
+      }
     });
 
-    // Subscribing to global events generated by index.ts Orchestrator
-    window.addEventListener(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted);
-    window.addEventListener(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished);
+    // Subscribing to global events
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_STARTED, this.handleGenerationStarted),
+    );
+    this.unsubscribeEvents.push(
+      onAppEvent(APP_EVENTS.GENERATION_FINISHED, this.handleGenerationFinished),
+    );
+    this.unsubscribeEvents.push(onAppEvent(APP_EVENTS.SVGEN_RESULTS, this.handleSVGenResults));
   }
 }
 
